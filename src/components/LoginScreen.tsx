@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Eye, EyeOff, Lock, User, AlertCircle, Shield } from 'lucide-react';
 
 interface LoginScreenProps {
-  onLogin: (username: string, password: string) => string | null;
+  onLogin: (username: string, password: string) => Promise<string | null> | string | null;
 }
 
 const EASE_SMOOTH = [0.16, 1, 0.3, 1] as const;
@@ -13,19 +13,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     const trimmedUser = username.trim();
     if (!trimmedUser || !password) {
       setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
       return;
     }
-    const err = onLogin(trimmedUser, password);
-    if (err) {
-      setError(err);
-    } else {
-      setError(null);
+    setSubmitting(true);
+    try {
+      const err = await onLogin(trimmedUser, password);
+      if (err) {
+        setError(err);
+      } else {
+        setError(null);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 

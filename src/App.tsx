@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { Cloud, X } from 'lucide-react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { AdminPanel } from './components/AdminPanel';
 import { CloudStorageModal } from './components/CloudStorageModal';
@@ -11,6 +12,7 @@ import { QuizFlow } from './components/QuizFlow';
 import { TopicsView } from './components/TopicsView';
 import { DEFAULT_ACCOUNTS } from './data/defaultData';
 import {
+  BOOTSTRAPPED_ADMIN_EMAIL,
   FIREBASE_PROJECT_ID,
   FIRESTORE_DATABASE_ID,
   auth,
@@ -21,9 +23,12 @@ import { CloudStorageState, MainTab, QuizAttempt, Topic, UserAccount } from './t
 import {
   checkIsCloudAdmin,
   createEmptyCloudTracker,
+  hashUnitPassword,
+  mergeAndSyncOnConnect,
   pushAllLocalDataToFirestore,
   saveSingleAttemptToFirestore,
   subscribeToCloudData,
+  subscribeToPublicUnitData,
   syncAccountsToFirestore,
   syncAttemptsDiffToFirestore,
   syncTopicsToFirestore,
@@ -40,9 +45,15 @@ import {
 } from './utils/storage';
 
 const EASE_SMOOTH = [0.16, 1, 0.3, 1] as const;
+const CONNECT_POPUP_TIMEOUT_MS = 25000;
 
 function extractFirebaseCode(raw: unknown): string {
-  if (raw && typeof raw === 'object' && 'code' in raw && typeof (raw as { code?: unknown }).code === 'string') {
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    'code' in raw &&
+    typeof (raw as { code?: unknown }).code === 'string'
+  ) {
     return (raw as { code: string }).code;
   }
   const msg = raw instanceof Error ? raw.message : String(raw);
@@ -54,16 +65,16 @@ function formatCloudErrorMessage(raw: unknown): string {
   const msg = raw instanceof Error ? raw.message : String(raw);
   const code = extractFirebaseCode(raw);
 
+  if (code === 'auth/popup-timeout' || msg.includes('auth/popup-timeout')) {
+    return 'Cửa sổ đăng nhập Google phản hồi quá lâu hoặc đã bị đóng mà trình duyệt không gửi tín hiệu về. Vui lòng bấm kết nối lại, kiểm tra trình duyệt không chặn cửa sổ bật lên (popup), hoặc mở trang bằng trình duyệt độc lập.';
+  }
   if (msg.includes("Free daily read units per project (free tier database)")) {
     return `Đã vượt hạn mức đọc miễn phí hôm nay. Bạn có thể xem hoặc nâng cấp tại: https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/databases/${FIRESTORE_DATABASE_ID}/data?openUpgradeDialog=true`;
   }
   if (msg.includes('Quota exceeded') || code.includes('resource-exhausted')) {
     return 'Hạn mức sử dụng cơ sở dữ liệu hôm nay đã hết và sẽ tự đặt lại vào ngày mai.';
   }
-  if (
-    code === 'auth/unauthorized-domain' ||
-    msg.includes('auth/unauthorized-domain')
-  ) {
+  if (code === 'auth/unauthorized-domain' || msg.includes('auth/unauthorized-domain')) {
     const host = typeof window !== 'undefined' ? window.location.hostname : '';
     return `Tên miền "${host}" chưa được cấp phép đăng nhập Google trong Firebase. Hãy mở Firebase Console (https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/settings) -> Authorized domains -> thêm tên miền "${host}" rồi thử lại.`;
   }
@@ -100,7 +111,7 @@ function formatCloudErrorMessage(raw: unknown): string {
     msg.includes('Missing or insufficient permissions') ||
     code.includes('permission-denied')
   ) {
-    return 'Tài khoản Google này chưa đủ quyền ghi vào mục quản trị dữ liệu này (permission-denied).';
+    return `Tài khoản Google này chưa đủ quyền ghi vào mục quản trị dữ liệu này (permission-denied). Để đồng bộ Tài khoản & Bộ đề, hãy đăng nhập bằng tài khoản Quản trị (${BOOTSTRAPPED_ADMIN_EMAIL}).`;
   }
   if (msg.includes('failed-precondition') || msg.includes('requires an index')) {
     return 'Truy vấn cơ sở dữ liệu cần chỉ mục (index) hoặc cấu hình bổ sung trên Firestore.';
@@ -120,6 +131,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<MainTab>('topics');
   const [activeQuizTopic, setActiveQuizTopic] = useState<Topic | null>(null);
   const [showCloudModal, setShowCloudModal] = useState(false);
+  const [dismissedCloudBanner, setDismissedCloudBanner] = useState(false);
 
   // Firebase Auth & Firestore Cloud Sync state
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -141,8 +153,10 @@ export default function App() {
   const accountsRef = useRef(accounts);
   const topicsRef = useRef(topics);
   const attemptsRef = useRef(attempts);
-  const seededRef = useRef({ accounts: false, topics: false, attempts: false });
-  const isSeedingRef = useRef(false);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const activeWriteCountRef = useRef(0);
+  const connectAttemptRef = useRef(0);
+  const connectTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     accountsRef.current = accounts;
@@ -156,8 +170,52 @@ export default function App() {
     attemptsRef.current = attempts;
   }, [attempts]);
 
+  useEffect(() => {
+    return () => {
+      if (connectTimeoutRef.current !== null) {
+        window.clearTimeout(connectTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const currentUser =
     accounts.find((a) => a.id === currentUserId && a.active) || null;
+
+  // Serialize all Firestore writes in strict FIFO order so topics always finish before attempts
+  const enqueueCloudWrite = useCallback((task: () => Promise<void>) => {
+    activeWriteCountRef.current += 1;
+    setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
+
+    const next = writeQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          await task();
+          setCloudState((prev) => ({
+            ...prev,
+            cloudAccountCount: trackerRef.current.accountIds.size,
+            cloudTopicCount: trackerRef.current.topicIds.size,
+            cloudAttemptCount: trackerRef.current.attemptIds.size,
+            lastSyncedAt: new Date().toISOString(),
+            error: null,
+          }));
+        } catch (err) {
+          console.error('Auto-sync write failed:', err);
+          setCloudState((prev) => ({
+            ...prev,
+            error: formatCloudErrorMessage(err),
+          }));
+        } finally {
+          activeWriteCountRef.current = Math.max(0, activeWriteCountRef.current - 1);
+          if (activeWriteCountRef.current === 0) {
+            setCloudState((prev) => ({ ...prev, syncing: false }));
+          }
+        }
+      });
+
+    writeQueueRef.current = next;
+    return next;
+  }, []);
 
   // Cross-tab localStorage sync
   useEffect(() => {
@@ -173,13 +231,16 @@ export default function App() {
   // Listen to Firebase Auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (connectTimeoutRef.current !== null) {
+        window.clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+
       if (!user || !user.emailVerified) {
         setFirebaseUser(null);
         trackerRef.current = createEmptyCloudTracker();
-        seededRef.current = { accounts: false, topics: false, attempts: false };
-        isSeedingRef.current = false;
-        setHonorEntries([]);
-        setCloudState({
+        setCloudState((prev) => ({
+          ...prev,
           authReady: true,
           connected: false,
           userEmail: null,
@@ -188,10 +249,7 @@ export default function App() {
           syncing: false,
           lastSyncedAt: null,
           error: null,
-          cloudAccountCount: 0,
-          cloudTopicCount: 0,
-          cloudAttemptCount: 0,
-        });
+        }));
         return;
       }
 
@@ -218,192 +276,332 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Attach Firestore onSnapshot listeners ONLY when Firebase Auth is ready & user is authenticated
+  // Public real-time Firestore subscription on ALL student/guest devices (NO Google Sign-In required!)
+  // Automatically pulls live Topics, Questions, Hashed Account Directory, and Honor Entries from Firestore.
+  useEffect(() => {
+    if (cloudState.connected) {
+      return;
+    }
+
+    let cancelled = false;
+    const publicTracker = createEmptyCloudTracker();
+    trackerRef.current = publicTracker;
+
+    const unsubscribePublic = subscribeToPublicUnitData({
+      tracker: publicTracker,
+      onTopics: (cloudTopics) => {
+        if (cancelled || cloudTopics.length === 0) return;
+        setTopics(cloudTopics);
+        saveTopics(cloudTopics);
+        setCloudState((prev) => ({
+          ...prev,
+          cloudTopicCount: cloudTopics.length,
+        }));
+      },
+      onDirectoryAccounts: (dirAccounts) => {
+        if (cancelled || dirAccounts.length === 0) return;
+        void (async () => {
+          const prevList = accountsRef.current;
+          const prevById = new Map(prevList.map((a) => [a.id, a]));
+          const prevByLower = new Map(prevList.map((a) => [a.username.toLowerCase(), a]));
+
+          const nextAccounts: UserAccount[] = [];
+          for (const dir of dirAccounts) {
+            const localMatch = prevById.get(dir.id) || prevByLower.get(dir.usernameLower);
+            let preservedPassword = '';
+            if (localMatch && localMatch.password) {
+              const localHash = await hashUnitPassword(dir.username, localMatch.password);
+              if (localHash === dir.passwordHash) {
+                preservedPassword = localMatch.password;
+              }
+            }
+            nextAccounts.push({
+              id: dir.id,
+              username: dir.username,
+              password: preservedPassword,
+              passwordHash: dir.passwordHash,
+              fullName: dir.fullName,
+              defaultUnit: dir.defaultUnit,
+              role: dir.role,
+              active: dir.active,
+              createdAt: dir.createdAt,
+              updatedAt: dir.updatedAt,
+            });
+          }
+
+          if (cancelled) return;
+
+          const hasRootAdmin = nextAccounts.some((a) => a.username.toLowerCase() === 'admin');
+          const finalAccounts = hasRootAdmin
+            ? nextAccounts
+            : [DEFAULT_ACCOUNTS[0], ...nextAccounts];
+
+          setAccounts(finalAccounts);
+          saveAccounts(finalAccounts);
+          setCloudState((prev) => ({
+            ...prev,
+            cloudAccountCount: finalAccounts.length,
+          }));
+        })();
+      },
+      onHonorEntries: (entries) => {
+        if (cancelled) return;
+        setHonorEntries(entries);
+        setCloudState((prev) => ({
+          ...prev,
+          cloudAttemptCount: entries.length,
+        }));
+      },
+      onError: (errMsg) => {
+        console.warn('Public unit sync listener:', errMsg);
+      },
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribePublic();
+    };
+  }, [cloudState.connected]);
+
+  // Step 1 on Google connect: Deterministic 2-way merge & auto-push -> Step 2: Authenticated Live onSnapshot
   useEffect(() => {
     if (!cloudState.authReady || !cloudState.connected || !firebaseUser) {
       return;
     }
 
+    let cancelled = false;
+    let unsubscribeListeners: (() => void) | null = null;
     const tracker = createEmptyCloudTracker();
     trackerRef.current = tracker;
-    seededRef.current = { accounts: false, topics: false, attempts: false };
-    isSeedingRef.current = false;
     const isAdmin = cloudState.isCloudAdmin;
 
-    const unsubscribe = subscribeToCloudData({
-      user: firebaseUser,
-      isCloudAdmin: isAdmin,
-      tracker,
-      onAccounts: (cloudAccounts) => {
-        if (isSeedingRef.current) return;
-        if (cloudAccounts.length > 0) {
-          seededRef.current.accounts = true;
-          const hasRootAdmin = cloudAccounts.some(
-            (a) => a.username.toLowerCase() === 'admin'
-          );
-          const merged = hasRootAdmin
-            ? cloudAccounts
-            : [DEFAULT_ACCOUNTS[0], ...cloudAccounts];
-          setAccounts(merged);
-          saveAccounts(merged);
-          setCloudState((prev) => ({
-            ...prev,
-            cloudAccountCount: merged.length,
-            lastSyncedAt: new Date().toISOString(),
-          }));
-        }
-      },
-      onTopics: (cloudTopics) => {
-        if (isSeedingRef.current) return;
-        if (cloudTopics.length > 0) {
-          seededRef.current.topics = true;
-          setTopics(cloudTopics);
-          saveTopics(cloudTopics);
-          setCloudState((prev) => ({
-            ...prev,
-            cloudTopicCount: cloudTopics.length,
-            lastSyncedAt: new Date().toISOString(),
-          }));
-        }
-      },
-      onAttempts: (cloudAttempts) => {
-        if (isSeedingRef.current) return;
+    const initializeSync = async () => {
+      setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
+      try {
+        const merged = await mergeAndSyncOnConnect({
+          user: firebaseUser,
+          isCloudAdmin: isAdmin,
+          localAccounts: accountsRef.current,
+          localTopics: topicsRef.current,
+          localAttempts: attemptsRef.current,
+          defaultAdminAccount: DEFAULT_ACCOUNTS[0],
+          tracker,
+        });
+
+        if (cancelled) return;
+
         if (isAdmin) {
-          if (cloudAttempts.length > 0) {
-            seededRef.current.attempts = true;
-            setAttempts(cloudAttempts);
-            saveAttempts(cloudAttempts);
-          } else if (seededRef.current.attempts) {
-            setAttempts([]);
-            saveAttempts([]);
-          }
-          setCloudState((prev) => ({
-            ...prev,
-            cloudAttemptCount: cloudAttempts.length,
-            lastSyncedAt: new Date().toISOString(),
-          }));
-        } else {
-          const byId = new Map<string, QuizAttempt>();
-          for (const localAtt of attemptsRef.current) byId.set(localAtt.id, localAtt);
-          for (const cloudAtt of cloudAttempts) byId.set(cloudAtt.id, cloudAtt);
-          const merged = Array.from(byId.values()).sort(
-            (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
-          );
-          setAttempts(merged);
-          saveAttempts(merged);
-          setCloudState((prev) => ({
-            ...prev,
-            cloudAttemptCount: cloudAttempts.length,
-            lastSyncedAt: new Date().toISOString(),
-          }));
+          setAccounts(merged.accounts);
+          saveAccounts(merged.accounts);
         }
-      },
-      onHonorEntries: (entries) => {
-        setHonorEntries(entries);
-      },
-      onSyncReady: () => {
-        // Sequential, race-free initial seed when Cloud Admin connects to an empty Firestore DB
-        if (
-          isAdmin &&
-          !isSeedingRef.current &&
-          ((!seededRef.current.accounts && tracker.accountIds.size === 0 && accountsRef.current.length > 0) ||
-            (!seededRef.current.topics && tracker.topicIds.size === 0 && topicsRef.current.length > 0) ||
-            (!seededRef.current.attempts && tracker.attemptIds.size === 0 && attemptsRef.current.length > 0))
-        ) {
-          isSeedingRef.current = true;
-          void (async () => {
-            try {
-              if (!seededRef.current.accounts && tracker.accountIds.size === 0 && accountsRef.current.length > 0) {
-                seededRef.current.accounts = true;
-                await syncAccountsToFirestore([], accountsRef.current, tracker);
-              }
-              if (!seededRef.current.topics && tracker.topicIds.size === 0 && topicsRef.current.length > 0) {
-                seededRef.current.topics = true;
-                await syncTopicsToFirestore([], topicsRef.current, tracker);
-              }
-              if (!seededRef.current.attempts && tracker.attemptIds.size === 0 && attemptsRef.current.length > 0) {
-                seededRef.current.attempts = true;
-                for (const att of attemptsRef.current) {
-                  await saveSingleAttemptToFirestore(att, firebaseUser.uid, tracker);
-                }
-              }
-              setCloudState((prev) => ({
-                ...prev,
-                syncing: false,
-                cloudAccountCount: tracker.accountIds.size,
-                cloudTopicCount: tracker.topicIds.size,
-                cloudAttemptCount: tracker.attemptIds.size,
-                lastSyncedAt: new Date().toISOString(),
-                error: null,
-              }));
-            } catch (err) {
-              console.error('Initial cloud seed error:', err);
-              setCloudState((prev) => ({
-                ...prev,
-                syncing: false,
-                error: formatCloudErrorMessage(err),
-              }));
-            } finally {
-              isSeedingRef.current = false;
-            }
-          })();
-          return;
+        if (merged.topics.length > 0) {
+          setTopics(merged.topics);
+          saveTopics(merged.topics);
         }
+        setAttempts(merged.attempts);
+        saveAttempts(merged.attempts);
 
         setCloudState((prev) => ({
           ...prev,
           syncing: false,
-          cloudAccountCount: tracker.accountIds.size,
-          cloudTopicCount: tracker.topicIds.size,
-          cloudAttemptCount: tracker.attemptIds.size,
+          cloudAccountCount: merged.counts.accounts,
+          cloudTopicCount: merged.counts.topics,
+          cloudAttemptCount: merged.counts.attempts,
           lastSyncedAt: new Date().toISOString(),
+          error: null,
         }));
-      },
-      onError: (errMsg) => {
-        console.error('Firestore listener error:', errMsg);
+
+        // Attach real-time Firestore listeners AFTER initial merge completes
+        unsubscribeListeners = subscribeToCloudData({
+          user: firebaseUser,
+          isCloudAdmin: isAdmin,
+          tracker,
+          onAccounts: (cloudAccounts) => {
+            if (activeWriteCountRef.current > 0 || cloudAccounts.length === 0) return;
+            const hasRootAdmin = cloudAccounts.some(
+              (a) => a.username.toLowerCase() === 'admin'
+            );
+            const nextList = hasRootAdmin
+              ? cloudAccounts
+              : [DEFAULT_ACCOUNTS[0], ...cloudAccounts];
+            setAccounts(nextList);
+            saveAccounts(nextList);
+            setCloudState((prev) => ({
+              ...prev,
+              cloudAccountCount: nextList.length,
+              lastSyncedAt: new Date().toISOString(),
+            }));
+          },
+          onTopics: (cloudTopics) => {
+            if (activeWriteCountRef.current > 0 || cloudTopics.length === 0) return;
+            setTopics(cloudTopics);
+            saveTopics(cloudTopics);
+            setCloudState((prev) => ({
+              ...prev,
+              cloudTopicCount: cloudTopics.length,
+              lastSyncedAt: new Date().toISOString(),
+            }));
+          },
+          onAttempts: (cloudAttempts) => {
+            if (activeWriteCountRef.current > 0) return;
+            if (isAdmin) {
+              setAttempts(cloudAttempts);
+              saveAttempts(cloudAttempts);
+              setCloudState((prev) => ({
+                ...prev,
+                cloudAttemptCount: cloudAttempts.length,
+                lastSyncedAt: new Date().toISOString(),
+              }));
+            } else {
+              const byId = new Map<string, QuizAttempt>();
+              for (const localAtt of attemptsRef.current) byId.set(localAtt.id, localAtt);
+              for (const cloudAtt of cloudAttempts) byId.set(cloudAtt.id, cloudAtt);
+              const nextMerged = Array.from(byId.values()).sort(
+                (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+              );
+              setAttempts(nextMerged);
+              saveAttempts(nextMerged);
+              setCloudState((prev) => ({
+                ...prev,
+                cloudAttemptCount: cloudAttempts.length,
+                lastSyncedAt: new Date().toISOString(),
+              }));
+            }
+          },
+          onHonorEntries: (entries) => {
+            setHonorEntries(entries);
+          },
+          onError: (errMsg) => {
+            console.error('Firestore listener error:', errMsg);
+            setCloudState((prev) => ({
+              ...prev,
+              syncing: false,
+              error: formatCloudErrorMessage(errMsg),
+            }));
+          },
+        });
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Initial cloud merge & sync failed:', err);
         setCloudState((prev) => ({
           ...prev,
           syncing: false,
-          error: formatCloudErrorMessage(errMsg),
+          error: formatCloudErrorMessage(err),
         }));
-      },
-    });
+      }
+    };
+
+    void initializeSync();
 
     return () => {
-      unsubscribe();
+      cancelled = true;
+      if (unsubscribeListeners) unsubscribeListeners();
     };
   }, [cloudState.authReady, cloudState.connected, cloudState.isCloudAdmin, firebaseUser]);
 
-  
-const handleConnectCloud = useCallback(async () => {
-  console.info('[Firebase] Bắt đầu đăng nhập Google');
+  // Auto re-sync when network connection comes back online
+  useEffect(() => {
+    if (!cloudState.connected || !firebaseUser) return;
+    const handleOnline = () => {
+      void enqueueCloudWrite(async () => {
+        await pushAllLocalDataToFirestore({
+          accounts: accountsRef.current,
+          topics: topicsRef.current,
+          attempts: attemptsRef.current,
+          ownerUid: firebaseUser.uid,
+          isCloudAdmin: cloudState.isCloudAdmin,
+          tracker: trackerRef.current,
+        });
+      });
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [cloudState.connected, cloudState.isCloudAdmin, firebaseUser, enqueueCloudWrite]);
 
-  setCloudState((prev) => ({
-    ...prev,
-    syncing: true,
-    error: null,
-  }));
-
-  try {
-    const result = await signInWithGoogleCloud();
-
-    console.info('[Firebase] Google đăng nhập thành công', {
-      hasUser: Boolean(result.user),
-      emailVerified: result.user.emailVerified,
-    });
-
-    console.info('[Firebase] Đang chờ kiểm tra quyền và đồng bộ Firestore');
-  } catch (err) {
-    console.error('[Firebase] Google đăng nhập thất bại:', err);
-
+  const handleCancelConnectCloud = useCallback(() => {
+    connectAttemptRef.current += 1;
+    if (connectTimeoutRef.current !== null) {
+      window.clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
     setCloudState((prev) => ({
       ...prev,
       syncing: false,
-      error: formatCloudErrorMessage(err),
+      error: null,
     }));
-  }
-}, []);
+  }, []);
 
+  const handleConnectCloud = useCallback(async () => {
+    const attemptId = ++connectAttemptRef.current;
+    if (connectTimeoutRef.current !== null) {
+      window.clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
+
+    setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      connectTimeoutRef.current = window.setTimeout(() => {
+        reject(new Error('auth/popup-timeout'));
+      }, CONNECT_POPUP_TIMEOUT_MS);
+    });
+
+    try {
+      const cred = await Promise.race([signInWithGoogleCloud(), timeoutPromise]);
+
+      if (connectTimeoutRef.current !== null) {
+        window.clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+
+      if (connectAttemptRef.current !== attemptId) return;
+
+      const signedInUser = cred?.user;
+      if (!signedInUser) {
+        setCloudState((prev) => ({
+          ...prev,
+          syncing: false,
+          error: 'Không nhận được thông tin tài khoản Google sau khi đăng nhập. Vui lòng thử lại.',
+        }));
+        return;
+      }
+
+      if (!signedInUser.emailVerified) {
+        setCloudState((prev) => ({
+          ...prev,
+          syncing: false,
+          error: 'Tài khoản Google này chưa được xác minh email nên không thể kết nối lưu trữ đám mây.',
+        }));
+        return;
+      }
+
+      // Guard against rare cases where onAuthStateChanged does not re-emit for an existing session
+      const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
+      if (connectAttemptRef.current !== attemptId) return;
+      setFirebaseUser(signedInUser);
+      setCloudState((prev) => ({
+        ...prev,
+        authReady: true,
+        connected: true,
+        userEmail: signedInUser.email,
+        userDisplayName: signedInUser.displayName,
+        isCloudAdmin: isAdmin,
+        error: null,
+      }));
+    } catch (err) {
+      if (connectTimeoutRef.current !== null) {
+        window.clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+      if (connectAttemptRef.current !== attemptId) return;
+      console.error('Google cloud sign-in failed:', err);
+      setCloudState((prev) => ({
+        ...prev,
+        syncing: false,
+        error: formatCloudErrorMessage(err),
+      }));
+    }
+  }, []);
 
   const handleDisconnectCloud = useCallback(async () => {
     setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
@@ -420,8 +618,7 @@ const handleConnectCloud = useCallback(async () => {
 
   const handleSyncCloudNow = useCallback(async () => {
     if (!firebaseUser || !cloudState.connected) return;
-    setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
-    try {
+    await enqueueCloudWrite(async () => {
       await pushAllLocalDataToFirestore({
         accounts: accountsRef.current,
         topics: topicsRef.current,
@@ -430,29 +627,26 @@ const handleConnectCloud = useCallback(async () => {
         isCloudAdmin: cloudState.isCloudAdmin,
         tracker: trackerRef.current,
       });
-      setCloudState((prev) => ({
-        ...prev,
-        syncing: false,
-        lastSyncedAt: new Date().toISOString(),
-        error: null,
-      }));
-    } catch (err) {
-      setCloudState((prev) => ({
-        ...prev,
-        syncing: false,
-        error: formatCloudErrorMessage(err),
-      }));
-    }
-  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin]);
+    });
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, enqueueCloudWrite]);
 
-  const handleLogin = (username: string, password: string): string | null => {
-    const matched = accounts.find(
+  const handleLogin = async (username: string, password: string): Promise<string | null> => {
+    const matched = accountsRef.current.find(
       (a) => a.username.toLowerCase() === username.toLowerCase()
     );
     if (!matched) {
       return 'Tên đăng nhập không tồn tại trong hệ thống.';
     }
-    if (matched.password !== password) {
+
+    let passwordValid = false;
+    if (matched.passwordHash && /^[a-f0-9]{64}$/.test(matched.passwordHash)) {
+      const inputHash = await hashUnitPassword(matched.username, password);
+      passwordValid = inputHash === matched.passwordHash;
+    } else {
+      passwordValid = matched.password === password;
+    }
+
+    if (!passwordValid) {
       return 'Mật khẩu chưa chính xác. Vui lòng kiểm tra lại.';
     }
     if (!matched.active) {
@@ -478,19 +672,17 @@ const handleConnectCloud = useCallback(async () => {
     setAccounts(nextAccounts);
     saveAccounts(nextAccounts);
 
-    if (cloudState.connected && cloudState.isCloudAdmin) {
-      seededRef.current.accounts = true;
-      void syncAccountsToFirestore(prevAccounts, nextAccounts, trackerRef.current)
-        .then(() => {
-          setCloudState((prev) => ({
-            ...prev,
-            lastSyncedAt: new Date().toISOString(),
-            error: null,
-          }));
-        })
-        .catch((err) => {
-          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-        });
+    if (cloudState.connected && firebaseUser) {
+      if (!cloudState.isCloudAdmin) {
+        setCloudState((prev) => ({
+          ...prev,
+          error: `Tài khoản Google "${cloudState.userEmail}" không có quyền Quản trị đám mây để đồng bộ danh sách tài khoản. Vui lòng kết nối bằng ${BOOTSTRAPPED_ADMIN_EMAIL}.`,
+        }));
+        return;
+      }
+      void enqueueCloudWrite(async () => {
+        await syncAccountsToFirestore(prevAccounts, nextAccounts, trackerRef.current, true);
+      });
     }
   };
 
@@ -499,19 +691,17 @@ const handleConnectCloud = useCallback(async () => {
     setTopics(nextTopics);
     saveTopics(nextTopics);
 
-    if (cloudState.connected && cloudState.isCloudAdmin) {
-      seededRef.current.topics = true;
-      void syncTopicsToFirestore(prevTopics, nextTopics, trackerRef.current)
-        .then(() => {
-          setCloudState((prev) => ({
-            ...prev,
-            lastSyncedAt: new Date().toISOString(),
-            error: null,
-          }));
-        })
-        .catch((err) => {
-          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-        });
+    if (cloudState.connected && firebaseUser) {
+      if (!cloudState.isCloudAdmin) {
+        setCloudState((prev) => ({
+          ...prev,
+          error: `Tài khoản Google "${cloudState.userEmail}" không có quyền Quản trị đám mây để đồng bộ bộ đề. Vui lòng kết nối bằng ${BOOTSTRAPPED_ADMIN_EMAIL}.`,
+        }));
+        return;
+      }
+      void enqueueCloudWrite(async () => {
+        await syncTopicsToFirestore(prevTopics, nextTopics, trackerRef.current, true);
+      });
     }
   };
 
@@ -520,50 +710,72 @@ const handleConnectCloud = useCallback(async () => {
     saveAttempts(nextAttempts);
 
     if (cloudState.connected && firebaseUser) {
-      seededRef.current.attempts = true;
-      void syncAttemptsDiffToFirestore(
-        nextAttempts,
-        firebaseUser.uid,
-        cloudState.isCloudAdmin,
-        trackerRef.current
-      )
-        .then(() => {
-          setCloudState((prev) => ({
-            ...prev,
-            lastSyncedAt: new Date().toISOString(),
-            error: null,
-          }));
-        })
-        .catch((err) => {
-          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-        });
+      const uid = firebaseUser.uid;
+      const isAdmin = cloudState.isCloudAdmin;
+      void enqueueCloudWrite(async () => {
+        await syncAttemptsDiffToFirestore(
+          nextAttempts,
+          uid,
+          isAdmin,
+          trackerRef.current,
+          topicsRef.current,
+          accountsRef.current
+        );
+      });
     }
   };
 
   const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
-    const next = [newAttempt, ...attemptsRef.current];
+    const enrichedAttempt: QuizAttempt = {
+      ...newAttempt,
+      accountId: newAttempt.accountId || currentUser?.id,
+    };
+    const next = [enrichedAttempt, ...attemptsRef.current];
     setAttempts(next);
     saveAttempts(next);
 
     if (cloudState.connected && firebaseUser) {
-      seededRef.current.attempts = true;
-      void saveSingleAttemptToFirestore(newAttempt, firebaseUser.uid, trackerRef.current)
-        .then(() => {
-          setCloudState((prev) => ({
-            ...prev,
-            lastSyncedAt: new Date().toISOString(),
-            error: null,
-          }));
-        })
-        .catch((err) => {
-          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-        });
+      const uid = firebaseUser.uid;
+      const isAdmin = cloudState.isCloudAdmin;
+      void enqueueCloudWrite(async () => {
+        const saved = await saveSingleAttemptToFirestore(
+          enrichedAttempt,
+          uid,
+          trackerRef.current,
+          {
+            accountId: enrichedAttempt.accountId,
+            accounts: accountsRef.current,
+            isCloudAdmin: isAdmin,
+            localTopics: topicsRef.current,
+          }
+        );
+        if (!saved) {
+          throw new Error(
+            'Chuyên đề của bài thi này chưa tồn tại trên Firebase Firestore. Quản trị viên cần kết nối đám mây và đồng bộ bộ đề trước.'
+          );
+        }
+      });
+    } else if (enrichedAttempt.accountId) {
+      // Student/guest device without Google Sign-In: automatically sync attempt directly to Firestore
+      void saveSingleAttemptToFirestore(
+        enrichedAttempt,
+        'unit_account',
+        trackerRef.current,
+        {
+          accountId: enrichedAttempt.accountId,
+          accounts: accountsRef.current,
+          isCloudAdmin: false,
+          localTopics: topicsRef.current,
+        }
+      ).catch((err) => {
+        console.warn('Unit account auto-sync attempt skipped:', err);
+      });
     }
   };
 
-  // Honor Board combines shared public cloud honor entries with local/own attempts
+  // Honor Board combines shared public cloud honor entries with local/own attempts (even without Google Sign-In!)
   const honorBoardAttempts = useMemo(() => {
-    if (!cloudState.connected || cloudState.isCloudAdmin || honorEntries.length === 0) {
+    if (cloudState.isCloudAdmin || honorEntries.length === 0) {
       return attempts;
     }
     const byId = new Map<string, QuizAttempt>();
@@ -572,7 +784,29 @@ const handleConnectCloud = useCallback(async () => {
     return Array.from(byId.values()).sort(
       (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
     );
-  }, [attempts, honorEntries, cloudState.connected, cloudState.isCloudAdmin]);
+  }, [attempts, honorEntries, cloudState.isCloudAdmin]);
+
+  // History view merges synced cloud entries for the logged-in unit account so results appear across devices
+  const historyAttempts = useMemo(() => {
+    if (cloudState.isCloudAdmin || !currentUser || honorEntries.length === 0) {
+      return attempts;
+    }
+    const byId = new Map<string, QuizAttempt>();
+    for (const entry of honorEntries) {
+      if (
+        currentUser.role === 'admin' ||
+        entry.accountUsername.toLowerCase() === currentUser.username.toLowerCase()
+      ) {
+        byId.set(entry.id, entry);
+      }
+    }
+    for (const own of attempts) {
+      byId.set(own.id, own);
+    }
+    return Array.from(byId.values()).sort(
+      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+  }, [attempts, honorEntries, cloudState.isCloudAdmin, currentUser]);
 
   const viewKey = activeQuizTopic ? `quiz-${activeQuizTopic.id}` : `tab-${activeTab}`;
 
@@ -610,6 +844,41 @@ const handleConnectCloud = useCallback(async () => {
               onLogout={handleLogout}
             />
 
+            {/* Prompt Admin to connect Google Cloud Storage so Admin edits push live to all student/guest devices */}
+            {currentUser.role === 'admin' &&
+              cloudState.authReady &&
+              !cloudState.connected &&
+              !dismissedCloudBanner && (
+                <div className="bg-[#EEF5F0] border-b border-[#BFD8C7]">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-[#1F4D36] font-medium">
+                      <Cloud className="w-4 h-4 shrink-0" />
+                      <span>
+                        Kết nối Google Quản trị để mọi thay đổi tài khoản & bộ đề tự động chuyển
+                        sang các thiết bị học viên qua Firebase Firestore.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowCloudModal(true)}
+                        className="px-3 py-1.5 rounded-md bg-[#1F4D36] hover:bg-[#173B29] text-white font-semibold transition-colors cursor-pointer"
+                      >
+                        Kết nối & Đồng bộ ngay
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDismissedCloudBanner(true)}
+                        aria-label="Ẩn thông báo"
+                        className="p-1 text-[#4B5B50] hover:text-[#152019] cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -637,7 +906,7 @@ const handleConnectCloud = useCallback(async () => {
                       {activeTab === 'history' && (
                         <HistoryView
                           currentUser={currentUser}
-                          attempts={attempts}
+                          attempts={historyAttempts}
                           topics={topics}
                         />
                       )}
@@ -660,6 +929,7 @@ const handleConnectCloud = useCallback(async () => {
                           onUpdateTopics={handleUpdateTopics}
                           onUpdateAttempts={handleUpdateAttempts}
                           onConnectCloud={handleConnectCloud}
+                          onCancelConnectCloud={handleCancelConnectCloud}
                           onDisconnectCloud={handleDisconnectCloud}
                           onSyncCloudNow={handleSyncCloudNow}
                         />
@@ -687,6 +957,7 @@ const handleConnectCloud = useCallback(async () => {
                     attempts: attempts.length,
                   }}
                   onConnect={handleConnectCloud}
+                  onCancelConnect={handleCancelConnectCloud}
                   onDisconnect={handleDisconnectCloud}
                   onSyncNow={handleSyncCloudNow}
                   onClose={() => setShowCloudModal(false)}

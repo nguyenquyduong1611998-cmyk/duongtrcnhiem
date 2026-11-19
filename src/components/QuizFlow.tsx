@@ -118,6 +118,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
 
     const attempt: QuizAttempt = {
       id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      accountId: currentUser.id,
       accountUsername: currentUser.username,
       candidateName: candidateName.trim(),
       unitName: unitName.trim(),

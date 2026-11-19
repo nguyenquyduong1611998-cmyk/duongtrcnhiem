@@ -4,6 +4,20 @@ export interface UserAccount {
   id: string;
   username: string;
   password: string;
+  passwordHash?: string;
+  fullName: string;
+  defaultUnit: string;
+  role: UserRole;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountDirectoryRecord {
+  id: string;
+  username: string;
+  usernameLower: string;
+  passwordHash: string;
   fullName: string;
   defaultUnit: string;
   role: UserRole;
@@ -35,6 +49,7 @@ export type GradeLevel = 'Giỏi' | 'Khá' | 'Đạt' | 'Yếu';
 
 export interface QuizAttempt {
   id: string;
+  accountId?: string;
   accountUsername: string;
   candidateName: string;
   unitName: string;

@@ -22,6 +22,7 @@ interface CloudStorageModalProps {
     attempts: number;
   };
   onConnect: () => Promise<void>;
+  onCancelConnect: () => void;
   onDisconnect: () => Promise<void>;
   onSyncNow: () => Promise<void>;
   onClose: () => void;
@@ -33,6 +34,7 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   cloud,
   localCounts,
   onConnect,
+  onCancelConnect,
   onDisconnect,
   onSyncNow,
   onClose,
@@ -118,12 +120,12 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
               <div className="p-4 rounded-xl bg-[#FAFBF9] border border-[#DDE3DC] space-y-2">
                 <div className="flex items-center gap-2 text-sm font-bold text-[#152019]">
                   <CloudOff className="w-4 h-4 text-[#64756A]" />
-                  <span>Đang lưu trữ cục bộ trên thiết bị</span>
+                  <span>Chưa đăng nhập Quản trị đám mây</span>
                 </div>
                 <p className="text-xs text-[#4B5B50] leading-relaxed">
-                  Dữ liệu hiện đang được lưu tự động trên trình duyệt này. Kết nối tài khoản Google
-                  để sao lưu và đồng bộ trực tuyến bộ chuyên đề, lịch sử làm bài và bảng tuyên dương
-                  giữa nhiều máy tính hoặc điện thoại.
+                  Tài khoản học viên/khách luôn tự động nhận bộ đề và danh sách tài khoản mới nhất từ
+                  Firebase Firestore mà không cần đăng nhập Google. Quản trị viên hãy kết nối Google
+                  để đẩy mọi chỉnh sửa lên đám mây cho tất cả thiết bị khác.
                 </p>
               </div>
 
@@ -148,19 +150,30 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                disabled={cloud.syncing}
-                onClick={() => void onConnect()}
-                className="w-full py-2.5 px-4 bg-[#1F4D36] hover:bg-[#173B29] disabled:opacity-60 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Cloud className="w-4 h-4" />
-                <span>
-                  {cloud.syncing
-                    ? 'Đang kết nối...'
-                    : 'Kết nối lưu trữ đám mây (Đăng nhập Google)'}
-                </span>
-              </button>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  disabled={cloud.syncing}
+                  onClick={() => void onConnect()}
+                  className="flex-1 py-2.5 px-4 bg-[#1F4D36] hover:bg-[#173B29] disabled:opacity-60 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Cloud className="w-4 h-4" />
+                  <span>
+                    {cloud.syncing
+                      ? 'Đang chờ xác thực Google...'
+                      : 'Kết nối lưu trữ đám mây (Đăng nhập Google)'}
+                  </span>
+                </button>
+                {cloud.syncing && (
+                  <button
+                    type="button"
+                    onClick={onCancelConnect}
+                    className="py-2.5 px-3.5 bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA] text-sm font-semibold rounded-lg shrink-0 transition-colors cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -180,6 +193,11 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                 <p className="text-xs text-[#166534]/90">
                   Tài khoản Google: <strong>{cloud.userEmail}</strong>
                 </p>
+                {cloud.isCloudAdmin && (
+                  <p className="text-xs text-[#166534]/85">
+                    Mọi thay đổi tài khoản, bộ đề và câu hỏi sẽ tự động đồng bộ trực tiếp sang thiết bị học viên.
+                  </p>
+                )}
                 {cloud.lastSyncedAt && (
                   <p className="text-xs text-[#166534]/80 font-mono-num">
                     Cập nhật gần nhất: {formatDateTime(cloud.lastSyncedAt)}

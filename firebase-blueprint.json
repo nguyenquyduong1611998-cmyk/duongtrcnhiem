@@ -23,20 +23,18 @@
         },
         "createdAt": {
           "type": "string",
-          "format": "date-time",
-          "description": "Firestore server timestamp set on create."
+          "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "format": "date-time",
-          "description": "Firestore server timestamp set on create and update."
+          "format": "date-time"
         }
       },
       "required": ["uid", "email", "note", "createdAt", "updatedAt"]
     },
     "ManagedAccount": {
       "title": "ManagedAccount",
-      "description": "Unit-issued military quiz account managed exclusively by administrators.",
+      "description": "Admin-only full account record stored in /managed_accounts/{accountId}.",
       "type": "object",
       "properties": {
         "id": {
@@ -100,6 +98,85 @@
         "defaultUnit",
         "role",
         "active",
+        "createdAtIso",
+        "updatedAtIso",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AccountDirectoryEntry": {
+      "title": "AccountDirectoryEntry",
+      "description": "Hashed non-plaintext unit login directory in /account_directory/{accountId} synced from Admin to student/guest devices.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "usernameLower": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "passwordHash": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "defaultUnit": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "student"]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public"]
+        },
+        "createdAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "updatedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "usernameLower",
+        "passwordHash",
+        "fullName",
+        "defaultUnit",
+        "role",
+        "active",
+        "visibility",
         "createdAtIso",
         "updatedAtIso",
         "createdAt",
@@ -255,6 +332,12 @@
           "maxLength": 128,
           "pattern": "^[a-zA-Z0-9_\\-]+$"
         },
+        "accountId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
         "accountUsername": {
           "type": "string",
           "minLength": 1,
@@ -326,6 +409,7 @@
         "id",
         "scope",
         "ownerUid",
+        "accountId",
         "accountUsername",
         "candidateName",
         "unitName",
@@ -362,6 +446,12 @@
           "pattern": "^[a-zA-Z0-9_\\-]+$"
         },
         "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "accountId": {
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
@@ -430,6 +520,7 @@
         "id",
         "attemptId",
         "ownerUid",
+        "accountId",
         "visibility",
         "accountUsername",
         "candidateName",
@@ -454,7 +545,11 @@
     },
     "/managed_accounts/{accountId}": {
       "schema": { "$ref": "#/entities/ManagedAccount" },
-      "description": "Admin-only store for unit-issued quiz accounts."
+      "description": "Admin-only store for full unit-issued quiz accounts."
+    },
+    "/account_directory/{accountId}": {
+      "schema": { "$ref": "#/entities/AccountDirectoryEntry" },
+      "description": "Hashed login directory enabling student/guest login across devices without exposing plaintext passwords."
     },
     "/topics/{topicId}": {
       "schema": { "$ref": "#/entities/Topic" },
@@ -466,7 +561,7 @@
     },
     "/attempts/{attemptId}": {
       "schema": { "$ref": "#/entities/QuizAttempt" },
-      "description": "Submitted quiz attempts owned by the submitting user or visible to admin."
+      "description": "Submitted quiz attempts owned by verified users or active unit accounts."
     },
     "/honor_entries/{entryId}": {
       "schema": { "$ref": "#/entities/HonorEntry" },

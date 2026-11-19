@@ -5,6 +5,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -19,7 +20,14 @@ import {
   db,
   handleFirestoreError,
 } from '../firebase';
-import { GradeLevel, Question, QuizAttempt, Topic, UserAccount } from '../types';
+import {
+  AccountDirectoryRecord,
+  GradeLevel,
+  Question,
+  QuizAttempt,
+  Topic,
+  UserAccount,
+} from '../types';
 
 const VALID_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
 const VALID_GRADES: ReadonlySet<string> = new Set(['Giỏi', 'Khá', 'Đạt', 'Yếu']);
@@ -35,6 +43,109 @@ export function sanitizeFirestoreId(raw: string, prefix: string): string {
     return cleaned;
   }
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Compact pure-JS SHA-256 fallback for non-secure LAN HTTP origins where crypto.subtle is unavailable
+function sha256FallbackHex(input: string): string {
+  const K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+  ]);
+
+  const bytes = new TextEncoder().encode(input);
+  const bitLen = bytes.length * 8;
+  const paddedLen = Math.ceil((bytes.length + 9) / 64) * 64;
+  const padded = new Uint8Array(paddedLen);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(paddedLen - 8, Math.floor(bitLen / 0x100000000), false);
+  view.setUint32(paddedLen - 4, bitLen >>> 0, false);
+
+  let h0 = 0x6a09e667;
+  let h1 = 0xbb67ae85;
+  let h2 = 0x3c6ef372;
+  let h3 = 0xa54ff53a;
+  let h4 = 0x510e527f;
+  let h5 = 0x9b05688c;
+  let h6 = 0x1f83d9ab;
+  let h7 = 0x5be0cd19;
+
+  const w = new Uint32Array(64);
+  const rotr = (x: number, n: number) => (x >>> n) | (x << (32 - n));
+
+  for (let offset = 0; offset < paddedLen; offset += 64) {
+    for (let i = 0; i < 16; i++) {
+      w[i] = view.getUint32(offset + i * 4, false);
+    }
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+
+    let a = h0;
+    let b = h1;
+    let c = h2;
+    let d = h3;
+    let e = h4;
+    let f = h5;
+    let g = h6;
+    let h = h7;
+
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const temp1 = (h + S1 + ch + K[i] + w[i]) >>> 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (S0 + maj) >>> 0;
+
+      h = g;
+      g = f;
+      f = e;
+      e = (d + temp1) >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (temp1 + temp2) >>> 0;
+    }
+
+    h0 = (h0 + a) >>> 0;
+    h1 = (h1 + b) >>> 0;
+    h2 = (h2 + c) >>> 0;
+    h3 = (h3 + d) >>> 0;
+    h4 = (h4 + e) >>> 0;
+    h5 = (h5 + f) >>> 0;
+    h6 = (h6 + g) >>> 0;
+    h7 = (h7 + h) >>> 0;
+  }
+
+  return [h0, h1, h2, h3, h4, h5, h6, h7]
+    .map((v) => v.toString(16).padStart(8, '0'))
+    .join('');
+}
+
+export async function hashUnitPassword(username: string, password: string): Promise<string> {
+  const normalized = `unit490-d3::${username.trim().toLowerCase()}::${password}`;
+  try {
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const encoded = new TextEncoder().encode(normalized);
+      const digest = await crypto.subtle.digest('SHA-256', encoded);
+      return Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+  } catch {
+    // Fall back to pure-JS SHA-256 on non-secure contexts
+  }
+  return sha256FallbackHex(normalized);
 }
 
 function clampString(val: string | undefined | null, maxLen: number, fallback = ''): string {
@@ -78,7 +189,12 @@ function timestampToIso(val: unknown, fallbackIso?: string): string {
   if (typeof fallbackIso === 'string' && fallbackIso.length > 0) {
     return fallbackIso;
   }
-  if (val && typeof val === 'object' && 'toDate' in val && typeof (val as Timestamp).toDate === 'function') {
+  if (
+    val &&
+    typeof val === 'object' &&
+    'toDate' in val &&
+    typeof (val as Timestamp).toDate === 'function'
+  ) {
     return (val as Timestamp).toDate().toISOString();
   }
   return new Date().toISOString();
@@ -100,6 +216,7 @@ export async function checkIsCloudAdmin(user: User | null): Promise<boolean> {
 
 export interface CloudSnapshotTracker {
   accountIds: Set<string>;
+  directoryIds: Set<string>;
   topicIds: Set<string>;
   questionIdsByTopic: Map<string, Set<string>>;
   attemptIds: Set<string>;
@@ -109,11 +226,20 @@ export interface CloudSnapshotTracker {
 export function createEmptyCloudTracker(): CloudSnapshotTracker {
   return {
     accountIds: new Set(),
+    directoryIds: new Set(),
     topicIds: new Set(),
     questionIdsByTopic: new Map(),
     attemptIds: new Set(),
     honorEntryIds: new Set(),
   };
+}
+
+export interface SubscribePublicUnitHandlers {
+  tracker: CloudSnapshotTracker;
+  onDirectoryAccounts: (accounts: AccountDirectoryRecord[]) => void;
+  onTopics: (topics: Topic[]) => void;
+  onHonorEntries: (entries: QuizAttempt[]) => void;
+  onError: (message: string) => void;
 }
 
 export interface SubscribeCloudHandlers {
@@ -124,39 +250,94 @@ export interface SubscribeCloudHandlers {
   onTopics: (topics: Topic[]) => void;
   onAttempts: (attempts: QuizAttempt[]) => void;
   onHonorEntries: (entries: QuizAttempt[]) => void;
-  onSyncReady: () => void;
   onError: (message: string) => void;
 }
 
-export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => void {
-  const {
-    user,
-    isCloudAdmin,
-    tracker,
-    onAccounts,
-    onTopics,
-    onAttempts,
-    onHonorEntries,
-    onSyncReady,
-    onError,
-  } = handlers;
+function parseAccountDoc(id: string, d: Record<string, unknown>): UserAccount {
+  return {
+    id,
+    username: String(d.username || ''),
+    password: String(d.password || ''),
+    fullName: String(d.fullName || ''),
+    defaultUnit: String(d.defaultUnit || ''),
+    role: d.role === 'admin' ? 'admin' : 'student',
+    active: Boolean(d.active),
+    createdAt: timestampToIso(d.createdAt, d.createdAtIso as string | undefined),
+    updatedAt: timestampToIso(d.updatedAt, d.updatedAtIso as string | undefined),
+  };
+}
 
-  const unsubscribers: Array<() => void> = [];
+function parseAccountDirectoryDoc(
+  id: string,
+  d: Record<string, unknown>
+): AccountDirectoryRecord {
+  const username = String(d.username || '');
+  return {
+    id,
+    username,
+    usernameLower: String(d.usernameLower || username.toLowerCase()),
+    passwordHash: String(d.passwordHash || ''),
+    fullName: String(d.fullName || ''),
+    defaultUnit: String(d.defaultUnit || ''),
+    role: d.role === 'admin' ? 'admin' : 'student',
+    active: Boolean(d.active),
+    createdAt: timestampToIso(d.createdAt, d.createdAtIso as string | undefined),
+    updatedAt: timestampToIso(d.updatedAt, d.updatedAtIso as string | undefined),
+  };
+}
+
+function parseQuestionDoc(id: string, qd: Record<string, unknown>): Question & { _order: number } {
+  const rawOpts = qd.options;
+  const opts: [string, string, string, string] =
+    Array.isArray(rawOpts) && rawOpts.length === 4
+      ? [
+          String(rawOpts[0] ?? ''),
+          String(rawOpts[1] ?? ''),
+          String(rawOpts[2] ?? ''),
+          String(rawOpts[3] ?? ''),
+        ]
+      : ['', '', '', ''];
+  return {
+    id,
+    text: String(qd.text || ''),
+    options: opts,
+    correctIndex: clampNumber(Number(qd.correctIndex ?? 0), 0, 3),
+    explanation: String(qd.explanation || ''),
+    _order: Number(qd.orderIndex ?? 0),
+  };
+}
+
+function parseAttemptDoc(id: string, d: Record<string, unknown>): QuizAttempt {
+  return {
+    id,
+    accountId: typeof d.accountId === 'string' && d.accountId ? d.accountId : undefined,
+    accountUsername: String(d.accountUsername || ''),
+    candidateName: String(d.candidateName || ''),
+    unitName: String(d.unitName || ''),
+    topicId: String(d.topicId || ''),
+    topicTitle: String(d.topicTitle || ''),
+    answers:
+      d.answers && typeof d.answers === 'object'
+        ? (d.answers as Record<string, number>)
+        : {},
+    correctCount: Number(d.correctCount || 0),
+    totalCount: Number(d.totalCount || 0),
+    score10: Number(d.score10 || 0),
+    grade: sanitizeGrade(String(d.grade || 'Yếu')),
+    durationSeconds: Number(d.durationSeconds || 0),
+    startedAt: timestampToIso(d.createdAt, d.startedAtIso as string | undefined),
+    submittedAt: timestampToIso(d.createdAt, d.submittedAtIso as string | undefined),
+  };
+}
+
+function subscribeTopicsTree(
+  tracker: CloudSnapshotTracker,
+  onTopics: (topics: Topic[]) => void,
+  reportSnapshotError: (error: unknown, operationType: OperationType, path: string) => void
+): () => void {
   const questionUnsubs = new Map<string, () => void>();
   const topicMetaMap = new Map<string, Omit<Topic, 'questions'>>();
   const topicQuestionsMap = new Map<string, Question[]>();
-
-  let topicsLoaded = false;
-  let attemptsLoaded = false;
-  let accountsLoaded = !isCloudAdmin;
-  let readyFired = false;
-
-  const checkReady = () => {
-    if (!readyFired && topicsLoaded && attemptsLoaded && accountsLoaded) {
-      readyFired = true;
-      onSyncReady();
-    }
-  };
 
   const emitTopics = () => {
     const assembled: Topic[] = Array.from(topicMetaMap.values())
@@ -168,29 +349,17 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
     onTopics(assembled);
   };
 
-  const reportSnapshotError = (error: unknown, operationType: OperationType, path: string) => {
-    try {
-      handleFirestoreError(error, operationType, path);
-    } catch (wrapped) {
-      const msg = wrapped instanceof Error ? wrapped.message : String(wrapped);
-      onError(msg);
-    }
-  };
-
-  // 1. Subscribe to public Topics + per-topic Questions subcollection
   const topicsQuery = query(collection(db, 'topics'), where('visibility', '==', 'public'));
   const unsubTopics = onSnapshot(
     topicsQuery,
     (snapshot) => {
       const activeIds = new Set<string>();
-      tracker.topicIds = new Set<string>();
       topicMetaMap.clear();
 
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
         const id = docSnap.id;
         activeIds.add(id);
-        tracker.topicIds.add(id);
 
         topicMetaMap.set(id, {
           id,
@@ -214,24 +383,8 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
               const qIds = new Set<string>();
               const list: Array<Question & { _order: number }> = [];
               qSnap.forEach((qDoc) => {
-                const qd = qDoc.data();
                 qIds.add(qDoc.id);
-                const opts = Array.isArray(qd.options) && qd.options.length === 4
-                  ? ([
-                      String(qd.options[0] ?? ''),
-                      String(qd.options[1] ?? ''),
-                      String(qd.options[2] ?? ''),
-                      String(qd.options[3] ?? ''),
-                    ] as [string, string, string, string])
-                  : (['', '', '', ''] as [string, string, string, string]);
-                list.push({
-                  id: qDoc.id,
-                  text: String(qd.text || ''),
-                  options: opts,
-                  correctIndex: clampNumber(Number(qd.correctIndex ?? 0), 0, 3),
-                  explanation: String(qd.explanation || ''),
-                  _order: Number(qd.orderIndex ?? 0),
-                });
+                list.push(parseQuestionDoc(qDoc.id, qDoc.data()));
               });
               list.sort((a, b) => a._order - b._order);
               tracker.questionIdsByTopic.set(id, qIds);
@@ -247,7 +400,6 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
         }
       });
 
-      // Clean up question listeners for deleted topics
       for (const [tid, unsub] of questionUnsubs.entries()) {
         if (!activeIds.has(tid)) {
           unsub();
@@ -257,96 +409,62 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
         }
       }
 
-      topicsLoaded = true;
+      tracker.topicIds = activeIds;
       emitTopics();
-      checkReady();
     },
     (err) => reportSnapshotError(err, OperationType.LIST, 'topics')
   );
-  unsubscribers.push(unsubTopics);
 
-  // 2. Subscribe to Managed Accounts (Cloud Admin only)
-  if (isCloudAdmin) {
-    const accountsQuery = query(
-      collection(db, 'managed_accounts'),
-      where('scope', '==', 'unit_490')
-    );
-    const unsubAccounts = onSnapshot(
-      accountsQuery,
-      (snapshot) => {
-        const nextIds = new Set<string>();
-        const list: UserAccount[] = [];
-        snapshot.forEach((docSnap) => {
-          const d = docSnap.data();
-          nextIds.add(docSnap.id);
-          list.push({
-            id: docSnap.id,
-            username: String(d.username || ''),
-            password: String(d.password || ''),
-            fullName: String(d.fullName || ''),
-            defaultUnit: String(d.defaultUnit || ''),
-            role: d.role === 'admin' ? 'admin' : 'student',
-            active: Boolean(d.active),
-            createdAt: timestampToIso(d.createdAt, d.createdAtIso),
-            updatedAt: timestampToIso(d.updatedAt, d.updatedAtIso),
-          });
-        });
-        tracker.accountIds = nextIds;
-        accountsLoaded = true;
-        onAccounts(list);
-        checkReady();
-      },
-      (err) => reportSnapshotError(err, OperationType.LIST, 'managed_accounts')
-    );
-    unsubscribers.push(unsubAccounts);
-  }
+  return () => {
+    unsubTopics();
+    for (const unsub of questionUnsubs.values()) unsub();
+    questionUnsubs.clear();
+  };
+}
 
-  // 3. Subscribe to Attempts (All unit attempts for Admin, own attempts for regular verified user)
-  const attemptsQuery = isCloudAdmin
-    ? query(collection(db, 'attempts'), where('scope', '==', 'unit_490'))
-    : query(collection(db, 'attempts'), where('ownerUid', '==', user.uid));
+/**
+ * Public real-time subscription that runs automatically on ALL devices
+ * (including student/guest devices that do NOT sign in with Google).
+ * Streams published Topics & Questions, Hashed Account Directory, and Honor Entries.
+ */
+export function subscribeToPublicUnitData(handlers: SubscribePublicUnitHandlers): () => void {
+  const { tracker, onDirectoryAccounts, onTopics, onHonorEntries, onError } = handlers;
+  const unsubscribers: Array<() => void> = [];
 
-  const unsubAttempts = onSnapshot(
-    attemptsQuery,
+  const reportSnapshotError = (error: unknown, operationType: OperationType, path: string) => {
+    try {
+      handleFirestoreError(error, operationType, path);
+    } catch (wrapped) {
+      const msg = wrapped instanceof Error ? wrapped.message : String(wrapped);
+      onError(msg);
+    }
+  };
+
+  // 1. Live published topics + questions
+  unsubscribers.push(subscribeTopicsTree(tracker, onTopics, reportSnapshotError));
+
+  // 2. Live hashed account directory (zero plaintext passwords)
+  const dirQuery = query(
+    collection(db, 'account_directory'),
+    where('visibility', '==', 'public')
+  );
+  const unsubDir = onSnapshot(
+    dirQuery,
     (snapshot) => {
       const nextIds = new Set<string>();
-      const list: QuizAttempt[] = [];
+      const list: AccountDirectoryRecord[] = [];
       snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
         nextIds.add(docSnap.id);
-        list.push({
-          id: docSnap.id,
-          accountUsername: String(d.accountUsername || ''),
-          candidateName: String(d.candidateName || ''),
-          unitName: String(d.unitName || ''),
-          topicId: String(d.topicId || ''),
-          topicTitle: String(d.topicTitle || ''),
-          answers:
-            d.answers && typeof d.answers === 'object'
-              ? (d.answers as Record<string, number>)
-              : {},
-          correctCount: Number(d.correctCount || 0),
-          totalCount: Number(d.totalCount || 0),
-          score10: Number(d.score10 || 0),
-          grade: sanitizeGrade(String(d.grade || 'Yếu')),
-          durationSeconds: Number(d.durationSeconds || 0),
-          startedAt: timestampToIso(d.createdAt, d.startedAtIso),
-          submittedAt: timestampToIso(d.createdAt, d.submittedAtIso),
-        });
+        list.push(parseAccountDirectoryDoc(docSnap.id, docSnap.data()));
       });
-      list.sort(
-        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
-      );
-      tracker.attemptIds = nextIds;
-      attemptsLoaded = true;
-      onAttempts(list);
-      checkReady();
+      tracker.directoryIds = nextIds;
+      onDirectoryAccounts(list);
     },
-    (err) => reportSnapshotError(err, OperationType.LIST, 'attempts')
+    (err) => reportSnapshotError(err, OperationType.LIST, 'account_directory')
   );
-  unsubscribers.push(unsubAttempts);
+  unsubscribers.push(unsubDir);
 
-  // 4. Subscribe to Public Honor Entries (for Honor Board across devices)
+  // 3. Live public honor board & student attempt summaries
   const honorQuery = query(
     collection(db, 'honor_entries'),
     where('visibility', '==', 'public')
@@ -357,24 +475,8 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
       const nextIds = new Set<string>();
       const list: QuizAttempt[] = [];
       snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
         nextIds.add(docSnap.id);
-        list.push({
-          id: docSnap.id,
-          accountUsername: String(d.accountUsername || ''),
-          candidateName: String(d.candidateName || ''),
-          unitName: String(d.unitName || ''),
-          topicId: String(d.topicId || ''),
-          topicTitle: String(d.topicTitle || ''),
-          answers: {},
-          correctCount: Number(d.correctCount || 0),
-          totalCount: Number(d.totalCount || 0),
-          score10: Number(d.score10 || 0),
-          grade: sanitizeGrade(String(d.grade || 'Yếu')),
-          durationSeconds: Number(d.durationSeconds || 0),
-          startedAt: timestampToIso(d.createdAt, d.startedAtIso),
-          submittedAt: timestampToIso(d.createdAt, d.submittedAtIso),
-        });
+        list.push(parseAttemptDoc(docSnap.id, docSnap.data()));
       });
       list.sort(
         (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
@@ -388,8 +490,108 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
 
   return () => {
     for (const unsub of unsubscribers) unsub();
-    for (const unsub of questionUnsubs.values()) unsub();
-    questionUnsubs.clear();
+  };
+}
+
+export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => void {
+  const {
+    user,
+    isCloudAdmin,
+    tracker,
+    onAccounts,
+    onTopics,
+    onAttempts,
+    onHonorEntries,
+    onError,
+  } = handlers;
+
+  const unsubscribers: Array<() => void> = [];
+
+  const reportSnapshotError = (error: unknown, operationType: OperationType, path: string) => {
+    try {
+      handleFirestoreError(error, operationType, path);
+    } catch (wrapped) {
+      const msg = wrapped instanceof Error ? wrapped.message : String(wrapped);
+      onError(msg);
+    }
+  };
+
+  // 1. Subscribe to public Topics + per-topic Questions subcollection
+  unsubscribers.push(subscribeTopicsTree(tracker, onTopics, reportSnapshotError));
+
+  // 2. Subscribe to Managed Accounts (Cloud Admin only)
+  if (isCloudAdmin) {
+    const accountsQuery = query(
+      collection(db, 'managed_accounts'),
+      where('scope', '==', 'unit_490')
+    );
+    const unsubAccounts = onSnapshot(
+      accountsQuery,
+      (snapshot) => {
+        const nextIds = new Set<string>();
+        const list: UserAccount[] = [];
+        snapshot.forEach((docSnap) => {
+          nextIds.add(docSnap.id);
+          list.push(parseAccountDoc(docSnap.id, docSnap.data()));
+        });
+        tracker.accountIds = nextIds;
+        onAccounts(list);
+      },
+      (err) => reportSnapshotError(err, OperationType.LIST, 'managed_accounts')
+    );
+    unsubscribers.push(unsubAccounts);
+  }
+
+  // 3. Subscribe to Attempts
+  const attemptsQuery = isCloudAdmin
+    ? query(collection(db, 'attempts'), where('scope', '==', 'unit_490'))
+    : query(collection(db, 'attempts'), where('ownerUid', '==', user.uid));
+
+  const unsubAttempts = onSnapshot(
+    attemptsQuery,
+    (snapshot) => {
+      const nextIds = new Set<string>();
+      const list: QuizAttempt[] = [];
+      snapshot.forEach((docSnap) => {
+        nextIds.add(docSnap.id);
+        list.push(parseAttemptDoc(docSnap.id, docSnap.data()));
+      });
+      list.sort(
+        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
+      tracker.attemptIds = nextIds;
+      onAttempts(list);
+    },
+    (err) => reportSnapshotError(err, OperationType.LIST, 'attempts')
+  );
+  unsubscribers.push(unsubAttempts);
+
+  // 4. Subscribe to Public Honor Entries
+  const honorQuery = query(
+    collection(db, 'honor_entries'),
+    where('visibility', '==', 'public')
+  );
+  const unsubHonor = onSnapshot(
+    honorQuery,
+    (snapshot) => {
+      const nextIds = new Set<string>();
+      const list: QuizAttempt[] = [];
+      snapshot.forEach((docSnap) => {
+        nextIds.add(docSnap.id);
+        list.push(parseAttemptDoc(docSnap.id, docSnap.data()));
+      });
+      list.sort(
+        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
+      tracker.honorEntryIds = nextIds;
+      onHonorEntries(list);
+    },
+    (err) => reportSnapshotError(err, OperationType.LIST, 'honor_entries')
+  );
+  unsubscribers.push(unsubHonor);
+
+  return () => {
+    for (const unsub of unsubscribers) unsub();
   };
 }
 
@@ -418,6 +620,45 @@ function buildAccountUpdatePayload(acc: UserAccount) {
     defaultUnit: clampString(acc.defaultUnit, 200, ''),
     role: acc.role === 'admin' ? 'admin' : 'student',
     active: Boolean(acc.active),
+    updatedAtIso: clampString(acc.updatedAt, 40, new Date().toISOString()),
+    updatedAt: serverTimestamp(),
+  };
+}
+
+function buildAccountDirectoryCreatePayload(
+  acc: UserAccount,
+  docId: string,
+  passwordHash: string
+) {
+  const cleanUsername = clampString(acc.username, 64, 'user');
+  return {
+    id: docId,
+    username: cleanUsername,
+    usernameLower: cleanUsername.toLowerCase(),
+    passwordHash,
+    fullName: clampString(acc.fullName, 150, ''),
+    defaultUnit: clampString(acc.defaultUnit, 200, ''),
+    role: acc.role === 'admin' ? 'admin' : 'student',
+    active: Boolean(acc.active),
+    visibility: 'public' as const,
+    createdAtIso: clampString(acc.createdAt, 40, new Date().toISOString()),
+    updatedAtIso: clampString(acc.updatedAt, 40, new Date().toISOString()),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+}
+
+function buildAccountDirectoryUpdatePayload(acc: UserAccount, passwordHash: string) {
+  const cleanUsername = clampString(acc.username, 64, 'user');
+  return {
+    username: cleanUsername,
+    usernameLower: cleanUsername.toLowerCase(),
+    passwordHash,
+    fullName: clampString(acc.fullName, 150, ''),
+    defaultUnit: clampString(acc.defaultUnit, 200, ''),
+    role: acc.role === 'admin' ? 'admin' : 'student',
+    active: Boolean(acc.active),
+    visibility: 'public' as const,
     updatedAtIso: clampString(acc.updatedAt, 40, new Date().toISOString()),
     updatedAt: serverTimestamp(),
   };
@@ -452,7 +693,12 @@ function buildTopicUpdatePayload(topic: Topic) {
   };
 }
 
-function buildQuestionCreatePayload(q: Question, topicId: string, qId: string, orderIndex: number) {
+function buildQuestionCreatePayload(
+  q: Question,
+  topicId: string,
+  qId: string,
+  orderIndex: number
+) {
   return {
     id: qId,
     topicId,
@@ -479,13 +725,41 @@ function buildQuestionUpdatePayload(q: Question, orderIndex: number) {
   };
 }
 
-function buildAttemptCreatePayload(attempt: QuizAttempt, docId: string, ownerUid: string) {
+function resolveAttemptAccountId(
+  attempt: QuizAttempt,
+  accounts?: UserAccount[],
+  explicitAccountId?: string
+): string {
+  if (explicitAccountId && explicitAccountId.trim()) {
+    return sanitizeFirestoreId(explicitAccountId, 'acc');
+  }
+  if (attempt.accountId && attempt.accountId.trim()) {
+    return sanitizeFirestoreId(attempt.accountId, 'acc');
+  }
+  if (accounts && accounts.length > 0 && attempt.accountUsername) {
+    const matched = accounts.find(
+      (a) => a.username.toLowerCase() === attempt.accountUsername.toLowerCase()
+    );
+    if (matched) {
+      return sanitizeFirestoreId(matched.id, 'acc');
+    }
+  }
+  return 'acc-admin-01';
+}
+
+function buildAttemptCreatePayload(
+  attempt: QuizAttempt,
+  docId: string,
+  ownerUid: string,
+  accountId: string
+) {
   const totalCount = clampNumber(Math.trunc(attempt.totalCount || 0), 0, 5000);
   const correctCount = clampNumber(Math.trunc(attempt.correctCount || 0), 0, totalCount);
   return {
     id: docId,
     scope: 'unit_490' as const,
     ownerUid,
+    accountId,
     accountUsername: clampString(attempt.accountUsername, 64, 'hocvien'),
     candidateName: clampString(attempt.candidateName, 150, 'Thí sinh'),
     unitName: clampString(attempt.unitName, 200, 'Tiểu đoàn 3'),
@@ -505,13 +779,19 @@ function buildAttemptCreatePayload(attempt: QuizAttempt, docId: string, ownerUid
   };
 }
 
-function buildHonorCreatePayload(attempt: QuizAttempt, docId: string, ownerUid: string) {
+function buildHonorCreatePayload(
+  attempt: QuizAttempt,
+  docId: string,
+  ownerUid: string,
+  accountId: string
+) {
   const totalCount = clampNumber(Math.trunc(attempt.totalCount || 0), 0, 5000);
   const correctCount = clampNumber(Math.trunc(attempt.correctCount || 0), 0, totalCount);
   return {
     id: docId,
     attemptId: docId,
     ownerUid,
+    accountId,
     visibility: 'public' as const,
     accountUsername: clampString(attempt.accountUsername, 64, 'hocvien'),
     candidateName: clampString(attempt.candidateName, 150, 'Thí sinh'),
@@ -532,7 +812,8 @@ function buildHonorCreatePayload(attempt: QuizAttempt, docId: string, ownerUid: 
 export async function syncAccountsToFirestore(
   prevAccounts: UserAccount[],
   nextAccounts: UserAccount[],
-  tracker: CloudSnapshotTracker
+  tracker: CloudSnapshotTracker,
+  allowDeletes = true
 ): Promise<void> {
   const prevMap = new Map(prevAccounts.map((a) => [a.id, a]));
   const nextIds = new Set(nextAccounts.map((a) => sanitizeFirestoreId(a.id, 'acc')));
@@ -540,165 +821,270 @@ export async function syncAccountsToFirestore(
   for (const acc of nextAccounts) {
     const docId = sanitizeFirestoreId(acc.id, 'acc');
     const prev = prevMap.get(acc.id);
-    const existsInCloud = tracker.accountIds.has(docId);
+    const hasChanged = !prev || JSON.stringify(prev) !== JSON.stringify(acc);
+    const passwordHash = acc.password
+      ? await hashUnitPassword(acc.username, acc.password)
+      : acc.passwordHash && /^[a-f0-9]{64}$/.test(acc.passwordHash)
+      ? acc.passwordHash
+      : await hashUnitPassword(acc.username, '123456');
+
+    // 1. Sync Admin-only /managed_accounts/{docId}
+    const ref = doc(db, 'managed_accounts', docId);
+    const path = `managed_accounts/${docId}`;
+    let existsInCloud = tracker.accountIds.has(docId);
+    if (!existsInCloud) {
+      try {
+        const snap = await getDoc(ref);
+        existsInCloud = snap.exists();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    }
 
     if (!existsInCloud) {
-      const path = `managed_accounts/${docId}`;
       try {
-        await setDoc(doc(db, 'managed_accounts', docId), buildAccountCreatePayload(acc, docId));
+        await setDoc(ref, buildAccountCreatePayload(acc, docId));
         tracker.accountIds.add(docId);
       } catch (error) {
         handleFirestoreError(error, OperationType.CREATE, path);
       }
-    } else if (!prev || JSON.stringify(prev) !== JSON.stringify(acc)) {
-      const path = `managed_accounts/${docId}`;
+    } else if (hasChanged) {
       try {
-        await updateDoc(doc(db, 'managed_accounts', docId), buildAccountUpdatePayload(acc));
+        await updateDoc(ref, buildAccountUpdatePayload(acc));
+        tracker.accountIds.add(docId);
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, path);
       }
     }
+
+    // 2. Sync split-collection hashed /account_directory/{docId} so student/guest devices receive updates live
+    const dirRef = doc(db, 'account_directory', docId);
+    const dirPath = `account_directory/${docId}`;
+    let existsInDir = tracker.directoryIds.has(docId);
+    if (!existsInDir) {
+      try {
+        const dirSnap = await getDoc(dirRef);
+        existsInDir = dirSnap.exists();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, dirPath);
+      }
+    }
+
+    if (!existsInDir) {
+      try {
+        await setDoc(dirRef, buildAccountDirectoryCreatePayload(acc, docId, passwordHash));
+        tracker.directoryIds.add(docId);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, dirPath);
+      }
+    } else if (hasChanged) {
+      try {
+        await updateDoc(dirRef, buildAccountDirectoryUpdatePayload(acc, passwordHash));
+        tracker.directoryIds.add(docId);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, dirPath);
+      }
+    }
   }
 
-  // Delete removed accounts
-  for (const existingId of Array.from(tracker.accountIds)) {
-    if (!nextIds.has(existingId)) {
-      const path = `managed_accounts/${existingId}`;
-      try {
-        await deleteDoc(doc(db, 'managed_accounts', existingId));
-        tracker.accountIds.delete(existingId);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, path);
+  if (allowDeletes) {
+    const deleteIds = new Set<string>([
+      ...Array.from(tracker.accountIds),
+      ...Array.from(tracker.directoryIds),
+    ]);
+    for (const existingId of deleteIds) {
+      if (!nextIds.has(existingId)) {
+        if (tracker.accountIds.has(existingId)) {
+          const path = `managed_accounts/${existingId}`;
+          try {
+            await deleteDoc(doc(db, 'managed_accounts', existingId));
+            tracker.accountIds.delete(existingId);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, path);
+          }
+        }
+        if (tracker.directoryIds.has(existingId)) {
+          const dirPath = `account_directory/${existingId}`;
+          try {
+            await deleteDoc(doc(db, 'account_directory', existingId));
+            tracker.directoryIds.delete(existingId);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.DELETE, dirPath);
+          }
+        }
       }
     }
   }
 }
 
+export async function syncSingleTopicToFirestore(
+  topic: Topic,
+  prevTopic: Topic | undefined,
+  tracker: CloudSnapshotTracker
+): Promise<void> {
+  const topicId = sanitizeFirestoreId(topic.id, 'topic');
+  const topicRef = doc(db, 'topics', topicId);
+  const topicPath = `topics/${topicId}`;
+
+  let topicExists = false;
+  try {
+    const snap = await getDoc(topicRef);
+    topicExists = snap.exists();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, topicPath);
+  }
+
+  if (!topicExists) {
+    try {
+      await setDoc(topicRef, buildTopicCreatePayload(topic, topicId));
+      tracker.topicIds.add(topicId);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, topicPath);
+    }
+  } else if (
+    !prevTopic ||
+    prevTopic.code !== topic.code ||
+    prevTopic.title !== topic.title ||
+    prevTopic.description !== topic.description ||
+    prevTopic.timeLimitMinutes !== topic.timeLimitMinutes ||
+    prevTopic.questions.length !== topic.questions.length
+  ) {
+    try {
+      await updateDoc(topicRef, buildTopicUpdatePayload(topic));
+      tracker.topicIds.add(topicId);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, topicPath);
+    }
+  }
+
+  // Fetch authoritative existing question IDs for this topic
+  const existingQIds = new Set<string>();
+  try {
+    const qSnap = await getDocs(
+      query(collection(db, 'topics', topicId, 'questions'), where('visibility', '==', 'public'))
+    );
+    qSnap.forEach((d) => existingQIds.add(d.id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, `topics/${topicId}/questions`);
+  }
+
+  const prevQMap = new Map((prevTopic?.questions || []).map((q, idx) => [q.id, { q, idx }]));
+  const nextQIds = new Set<string>();
+
+  let batch = writeBatch(db);
+  let batchCount = 0;
+  const flushBatch = async (pathHint: string) => {
+    if (batchCount === 0) return;
+    const currentBatch = batch;
+    batch = writeBatch(db);
+    batchCount = 0;
+    try {
+      await currentBatch.commit();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, pathHint);
+    }
+  };
+
+  for (let i = 0; i < topic.questions.length; i++) {
+    const q = topic.questions[i];
+    const qId = sanitizeFirestoreId(q.id, 'q');
+    nextQIds.add(qId);
+    const prevEntry = prevQMap.get(q.id);
+    const qRef = doc(db, 'topics', topicId, 'questions', qId);
+
+    if (!existingQIds.has(qId)) {
+      batch.set(qRef, buildQuestionCreatePayload(q, topicId, qId, i));
+      existingQIds.add(qId);
+      batchCount++;
+    } else if (
+      !prevEntry ||
+      prevEntry.idx !== i ||
+      JSON.stringify(prevEntry.q) !== JSON.stringify(q)
+    ) {
+      batch.update(qRef, buildQuestionUpdatePayload(q, i));
+      batchCount++;
+    }
+
+    if (batchCount >= 350) {
+      await flushBatch(`topics/${topicId}/questions`);
+    }
+  }
+
+  for (const oldQId of Array.from(existingQIds)) {
+    if (!nextQIds.has(oldQId)) {
+      batch.delete(doc(db, 'topics', topicId, 'questions', oldQId));
+      existingQIds.delete(oldQId);
+      batchCount++;
+      if (batchCount >= 350) {
+        await flushBatch(`topics/${topicId}/questions`);
+      }
+    }
+  }
+
+  await flushBatch(`topics/${topicId}/questions`);
+  tracker.questionIdsByTopic.set(topicId, existingQIds);
+}
+
 export async function syncTopicsToFirestore(
   prevTopics: Topic[],
   nextTopics: Topic[],
-  tracker: CloudSnapshotTracker
+  tracker: CloudSnapshotTracker,
+  allowDeletes = true
 ): Promise<void> {
   const prevMap = new Map(prevTopics.map((t) => [t.id, t]));
   const nextTopicIds = new Set(nextTopics.map((t) => sanitizeFirestoreId(t.id, 'topic')));
 
   for (const topic of nextTopics) {
-    const topicId = sanitizeFirestoreId(topic.id, 'topic');
-    const prev = prevMap.get(topic.id);
-    const topicExists = tracker.topicIds.has(topicId);
-    const existingQIds = tracker.questionIdsByTopic.get(topicId) || new Set<string>();
-
-    // Ensure parent topic exists or is updated first
-    if (!topicExists) {
-      const path = `topics/${topicId}`;
-      try {
-        await setDoc(doc(db, 'topics', topicId), buildTopicCreatePayload(topic, topicId));
-        tracker.topicIds.add(topicId);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.CREATE, path);
-      }
-    } else if (
-      !prev ||
-      prev.code !== topic.code ||
-      prev.title !== topic.title ||
-      prev.description !== topic.description ||
-      prev.timeLimitMinutes !== topic.timeLimitMinutes ||
-      prev.questions.length !== topic.questions.length
-    ) {
-      const path = `topics/${topicId}`;
-      try {
-        await updateDoc(doc(db, 'topics', topicId), buildTopicUpdatePayload(topic));
-      } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, path);
-      }
-    }
-
-    // Sync questions subcollection in batches of 350
-    const prevQMap = new Map((prev?.questions || []).map((q, idx) => [q.id, { q, idx }]));
-    const nextQIds = new Set<string>();
-    const ops: Array<() => Promise<void>> = [];
-
-    let batch = writeBatch(db);
-    let batchCount = 0;
-    const flushBatch = async (pathHint: string) => {
-      if (batchCount === 0) return;
-      const currentBatch = batch;
-      batch = writeBatch(db);
-      batchCount = 0;
-      try {
-        await currentBatch.commit();
-      } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, pathHint);
-      }
-    };
-
-    for (let i = 0; i < topic.questions.length; i++) {
-      const q = topic.questions[i];
-      const qId = sanitizeFirestoreId(q.id, 'q');
-      nextQIds.add(qId);
-      const prevEntry = prevQMap.get(q.id);
-      const qRef = doc(db, 'topics', topicId, 'questions', qId);
-
-      if (!existingQIds.has(qId)) {
-        batch.set(qRef, buildQuestionCreatePayload(q, topicId, qId, i));
-        existingQIds.add(qId);
-        batchCount++;
-      } else if (
-        !prevEntry ||
-        prevEntry.idx !== i ||
-        JSON.stringify(prevEntry.q) !== JSON.stringify(q)
-      ) {
-        batch.update(qRef, buildQuestionUpdatePayload(q, i));
-        batchCount++;
-      }
-
-      if (batchCount >= 350) {
-        await flushBatch(`topics/${topicId}/questions`);
-      }
-    }
-
-    for (const oldQId of Array.from(existingQIds)) {
-      if (!nextQIds.has(oldQId)) {
-        batch.delete(doc(db, 'topics', topicId, 'questions', oldQId));
-        existingQIds.delete(oldQId);
-        batchCount++;
-        if (batchCount >= 350) {
-          await flushBatch(`topics/${topicId}/questions`);
-        }
-      }
-    }
-
-    await flushBatch(`topics/${topicId}/questions`);
-    tracker.questionIdsByTopic.set(topicId, existingQIds);
-    for (const op of ops) await op();
+    await syncSingleTopicToFirestore(topic, prevMap.get(topic.id), tracker);
   }
 
-  // Delete removed topics & their subcollection questions
-  for (const existingTopicId of Array.from(tracker.topicIds)) {
-    if (!nextTopicIds.has(existingTopicId)) {
-      const qIds = tracker.questionIdsByTopic.get(existingTopicId) || new Set<string>();
-      let batch = writeBatch(db);
-      let count = 0;
-      for (const qId of qIds) {
-        batch.delete(doc(db, 'topics', existingTopicId, 'questions', qId));
-        count++;
-        if (count >= 350) {
-          try {
-            await batch.commit();
-          } catch (error) {
-            handleFirestoreError(error, OperationType.DELETE, `topics/${existingTopicId}/questions`);
-          }
-          batch = writeBatch(db);
-          count = 0;
+  if (allowDeletes) {
+    for (const existingTopicId of Array.from(tracker.topicIds)) {
+      if (!nextTopicIds.has(existingTopicId)) {
+        const qIds = new Set<string>();
+        try {
+          const qSnap = await getDocs(
+            query(
+              collection(db, 'topics', existingTopicId, 'questions'),
+              where('visibility', '==', 'public')
+            )
+          );
+          qSnap.forEach((d) => qIds.add(d.id));
+        } catch (error) {
+          handleFirestoreError(
+            error,
+            OperationType.LIST,
+            `topics/${existingTopicId}/questions`
+          );
         }
-      }
-      batch.delete(doc(db, 'topics', existingTopicId));
-      try {
-        await batch.commit();
-        tracker.topicIds.delete(existingTopicId);
-        tracker.questionIdsByTopic.delete(existingTopicId);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `topics/${existingTopicId}`);
+
+        let batch = writeBatch(db);
+        let count = 0;
+        for (const qId of qIds) {
+          batch.delete(doc(db, 'topics', existingTopicId, 'questions', qId));
+          count++;
+          if (count >= 350) {
+            try {
+              await batch.commit();
+            } catch (error) {
+              handleFirestoreError(
+                error,
+                OperationType.DELETE,
+                `topics/${existingTopicId}/questions`
+              );
+            }
+            batch = writeBatch(db);
+            count = 0;
+          }
+        }
+        batch.delete(doc(db, 'topics', existingTopicId));
+        try {
+          await batch.commit();
+          tracker.topicIds.delete(existingTopicId);
+          tracker.questionIdsByTopic.delete(existingTopicId);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, `topics/${existingTopicId}`);
+        }
       }
     }
   }
@@ -707,27 +1093,93 @@ export async function syncTopicsToFirestore(
 export async function saveSingleAttemptToFirestore(
   attempt: QuizAttempt,
   ownerUid: string,
-  tracker: CloudSnapshotTracker
+  tracker: CloudSnapshotTracker,
+  options?: {
+    accountId?: string;
+    accounts?: UserAccount[];
+    isCloudAdmin?: boolean;
+    localTopics?: Topic[];
+  }
 ): Promise<boolean> {
   const attemptId = sanitizeFirestoreId(attempt.id, 'att');
   const topicId = sanitizeFirestoreId(attempt.topicId, 'topic');
+  const resolvedAccountId = resolveAttemptAccountId(
+    attempt,
+    options?.accounts,
+    options?.accountId
+  );
+  const isUnitSubmission = ownerUid === 'unit_account';
 
-  // Verify parent topic exists in cloud before writing to avoid orphaned attempt rejection
-  if (!tracker.topicIds.has(topicId)) {
-    return false;
+  // Check authoritative existence via honor_entries (publicly readable by all devices) or attempts
+  if (isUnitSubmission) {
+    try {
+      const existingHonor = await getDoc(doc(db, 'honor_entries', attemptId));
+      if (existingHonor.exists()) {
+        tracker.honorEntryIds.add(attemptId);
+        return true;
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, `honor_entries/${attemptId}`);
+    }
+
+    // Verify account exists and is active in /account_directory before submitting unauthenticated
+    try {
+      const dirSnap = await getDoc(doc(db, 'account_directory', resolvedAccountId));
+      if (!dirSnap.exists()) return false;
+      const dirData = dirSnap.data();
+      if (
+        dirData.active !== true ||
+        String(dirData.username || '') !== clampString(attempt.accountUsername, 64, 'hocvien')
+      ) {
+        return false;
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, `account_directory/${resolvedAccountId}`);
+    }
+  } else {
+    const attemptRef = doc(db, 'attempts', attemptId);
+    try {
+      const existingAtt = await getDoc(attemptRef);
+      if (existingAtt.exists()) {
+        tracker.attemptIds.add(attemptId);
+        return true;
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.GET, `attempts/${attemptId}`);
+    }
   }
-  if (tracker.attemptIds.has(attemptId)) {
-    return true;
+
+  // Ensure parent topic exists in Firestore (required by Global Consistency rule)
+  let topicExists = false;
+  try {
+    const topicSnap = await getDoc(doc(db, 'topics', topicId));
+    topicExists = topicSnap.exists();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, `topics/${topicId}`);
+  }
+
+  if (!topicExists && options?.isCloudAdmin && options.localTopics) {
+    const localParent = options.localTopics.find(
+      (t) => sanitizeFirestoreId(t.id, 'topic') === topicId
+    );
+    if (localParent) {
+      await syncSingleTopicToFirestore(localParent, undefined, tracker);
+      topicExists = true;
+    }
+  }
+
+  if (!topicExists) {
+    return false;
   }
 
   const batch = writeBatch(db);
   batch.set(
     doc(db, 'attempts', attemptId),
-    buildAttemptCreatePayload(attempt, attemptId, ownerUid)
+    buildAttemptCreatePayload(attempt, attemptId, ownerUid, resolvedAccountId)
   );
   batch.set(
     doc(db, 'honor_entries', attemptId),
-    buildHonorCreatePayload(attempt, attemptId, ownerUid)
+    buildHonorCreatePayload(attempt, attemptId, ownerUid, resolvedAccountId)
   );
 
   try {
@@ -744,7 +1196,9 @@ export async function syncAttemptsDiffToFirestore(
   nextAttempts: QuizAttempt[],
   ownerUid: string,
   isCloudAdmin: boolean,
-  tracker: CloudSnapshotTracker
+  tracker: CloudSnapshotTracker,
+  localTopics: Topic[],
+  accounts?: UserAccount[]
 ): Promise<void> {
   const nextIds = new Set(nextAttempts.map((a) => sanitizeFirestoreId(a.id, 'att')));
 
@@ -752,13 +1206,26 @@ export async function syncAttemptsDiffToFirestore(
   for (const att of nextAttempts) {
     const attId = sanitizeFirestoreId(att.id, 'att');
     if (!tracker.attemptIds.has(attId)) {
-      await saveSingleAttemptToFirestore(att, ownerUid, tracker);
+      await saveSingleAttemptToFirestore(att, ownerUid, tracker, {
+        accounts,
+        isCloudAdmin,
+        localTopics,
+      });
     }
   }
 
   // Delete removed attempts & paired honor entries (Admin only)
   if (isCloudAdmin) {
-    const toDelete = Array.from(tracker.attemptIds).filter((id) => !nextIds.has(id));
+    const cloudSnap = await getDocs(
+      query(collection(db, 'attempts'), where('scope', '==', 'unit_490'))
+    );
+    const toDelete: string[] = [];
+    cloudSnap.forEach((d) => {
+      if (!nextIds.has(d.id)) {
+        toDelete.push(d.id);
+      }
+    });
+
     let batch = writeBatch(db);
     let count = 0;
 
@@ -792,6 +1259,191 @@ export async function syncAttemptsDiffToFirestore(
   }
 }
 
+/**
+ * Deterministic 2-way merge + automatic push on initial Google connect.
+ * Ensures NO local-only accounts, topics, or attempts are ever lost when connecting,
+ * and backfills /account_directory so student/guest devices receive every account live.
+ */
+export async function mergeAndSyncOnConnect(params: {
+  user: User;
+  isCloudAdmin: boolean;
+  localAccounts: UserAccount[];
+  localTopics: Topic[];
+  localAttempts: QuizAttempt[];
+  defaultAdminAccount: UserAccount;
+  tracker: CloudSnapshotTracker;
+}): Promise<{
+  accounts: UserAccount[];
+  topics: Topic[];
+  attempts: QuizAttempt[];
+  counts: { accounts: number; topics: number; attempts: number };
+}> {
+  const {
+    user,
+    isCloudAdmin,
+    localAccounts,
+    localTopics,
+    localAttempts,
+    defaultAdminAccount,
+    tracker,
+  } = params;
+
+  // 1. Fetch & merge Accounts + backfill /account_directory (Cloud Admin only)
+  let mergedAccounts = localAccounts;
+  if (isCloudAdmin) {
+    const cloudAccounts: UserAccount[] = [];
+    try {
+      const accSnap = await getDocs(
+        query(collection(db, 'managed_accounts'), where('scope', '==', 'unit_490'))
+      );
+      accSnap.forEach((d) => {
+        tracker.accountIds.add(d.id);
+        cloudAccounts.push(parseAccountDoc(d.id, d.data()));
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'managed_accounts');
+    }
+
+    try {
+      const dirSnap = await getDocs(
+        query(collection(db, 'account_directory'), where('visibility', '==', 'public'))
+      );
+      dirSnap.forEach((d) => {
+        tracker.directoryIds.add(d.id);
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.LIST, 'account_directory');
+    }
+
+    const accByUsername = new Map<string, UserAccount>();
+    for (const ca of cloudAccounts) accByUsername.set(ca.username.toLowerCase(), ca);
+    for (const la of localAccounts) {
+      const key = la.username.toLowerCase();
+      if (!accByUsername.has(key) && la.password) {
+        accByUsername.set(key, la);
+      }
+    }
+    if (!accByUsername.has('admin')) {
+      accByUsername.set('admin', defaultAdminAccount);
+    }
+    mergedAccounts = Array.from(accByUsername.values());
+
+    // Push any account missing from managed_accounts OR missing from account_directory
+    const needsSync = mergedAccounts.filter((a) => {
+      const id = sanitizeFirestoreId(a.id, 'acc');
+      return !tracker.accountIds.has(id) || !tracker.directoryIds.has(id);
+    });
+    if (needsSync.length > 0) {
+      await syncAccountsToFirestore([], needsSync, tracker, false);
+    }
+  }
+
+  // 2. Fetch & merge Topics + Questions
+  const cloudTopics: Topic[] = [];
+  try {
+    const topicSnap = await getDocs(
+      query(collection(db, 'topics'), where('visibility', '==', 'public'))
+    );
+    for (const tDoc of topicSnap.docs) {
+      const td = tDoc.data();
+      const tid = tDoc.id;
+      tracker.topicIds.add(tid);
+
+      const qSnap = await getDocs(
+        query(collection(db, 'topics', tid, 'questions'), where('visibility', '==', 'public'))
+      );
+      const qIds = new Set<string>();
+      const qList: Array<Question & { _order: number }> = [];
+      qSnap.forEach((qd) => {
+        qIds.add(qd.id);
+        qList.push(parseQuestionDoc(qd.id, qd.data()));
+      });
+      qList.sort((a, b) => a._order - b._order);
+      tracker.questionIdsByTopic.set(tid, qIds);
+
+      cloudTopics.push({
+        id: tid,
+        code: String(td.code || 'CD-01'),
+        title: String(td.title || 'Chuyên đề'),
+        description: String(td.description || ''),
+        timeLimitMinutes: Number(td.timeLimitMinutes || 15),
+        createdAt: timestampToIso(td.createdAt, td.createdAtIso),
+        updatedAt: timestampToIso(td.updatedAt, td.updatedAtIso),
+        questions: qList.map(({ _order: _unused, ...rest }) => rest),
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'topics');
+  }
+
+  const topicsById = new Map<string, Topic>();
+  for (const ct of cloudTopics) topicsById.set(sanitizeFirestoreId(ct.id, 'topic'), ct);
+  const localOnlyTopics: Topic[] = [];
+  for (const lt of localTopics) {
+    const tid = sanitizeFirestoreId(lt.id, 'topic');
+    if (!topicsById.has(tid)) {
+      topicsById.set(tid, lt);
+      localOnlyTopics.push(lt);
+    }
+  }
+
+  if (isCloudAdmin && localOnlyTopics.length > 0) {
+    await syncTopicsToFirestore([], localOnlyTopics, tracker, false);
+  }
+  const mergedTopics = Array.from(topicsById.values()).sort((a, b) =>
+    a.code.localeCompare(b.code)
+  );
+
+  // 3. Fetch & merge Attempts
+  const cloudAttempts: QuizAttempt[] = [];
+  try {
+    const attQuery = isCloudAdmin
+      ? query(collection(db, 'attempts'), where('scope', '==', 'unit_490'))
+      : query(collection(db, 'attempts'), where('ownerUid', '==', user.uid));
+    const attSnap = await getDocs(attQuery);
+    attSnap.forEach((d) => {
+      tracker.attemptIds.add(d.id);
+      cloudAttempts.push(parseAttemptDoc(d.id, d.data()));
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'attempts');
+  }
+
+  const attemptsById = new Map<string, QuizAttempt>();
+  for (const ca of cloudAttempts) attemptsById.set(sanitizeFirestoreId(ca.id, 'att'), ca);
+  const localOnlyAttempts: QuizAttempt[] = [];
+  for (const la of localAttempts) {
+    const aid = sanitizeFirestoreId(la.id, 'att');
+    if (!attemptsById.has(aid)) {
+      attemptsById.set(aid, la);
+      localOnlyAttempts.push(la);
+    }
+  }
+
+  for (const att of localOnlyAttempts) {
+    await saveSingleAttemptToFirestore(att, user.uid, tracker, {
+      accounts: mergedAccounts,
+      isCloudAdmin,
+      localTopics: mergedTopics,
+    });
+  }
+
+  const mergedAttempts = Array.from(attemptsById.values()).sort(
+    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+  );
+
+  return {
+    accounts: mergedAccounts,
+    topics: mergedTopics,
+    attempts: mergedAttempts,
+    counts: {
+      accounts: tracker.accountIds.size,
+      topics: tracker.topicIds.size,
+      attempts: tracker.attemptIds.size,
+    },
+  };
+}
+
 export async function pushAllLocalDataToFirestore(params: {
   accounts: UserAccount[];
   topics: Topic[];
@@ -807,15 +1459,19 @@ export async function pushAllLocalDataToFirestore(params: {
   let attemptsSynced = 0;
 
   if (isCloudAdmin) {
-    await syncAccountsToFirestore([], accounts, tracker);
+    await syncAccountsToFirestore([], accounts, tracker, false);
     accountsSynced = accounts.length;
 
-    await syncTopicsToFirestore([], topics, tracker);
+    await syncTopicsToFirestore([], topics, tracker, false);
     topicsSynced = topics.length;
   }
 
   for (const att of attempts) {
-    const ok = await saveSingleAttemptToFirestore(att, ownerUid, tracker);
+    const ok = await saveSingleAttemptToFirestore(att, ownerUid, tracker, {
+      accounts,
+      isCloudAdmin,
+      localTopics: topics,
+    });
     if (ok) attemptsSynced++;
   }
 

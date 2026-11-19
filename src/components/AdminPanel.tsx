@@ -62,6 +62,7 @@ interface AdminPanelProps {
   onUpdateTopics: (topics: Topic[]) => void;
   onUpdateAttempts: (attempts: QuizAttempt[]) => void;
   onConnectCloud: () => Promise<void>;
+  onCancelConnectCloud: () => void;
   onDisconnectCloud: () => Promise<void>;
   onSyncCloudNow: () => Promise<void>;
 }
@@ -82,6 +83,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onUpdateTopics,
   onUpdateAttempts,
   onConnectCloud,
+  onCancelConnectCloud,
   onDisconnectCloud,
   onSyncCloudNow,
 }) => {
@@ -228,6 +230,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               ...a,
               username: uname,
               password: pwd,
+              passwordHash: undefined,
               fullName: accFullName.trim(),
               defaultUnit: accDefaultUnit.trim(),
               role: a.username.toLowerCase() === 'admin' ? 'admin' : accRole,
@@ -992,7 +995,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           </td>
                           <td className="py-3.5 px-4 font-mono-num text-xs text-[#243329]">
-                            {acc.password}
+                            {acc.password || '••••••••'}
                           </td>
                           <td className="py-3.5 px-4">
                             <div className="font-medium text-[#152019]">
@@ -1947,43 +1950,72 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             <div className="p-6 space-y-5">
-              {cloud.error && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs leading-relaxed"
-                >
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{cloud.error}</span>
-                </div>
-              )}
+              {cloud.error && (() => {
+                const urlMatch = cloud.error.match(
+                  /https:\/\/console\.firebase\.google\.com\/[^\s)]+/
+                );
+                return (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs leading-relaxed"
+                  >
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div className="space-y-2 min-w-0">
+                      <p className="break-words">{cloud.error}</p>
+                      {urlMatch && (
+                        <a
+                          href={urlMatch[0]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-[#FECACA] text-[#B91C1C] font-semibold hover:bg-[#FEE2E2] transition-colors"
+                        >
+                          Mở cài đặt Firebase Console
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {!cloud.connected ? (
                 <div className="space-y-4">
                   <div className="p-4 rounded-xl bg-[#FAFBF9] border border-[#DDE3DC] space-y-2">
                     <div className="flex items-center gap-2 text-sm font-bold text-[#152019]">
                       <CloudOff className="w-4 h-4 text-[#64756A]" />
-                      <span>Chưa kết nối tài khoản lưu trữ đám mây</span>
+                      <span>Chưa kết nối tài khoản Quản trị đám mây</span>
                     </div>
                     <p className="text-xs text-[#4B5B50] leading-relaxed">
-                      Hiện hệ thống đang lưu trữ trên bộ nhớ trình duyệt cục bộ (localStorage). Hãy
-                      đăng nhập Google để kích hoạt đồng bộ thời gian thực với cơ sở dữ liệu Firebase
-                      Firestore, đảm bảo dữ liệu không bị mất khi đổi máy hoặc xóa bộ nhớ trình duyệt.
+                      Hãy đăng nhập Google bằng tài khoản Quản trị để tự động đồng bộ mọi thay đổi về
+                      tài khoản, bộ chuyên đề và câu hỏi lên Firebase Firestore. Sau khi đồng bộ, các
+                      thiết bị học viên/khách sẽ tự động nhận dữ liệu mới nhất mà không cần đăng nhập
+                      Google.
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    disabled={cloud.syncing}
-                    onClick={() => void onConnectCloud()}
-                    className="w-full sm:w-auto px-5 py-2.5 bg-[#1F4D36] hover:bg-[#173B29] disabled:opacity-60 text-white text-sm font-semibold rounded-lg inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Cloud className="w-4 h-4" />
-                    <span>
-                      {cloud.syncing
-                        ? 'Đang kết nối...'
-                        : 'Kết nối lưu trữ đám mây (Đăng nhập Google)'}
-                    </span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      disabled={cloud.syncing}
+                      onClick={() => void onConnectCloud()}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-[#1F4D36] hover:bg-[#173B29] disabled:opacity-60 text-white text-sm font-semibold rounded-lg inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Cloud className="w-4 h-4" />
+                      <span>
+                        {cloud.syncing
+                          ? 'Đang chờ xác thực Google...'
+                          : 'Kết nối lưu trữ đám mây (Đăng nhập Google)'}
+                      </span>
+                    </button>
+                    {cloud.syncing && (
+                      <button
+                        type="button"
+                        onClick={onCancelConnectCloud}
+                        className="px-4 py-2.5 bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA] text-sm font-semibold rounded-lg transition-colors cursor-pointer"
+                      >
+                        Hủy kết nối
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-5">
@@ -2003,6 +2035,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <p className="text-xs text-[#166534]/90">
                       Tài khoản Google đang liên kết: <strong>{cloud.userEmail}</strong>
                     </p>
+                    {cloud.isCloudAdmin && (
+                      <p className="text-xs text-[#166534]/85">
+                        Mọi thay đổi tại trang Quản trị tự động đồng bộ trực tiếp sang các tài khoản học viên/khách.
+                      </p>
+                    )}
                     {cloud.lastSyncedAt && (
                       <p className="text-xs text-[#166534]/80 font-mono-num">
                         Lần đồng bộ gần nhất: {formatDateTime(cloud.lastSyncedAt)}

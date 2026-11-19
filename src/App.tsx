@@ -1,13 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { AdminPanel } from './components/AdminPanel';
+import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
 import { TopicsView } from './components/TopicsView';
-import { MainTab, QuizAttempt, Topic, UserAccount } from './types';
+import { DEFAULT_ACCOUNTS } from './data/defaultData';
+import {
+  FIREBASE_PROJECT_ID,
+  FIRESTORE_DATABASE_ID,
+  auth,
+  signInWithGoogleCloud,
+  signOutGoogleCloud,
+} from './firebase';
+import { CloudStorageState, MainTab, QuizAttempt, Topic, UserAccount } from './types';
+import {
+  checkIsCloudAdmin,
+  createEmptyCloudTracker,
+  pushAllLocalDataToFirestore,
+  saveSingleAttemptToFirestore,
+  subscribeToCloudData,
+  syncAccountsToFirestore,
+  syncAttemptsDiffToFirestore,
+  syncTopicsToFirestore,
+} from './utils/firebaseSync';
 import {
   loadAccounts,
   loadAttempts,
@@ -21,18 +41,75 @@ import {
 
 const EASE_SMOOTH = [0.16, 1, 0.3, 1] as const;
 
+function formatCloudErrorMessage(raw: unknown): string {
+  const msg = raw instanceof Error ? raw.message : String(raw);
+  if (msg.includes("Free daily read units per project (free tier database)")) {
+    return `Đã vượt hạn mức đọc miễn phí hôm nay. Bạn có thể xem hoặc nâng cấp tại: https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/databases/${FIRESTORE_DATABASE_ID}/data?openUpgradeDialog=true`;
+  }
+  if (msg.includes('Quota exceeded')) {
+    return 'Hạn mức sử dụng cơ sở dữ liệu hôm nay đã hết và sẽ tự đặt lại vào ngày mai.';
+  }
+  if (msg.includes('popup-closed-by-user') || msg.includes('cancelled-popup-request')) {
+    return 'Đã hủy cửa sổ đăng nhập Google.';
+  }
+  if (msg.includes('popup-blocked')) {
+    return 'Trình duyệt đang chặn cửa sổ đăng nhập Google. Vui lòng cho phép popup rồi thử lại.';
+  }
+  if (msg.includes('Missing or insufficient permissions')) {
+    return 'Tài khoản Google này chưa được cấp quyền ghi vào mục quản trị này.';
+  }
+  return 'Không thể đồng bộ với cơ sở dữ liệu đám mây lúc này. Dữ liệu vẫn được lưu an toàn trên thiết bị.';
+}
+
 export default function App() {
   const [accounts, setAccounts] = useState<UserAccount[]>(() => loadAccounts());
   const [topics, setTopics] = useState<Topic[]>(() => loadTopics());
   const [attempts, setAttempts] = useState<QuizAttempt[]>(() => loadAttempts());
+  const [honorEntries, setHonorEntries] = useState<QuizAttempt[]>([]);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => loadSessionUserId());
   const [activeTab, setActiveTab] = useState<MainTab>('topics');
   const [activeQuizTopic, setActiveQuizTopic] = useState<Topic | null>(null);
+  const [showCloudModal, setShowCloudModal] = useState(false);
+
+  // Firebase Auth & Firestore Cloud Sync state
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [cloudState, setCloudState] = useState<CloudStorageState>({
+    authReady: false,
+    connected: false,
+    userEmail: null,
+    userDisplayName: null,
+    isCloudAdmin: false,
+    syncing: false,
+    lastSyncedAt: null,
+    error: null,
+    cloudAccountCount: 0,
+    cloudTopicCount: 0,
+    cloudAttemptCount: 0,
+  });
+
+  const trackerRef = useRef(createEmptyCloudTracker());
+  const accountsRef = useRef(accounts);
+  const topicsRef = useRef(topics);
+  const attemptsRef = useRef(attempts);
+  const seededRef = useRef({ accounts: false, topics: false, attempts: false });
+
+  useEffect(() => {
+    accountsRef.current = accounts;
+  }, [accounts]);
+
+  useEffect(() => {
+    topicsRef.current = topics;
+  }, [topics]);
+
+  useEffect(() => {
+    attemptsRef.current = attempts;
+  }, [attempts]);
 
   const currentUser =
     accounts.find((a) => a.id === currentUserId && a.active) || null;
 
+  // Cross-tab localStorage sync
   useEffect(() => {
     const handleStorageSync = (e: StorageEvent) => {
       if (e.key === 'tinhoc490_accounts_v1') setAccounts(loadAccounts());
@@ -42,6 +119,244 @@ export default function App() {
     window.addEventListener('storage', handleStorageSync);
     return () => window.removeEventListener('storage', handleStorageSync);
   }, []);
+
+  // Listen to Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user || !user.emailVerified) {
+        setFirebaseUser(null);
+        trackerRef.current = createEmptyCloudTracker();
+        seededRef.current = { accounts: false, topics: false, attempts: false };
+        setHonorEntries([]);
+        setCloudState({
+          authReady: true,
+          connected: false,
+          userEmail: null,
+          userDisplayName: null,
+          isCloudAdmin: false,
+          syncing: false,
+          lastSyncedAt: null,
+          error: null,
+          cloudAccountCount: 0,
+          cloudTopicCount: 0,
+          cloudAttemptCount: 0,
+        });
+        return;
+      }
+
+      setFirebaseUser(user);
+      let isAdmin = false;
+      try {
+        isAdmin = await checkIsCloudAdmin(user);
+      } catch (err) {
+        console.error('Admin check failed:', err);
+      }
+
+      setCloudState((prev) => ({
+        ...prev,
+        authReady: true,
+        connected: true,
+        userEmail: user.email,
+        userDisplayName: user.displayName,
+        isCloudAdmin: isAdmin,
+        syncing: true,
+        error: null,
+      }));
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Attach Firestore onSnapshot listeners ONLY when Firebase Auth is ready & user is authenticated
+  useEffect(() => {
+    if (!cloudState.authReady || !cloudState.connected || !firebaseUser) {
+      return;
+    }
+
+    const tracker = createEmptyCloudTracker();
+    trackerRef.current = tracker;
+    seededRef.current = { accounts: false, topics: false, attempts: false };
+    const isAdmin = cloudState.isCloudAdmin;
+
+    const unsubscribe = subscribeToCloudData({
+      user: firebaseUser,
+      isCloudAdmin: isAdmin,
+      tracker,
+      onAccounts: (cloudAccounts) => {
+        if (cloudAccounts.length > 0) {
+          seededRef.current.accounts = true;
+          const hasRootAdmin = cloudAccounts.some(
+            (a) => a.username.toLowerCase() === 'admin'
+          );
+          const merged = hasRootAdmin
+            ? cloudAccounts
+            : [DEFAULT_ACCOUNTS[0], ...cloudAccounts];
+          setAccounts(merged);
+          saveAccounts(merged);
+          setCloudState((prev) => ({
+            ...prev,
+            cloudAccountCount: merged.length,
+            lastSyncedAt: new Date().toISOString(),
+          }));
+        } else if (isAdmin && !seededRef.current.accounts && accountsRef.current.length > 0) {
+          seededRef.current.accounts = true;
+          void syncAccountsToFirestore([], accountsRef.current, tracker).catch((err) => {
+            setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+          });
+        }
+      },
+      onTopics: (cloudTopics) => {
+        if (cloudTopics.length > 0) {
+          seededRef.current.topics = true;
+          setTopics(cloudTopics);
+          saveTopics(cloudTopics);
+          setCloudState((prev) => ({
+            ...prev,
+            cloudTopicCount: cloudTopics.length,
+            lastSyncedAt: new Date().toISOString(),
+          }));
+
+          // If cloud attempts were initially empty, seed them once topics are ready
+          if (
+            isAdmin &&
+            !seededRef.current.attempts &&
+            tracker.attemptIds.size === 0 &&
+            attemptsRef.current.length > 0
+          ) {
+            seededRef.current.attempts = true;
+            void (async () => {
+              for (const att of attemptsRef.current) {
+                await saveSingleAttemptToFirestore(att, firebaseUser.uid, tracker);
+              }
+            })().catch((err) => {
+              setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+            });
+          }
+        } else if (isAdmin && !seededRef.current.topics && topicsRef.current.length > 0) {
+          seededRef.current.topics = true;
+          void syncTopicsToFirestore([], topicsRef.current, tracker).catch((err) => {
+            setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+          });
+        }
+      },
+      onAttempts: (cloudAttempts) => {
+        if (isAdmin) {
+          if (cloudAttempts.length > 0) {
+            seededRef.current.attempts = true;
+            setAttempts(cloudAttempts);
+            saveAttempts(cloudAttempts);
+          } else if (seededRef.current.attempts) {
+            // Cloud was explicitly cleared by Admin
+            setAttempts([]);
+            saveAttempts([]);
+          } else if (tracker.topicIds.size > 0 && attemptsRef.current.length > 0) {
+            seededRef.current.attempts = true;
+            void (async () => {
+              for (const att of attemptsRef.current) {
+                await saveSingleAttemptToFirestore(att, firebaseUser.uid, tracker);
+              }
+            })().catch((err) => {
+              setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+            });
+          }
+          setCloudState((prev) => ({
+            ...prev,
+            cloudAttemptCount: cloudAttempts.length,
+            lastSyncedAt: new Date().toISOString(),
+          }));
+        } else {
+          // Regular verified user: merge their cloud attempts with local unsynced cache
+          const byId = new Map<string, QuizAttempt>();
+          for (const localAtt of attemptsRef.current) byId.set(localAtt.id, localAtt);
+          for (const cloudAtt of cloudAttempts) byId.set(cloudAtt.id, cloudAtt);
+          const merged = Array.from(byId.values()).sort(
+            (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+          );
+          setAttempts(merged);
+          saveAttempts(merged);
+          setCloudState((prev) => ({
+            ...prev,
+            cloudAttemptCount: cloudAttempts.length,
+            lastSyncedAt: new Date().toISOString(),
+          }));
+        }
+      },
+      onHonorEntries: (entries) => {
+        setHonorEntries(entries);
+      },
+      onSyncReady: () => {
+        setCloudState((prev) => ({
+          ...prev,
+          syncing: false,
+          lastSyncedAt: new Date().toISOString(),
+        }));
+      },
+      onError: (errMsg) => {
+        setCloudState((prev) => ({
+          ...prev,
+          syncing: false,
+          error: formatCloudErrorMessage(errMsg),
+        }));
+      },
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [cloudState.authReady, cloudState.connected, cloudState.isCloudAdmin, firebaseUser]);
+
+  const handleConnectCloud = useCallback(async () => {
+    setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
+    try {
+      await signInWithGoogleCloud();
+    } catch (err) {
+      setCloudState((prev) => ({
+        ...prev,
+        syncing: false,
+        error: formatCloudErrorMessage(err),
+      }));
+    }
+  }, []);
+
+  const handleDisconnectCloud = useCallback(async () => {
+    setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
+    try {
+      await signOutGoogleCloud();
+    } catch (err) {
+      setCloudState((prev) => ({
+        ...prev,
+        syncing: false,
+        error: formatCloudErrorMessage(err),
+      }));
+    }
+  }, []);
+
+  const handleSyncCloudNow = useCallback(async () => {
+    if (!firebaseUser || !cloudState.connected) return;
+    setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
+    try {
+      await pushAllLocalDataToFirestore({
+        accounts: accountsRef.current,
+        topics: topicsRef.current,
+        attempts: attemptsRef.current,
+        ownerUid: firebaseUser.uid,
+        isCloudAdmin: cloudState.isCloudAdmin,
+        tracker: trackerRef.current,
+      });
+      setCloudState((prev) => ({
+        ...prev,
+        syncing: false,
+        lastSyncedAt: new Date().toISOString(),
+        error: null,
+      }));
+    } catch (err) {
+      setCloudState((prev) => ({
+        ...prev,
+        syncing: false,
+        error: formatCloudErrorMessage(err),
+      }));
+    }
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin]);
 
   const handleLogin = (username: string, password: string): string | null => {
     const matched = accounts.find(
@@ -72,24 +387,105 @@ export default function App() {
   };
 
   const handleUpdateAccounts = (nextAccounts: UserAccount[]) => {
+    const prevAccounts = accountsRef.current;
     setAccounts(nextAccounts);
     saveAccounts(nextAccounts);
+
+    if (cloudState.connected && cloudState.isCloudAdmin) {
+      seededRef.current.accounts = true;
+      void syncAccountsToFirestore(prevAccounts, nextAccounts, trackerRef.current)
+        .then(() => {
+          setCloudState((prev) => ({
+            ...prev,
+            lastSyncedAt: new Date().toISOString(),
+            error: null,
+          }));
+        })
+        .catch((err) => {
+          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+        });
+    }
   };
 
   const handleUpdateTopics = (nextTopics: Topic[]) => {
+    const prevTopics = topicsRef.current;
     setTopics(nextTopics);
     saveTopics(nextTopics);
+
+    if (cloudState.connected && cloudState.isCloudAdmin) {
+      seededRef.current.topics = true;
+      void syncTopicsToFirestore(prevTopics, nextTopics, trackerRef.current)
+        .then(() => {
+          setCloudState((prev) => ({
+            ...prev,
+            lastSyncedAt: new Date().toISOString(),
+            error: null,
+          }));
+        })
+        .catch((err) => {
+          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+        });
+    }
   };
 
   const handleUpdateAttempts = (nextAttempts: QuizAttempt[]) => {
     setAttempts(nextAttempts);
     saveAttempts(nextAttempts);
+
+    if (cloudState.connected && firebaseUser) {
+      seededRef.current.attempts = true;
+      void syncAttemptsDiffToFirestore(
+        nextAttempts,
+        firebaseUser.uid,
+        cloudState.isCloudAdmin,
+        trackerRef.current
+      )
+        .then(() => {
+          setCloudState((prev) => ({
+            ...prev,
+            lastSyncedAt: new Date().toISOString(),
+            error: null,
+          }));
+        })
+        .catch((err) => {
+          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+        });
+    }
   };
 
   const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
-    const next = [newAttempt, ...attempts];
-    handleUpdateAttempts(next);
+    const next = [newAttempt, ...attemptsRef.current];
+    setAttempts(next);
+    saveAttempts(next);
+
+    if (cloudState.connected && firebaseUser) {
+      seededRef.current.attempts = true;
+      void saveSingleAttemptToFirestore(newAttempt, firebaseUser.uid, trackerRef.current)
+        .then(() => {
+          setCloudState((prev) => ({
+            ...prev,
+            lastSyncedAt: new Date().toISOString(),
+            error: null,
+          }));
+        })
+        .catch((err) => {
+          setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
+        });
+    }
   };
+
+  // Honor Board combines shared public cloud honor entries with local/own attempts
+  const honorBoardAttempts = useMemo(() => {
+    if (!cloudState.connected || cloudState.isCloudAdmin || honorEntries.length === 0) {
+      return attempts;
+    }
+    const byId = new Map<string, QuizAttempt>();
+    for (const entry of honorEntries) byId.set(entry.id, entry);
+    for (const own of attempts) byId.set(own.id, own);
+    return Array.from(byId.values()).sort(
+      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+  }, [attempts, honorEntries, cloudState.connected, cloudState.isCloudAdmin]);
 
   const viewKey = activeQuizTopic ? `quiz-${activeQuizTopic.id}` : `tab-${activeTab}`;
 
@@ -118,10 +514,12 @@ export default function App() {
             <Navbar
               currentUser={currentUser}
               activeTab={activeTab}
+              cloudConnected={cloudState.connected}
               onSelectTab={(tab) => {
                 setActiveQuizTopic(null);
                 setActiveTab(tab);
               }}
+              onOpenCloudStorage={() => setShowCloudModal(true)}
               onLogout={handleLogout}
             />
 
@@ -159,7 +557,7 @@ export default function App() {
                       {activeTab === 'honor' && (
                         <HonorBoardView
                           currentUser={currentUser}
-                          attempts={attempts}
+                          attempts={honorBoardAttempts}
                           accounts={accounts}
                           topics={topics}
                         />
@@ -170,9 +568,13 @@ export default function App() {
                           accounts={accounts}
                           topics={topics}
                           attempts={attempts}
+                          cloud={cloudState}
                           onUpdateAccounts={handleUpdateAccounts}
                           onUpdateTopics={handleUpdateTopics}
                           onUpdateAttempts={handleUpdateAttempts}
+                          onConnectCloud={handleConnectCloud}
+                          onDisconnectCloud={handleDisconnectCloud}
+                          onSyncCloudNow={handleSyncCloudNow}
                         />
                       )}
                     </>
@@ -187,6 +589,23 @@ export default function App() {
                 <span>Tích cực, chủ động, tiến bộ toàn diện</span>
               </div>
             </footer>
+
+            <AnimatePresence>
+              {showCloudModal && (
+                <CloudStorageModal
+                  cloud={cloudState}
+                  localCounts={{
+                    accounts: accounts.length,
+                    topics: topics.length,
+                    attempts: attempts.length,
+                  }}
+                  onConnect={handleConnectCloud}
+                  onDisconnect={handleDisconnectCloud}
+                  onSyncNow={handleSyncCloudNow}
+                  onClose={() => setShowCloudModal(false)}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

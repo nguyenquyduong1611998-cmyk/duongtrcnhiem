@@ -4,6 +4,9 @@ import {
   AlertCircle,
   BookOpen,
   Check,
+  Cloud,
+  CloudOff,
+  Database,
   Download,
   Edit3,
   Eye,
@@ -11,9 +14,11 @@ import {
   FileText,
   FileUp,
   Lock,
+  LogOut,
   Plus,
   RefreshCw,
   Save,
+  ShieldCheck,
   Trash2,
   Unlock,
   Upload,
@@ -23,6 +28,7 @@ import {
 } from 'lucide-react';
 import {
   CandidateSummary,
+  CloudStorageState,
   Question,
   QuizAttempt,
   SystemBackupPayload,
@@ -43,7 +49,7 @@ import {
   exportAccountsBackup,
   exportFullBackup,
 } from '../utils/storage';
-import { groupAttemptsByCandidate } from '../utils/grading';
+import { formatDateTime, groupAttemptsByCandidate } from '../utils/grading';
 import { CandidateDetailModal } from './CandidateDetailModal';
 
 interface AdminPanelProps {
@@ -51,12 +57,16 @@ interface AdminPanelProps {
   accounts: UserAccount[];
   topics: Topic[];
   attempts: QuizAttempt[];
+  cloud: CloudStorageState;
   onUpdateAccounts: (accounts: UserAccount[]) => void;
   onUpdateTopics: (topics: Topic[]) => void;
   onUpdateAttempts: (attempts: QuizAttempt[]) => void;
+  onConnectCloud: () => Promise<void>;
+  onDisconnectCloud: () => Promise<void>;
+  onSyncCloudNow: () => Promise<void>;
 }
 
-type AdminSubTab = 'accounts' | 'topics';
+type AdminSubTab = 'accounts' | 'topics' | 'storage';
 type ExampleFormat = 'txt' | 'csv' | 'json' | 'docx';
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'] as const;
@@ -67,9 +77,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   accounts,
   topics,
   attempts,
+  cloud,
   onUpdateAccounts,
   onUpdateTopics,
   onUpdateAttempts,
+  onConnectCloud,
+  onDisconnectCloud,
+  onSyncCloudNow,
 }) => {
   const [subTab, setSubTab] = useState<AdminSubTab>('accounts');
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -718,6 +732,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <BookOpen className="w-4 h-4 relative z-10" />
             <span className="relative z-10">Bộ đề & Đẩy đề từ file</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSubTab('storage');
+              setNotice(null);
+            }}
+            className={`relative inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+              subTab === 'storage'
+                ? 'text-[#1F4D36]'
+                : 'text-[#4B5B50] hover:text-[#152019]'
+            }`}
+          >
+            {subTab === 'storage' && (
+              <motion.span
+                layoutId="admin-subtab-pill"
+                transition={{ duration: 0.2, ease: EASE_SMOOTH }}
+                className="absolute inset-0 bg-white rounded-md shadow-sm"
+              />
+            )}
+            <Database className="w-4 h-4 relative z-10" />
+            <span className="relative z-10">Lưu trữ dữ liệu</span>
+          </button>
         </div>
       </div>
 
@@ -754,6 +790,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Shared hidden JSON backup file input */}
+      <input
+        ref={backupInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleImportBackup}
+        className="hidden"
+      />
 
       {/* ==================== TAB 1: QUẢN LÝ TÀI KHOẢN & SAO LƯU ==================== */}
       {subTab === 'accounts' && (
@@ -902,13 +947,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <span>Sao lưu Toàn bộ Hệ thống (.json)</span>
                 </button>
 
-                <input
-                  ref={backupInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleImportBackup}
-                  className="hidden"
-                />
                 <button
                   type="button"
                   onClick={() => backupInputRef.current?.click()}
@@ -1884,6 +1922,220 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ==================== TAB 3: LƯU TRỮ DỮ LIỆU ĐÁM MÂY & SAO LƯU ==================== */}
+      {subTab === 'storage' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Cloud Firestore Storage Panel */}
+          <div className="lg:col-span-7 bg-white border border-[#DDE3DC] rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#DDE3DC] bg-[#FAFBF9] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-[#1F4D36] text-[#F5E1A4] flex items-center justify-center shrink-0">
+                  <Database className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#152019]">
+                    Lưu trữ cơ sở dữ liệu đám mây (Firebase Firestore)
+                  </h3>
+                  <p className="text-xs text-[#64756A]">
+                    Đồng bộ tự động tài khoản, bộ câu hỏi chuyên đề và lịch sử lượt thi giữa mọi thiết bị.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {cloud.error && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs leading-relaxed"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{cloud.error}</span>
+                </div>
+              )}
+
+              {!cloud.connected ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-[#FAFBF9] border border-[#DDE3DC] space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-bold text-[#152019]">
+                      <CloudOff className="w-4 h-4 text-[#64756A]" />
+                      <span>Chưa kết nối tài khoản lưu trữ đám mây</span>
+                    </div>
+                    <p className="text-xs text-[#4B5B50] leading-relaxed">
+                      Hiện hệ thống đang lưu trữ trên bộ nhớ trình duyệt cục bộ (localStorage). Hãy
+                      đăng nhập Google để kích hoạt đồng bộ thời gian thực với cơ sở dữ liệu Firebase
+                      Firestore, đảm bảo dữ liệu không bị mất khi đổi máy hoặc xóa bộ nhớ trình duyệt.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={cloud.syncing}
+                    onClick={() => void onConnectCloud()}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-[#1F4D36] hover:bg-[#173B29] disabled:opacity-60 text-white text-sm font-semibold rounded-lg inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Cloud className="w-4 h-4" />
+                    <span>
+                      {cloud.syncing
+                        ? 'Đang kết nối...'
+                        : 'Kết nối lưu trữ đám mây (Đăng nhập Google)'}
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="p-4 rounded-xl bg-[#ECFDF5] border border-[#BBF7D0] space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-[#166534] inline-flex items-center gap-2">
+                        <Cloud className="w-4 h-4" />
+                        Đã kích hoạt lưu trữ đám mây Firebase Firestore
+                      </span>
+                      {cloud.isCloudAdmin && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-[#BBF7D0] text-[11px] font-bold text-[#166534]">
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          Quản trị viên đám mây
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#166534]/90">
+                      Tài khoản Google đang liên kết: <strong>{cloud.userEmail}</strong>
+                    </p>
+                    {cloud.lastSyncedAt && (
+                      <p className="text-xs text-[#166534]/80 font-mono-num">
+                        Lần đồng bộ gần nhất: {formatDateTime(cloud.lastSyncedAt)}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-4 rounded-xl bg-[#FAFBF9] border border-[#DDE3DC] text-center">
+                      <div className="font-mono-num text-xl font-bold text-[#1F4D36]">
+                        {cloud.isCloudAdmin ? cloud.cloudAccountCount : accounts.length}
+                      </div>
+                      <div className="text-xs text-[#64756A] mt-1">Tài khoản</div>
+                    </div>
+                    <div className="p-4 rounded-xl bg-[#FAFBF9] border border-[#DDE3DC] text-center">
+                      <div className="font-mono-num text-xl font-bold text-[#1F4D36]">
+                        {cloud.cloudTopicCount}
+                      </div>
+                      <div className="text-xs text-[#64756A] mt-1">Chuyên đề</div>
+                    </div>
+                    <div className="p-4 rounded-xl bg-[#FAFBF9] border border-[#DDE3DC] text-center">
+                      <div className="font-mono-num text-xl font-bold text-[#1F4D36]">
+                        {cloud.cloudAttemptCount}
+                      </div>
+                      <div className="text-xs text-[#64756A] mt-1">Lượt thi</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      disabled={cloud.syncing}
+                      onClick={async () => {
+                        await onSyncCloudNow();
+                        showToast(
+                          'success',
+                          'Đã đồng bộ toàn bộ dữ liệu hiện tại lên cơ sở dữ liệu đám mây.'
+                        );
+                      }}
+                      className="px-4 py-2.5 bg-[#1F4D36] hover:bg-[#173B29] disabled:opacity-60 text-white text-xs sm:text-sm font-semibold rounded-lg inline-flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw
+                        className={`w-4 h-4 ${cloud.syncing ? 'animate-spin' : ''}`}
+                      />
+                      <span>
+                        {cloud.syncing ? 'Đang đồng bộ...' : 'Đồng bộ ngay lên đám mây'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={cloud.syncing}
+                      onClick={async () => {
+                        await onDisconnectCloud();
+                        showToast(
+                          'success',
+                          'Đã ngắt kết nối đám mây. Dữ liệu cục bộ vẫn được giữ nguyên.'
+                        );
+                      }}
+                      className="px-4 py-2.5 bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA] text-xs sm:text-sm font-semibold rounded-lg inline-flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Ngắt kết nối Google</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Local JSON File Backup & Restore Card */}
+          <div className="lg:col-span-5 bg-white border border-[#DDE3DC] rounded-xl p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-[#152019]">
+                Sao lưu & Nạp tệp dữ liệu ngoại tuyến (.json)
+              </h3>
+              <p className="text-xs text-[#4B5B50] mt-1 leading-relaxed">
+                Xuất bản sao dự phòng toàn bộ hệ thống về máy tính hoặc nạp lại dữ liệu từ tệp JSON
+                đã lưu trước đó. Khi đang kết nối đám mây, dữ liệu nạp sẽ tự động đồng bộ lên
+                Firebase Firestore.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5 text-center">
+              <div className="p-3 rounded-lg bg-[#F4F6F4] border border-[#DDE3DC]">
+                <div className="font-mono-num text-base font-bold text-[#152019]">
+                  {accounts.length}
+                </div>
+                <div className="text-[11px] text-[#64756A]">Tài khoản</div>
+              </div>
+              <div className="p-3 rounded-lg bg-[#F4F6F4] border border-[#DDE3DC]">
+                <div className="font-mono-num text-base font-bold text-[#152019]">
+                  {topics.length}
+                </div>
+                <div className="text-[11px] text-[#64756A]">Chuyên đề</div>
+              </div>
+              <div className="p-3 rounded-lg bg-[#F4F6F4] border border-[#DDE3DC]">
+                <div className="font-mono-num text-base font-bold text-[#152019]">
+                  {attempts.length}
+                </div>
+                <div className="text-[11px] text-[#64756A]">Lượt thi</div>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={handleExportFull}
+                className="w-full py-2.5 px-4 bg-[#FAFBF9] hover:bg-[#EEF5F0] border border-[#CFD8CE] rounded-lg text-xs font-semibold text-[#152019] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-[#8C6516]" />
+                <span>Tải bản sao lưu Toàn bộ Hệ thống (.json)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportAccounts}
+                className="w-full py-2.5 px-4 bg-[#FAFBF9] hover:bg-[#EEF5F0] border border-[#CFD8CE] rounded-lg text-xs font-semibold text-[#152019] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-[#1F4D36]" />
+                <span>Tải bản sao lưu Tài khoản (.json)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => backupInputRef.current?.click()}
+                className="w-full py-2.5 px-4 bg-[#1F4D36] hover:bg-[#173B29] rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Nạp dữ liệu từ tệp (.json)</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

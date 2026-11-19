@@ -1,0 +1,476 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized cloud administrator record in /admins/{adminUid}.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Firestore server timestamp set on create."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Firestore server timestamp set on create and update."
+        }
+      },
+      "required": ["uid", "email", "note", "createdAt", "updatedAt"]
+    },
+    "ManagedAccount": {
+      "title": "ManagedAccount",
+      "description": "Unit-issued military quiz account managed exclusively by administrators.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["unit_490"]
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "defaultUnit": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "student"]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "updatedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "scope",
+        "username",
+        "password",
+        "fullName",
+        "defaultUnit",
+        "role",
+        "active",
+        "createdAtIso",
+        "updatedAtIso",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Topic": {
+      "title": "Topic",
+      "description": "Quiz topic metadata stored in /topics/{topicId}.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 250
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1500
+        },
+        "timeLimitMinutes": {
+          "type": "number"
+        },
+        "questionCount": {
+          "type": "number"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public"]
+        },
+        "createdAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "updatedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "title",
+        "description",
+        "timeLimitMinutes",
+        "questionCount",
+        "visibility",
+        "createdAtIso",
+        "updatedAtIso",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "TopicQuestion": {
+      "title": "TopicQuestion",
+      "description": "Individual quiz question in /topics/{topicId}/questions/{questionId}.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "topicId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderIndex": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "options": {
+          "type": "array",
+          "description": "Fixed 4-item array of answer options, each maxLength 1000."
+        },
+        "correctIndex": {
+          "type": "number"
+        },
+        "explanation": {
+          "type": "string",
+          "maxLength": 3000
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "topicId",
+        "orderIndex",
+        "text",
+        "options",
+        "correctIndex",
+        "explanation",
+        "visibility",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "QuizAttempt": {
+      "title": "QuizAttempt",
+      "description": "Submitted quiz attempt stored in /attempts/{attemptId}.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["unit_490"]
+        },
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "accountUsername": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "candidateName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "unitName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "topicId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "topicTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 250
+        },
+        "answers": {
+          "type": "object",
+          "description": "Map of questionId to selected option index (0-3), max 500 entries."
+        },
+        "correctCount": {
+          "type": "number"
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "score10": {
+          "type": "number"
+        },
+        "grade": {
+          "type": "string",
+          "enum": ["Giỏi", "Khá", "Đạt", "Yếu"]
+        },
+        "durationSeconds": {
+          "type": "number"
+        },
+        "startedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "submittedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "status": {
+          "type": "string",
+          "enum": ["submitted"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "scope",
+        "ownerUid",
+        "accountUsername",
+        "candidateName",
+        "unitName",
+        "topicId",
+        "topicTitle",
+        "answers",
+        "correctCount",
+        "totalCount",
+        "score10",
+        "grade",
+        "durationSeconds",
+        "startedAtIso",
+        "submittedAtIso",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "HonorEntry": {
+      "title": "HonorEntry",
+      "description": "Public non-PII honor board summary linked atomically to a QuizAttempt.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "attemptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": ["public"]
+        },
+        "accountUsername": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "candidateName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "unitName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "topicId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "topicTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 250
+        },
+        "correctCount": {
+          "type": "number"
+        },
+        "totalCount": {
+          "type": "number"
+        },
+        "score10": {
+          "type": "number"
+        },
+        "grade": {
+          "type": "string",
+          "enum": ["Giỏi", "Khá", "Đạt", "Yếu"]
+        },
+        "durationSeconds": {
+          "type": "number"
+        },
+        "startedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "submittedAtIso": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "attemptId",
+        "ownerUid",
+        "visibility",
+        "accountUsername",
+        "candidateName",
+        "unitName",
+        "topicId",
+        "topicTitle",
+        "correctCount",
+        "totalCount",
+        "score10",
+        "grade",
+        "durationSeconds",
+        "startedAtIso",
+        "submittedAtIso",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Trusted cloud administrator registry."
+    },
+    "/managed_accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/ManagedAccount" },
+      "description": "Admin-only store for unit-issued quiz accounts."
+    },
+    "/topics/{topicId}": {
+      "schema": { "$ref": "#/entities/Topic" },
+      "description": "Published quiz topics for Brigade 490 - Battalion 3."
+    },
+    "/topics/{topicId}/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/TopicQuestion" },
+      "description": "Questions belonging to a parent topic."
+    },
+    "/attempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/QuizAttempt" },
+      "description": "Submitted quiz attempts owned by the submitting user or visible to admin."
+    },
+    "/honor_entries/{entryId}": {
+      "schema": { "$ref": "#/entities/HonorEntry" },
+      "description": "Public non-PII honor board summaries atomically paired with attempts."
+    }
+  }
+}

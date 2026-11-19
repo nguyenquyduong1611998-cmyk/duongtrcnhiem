@@ -91,3 +91,18 @@ export interface SystemBackupPayload {
   topics?: Topic[];
   attempts?: QuizAttempt[];
 }
+
+export interface CloudStorageState {
+  authReady: boolean;
+  connected: boolean;
+  userEmail: string | null;
+  userDisplayName: string | null;
+  isCloudAdmin: boolean;
+  syncing: boolean;
+  lastSyncedAt: string | null;
+  error: string | null;
+  cloudAccountCount: number;
+  cloudTopicCount: number;
+  cloudAttemptCount: number;
+}
+

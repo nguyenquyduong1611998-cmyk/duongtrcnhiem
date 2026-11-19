@@ -231,6 +231,12 @@ export default function App() {
   // Listen to Firebase Auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.info('[Firebase Auth]', {
+  hasUser: Boolean(user),
+  hasEmail: Boolean(user?.email),
+  emailVerified: user?.emailVerified,
+  providers: user?.providerData.map(p => p.providerId),
+});
       if (connectTimeoutRef.current !== null) {
         window.clearTimeout(connectTimeoutRef.current);
         connectTimeoutRef.current = null;

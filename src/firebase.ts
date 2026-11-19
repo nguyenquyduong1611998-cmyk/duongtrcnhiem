@@ -4,6 +4,7 @@ import {
   getAuth,
   signInWithPopup,
   signOut,
+    reload,
 } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';

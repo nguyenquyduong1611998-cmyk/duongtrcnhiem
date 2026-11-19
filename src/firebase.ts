@@ -4,6 +4,7 @@ import {
   getAuth,
   signInWithPopup,
   signOut,
+    reload,
 } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -13,6 +14,8 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export const BOOTSTRAPPED_ADMIN_EMAIL = 'nguyenquyduong1611998@gmail.com';
@@ -83,8 +86,19 @@ export async function testConnection(): Promise<void> {
 
 void testConnection();
 
+
 export async function signInWithGoogleCloud() {
-  return signInWithPopup(auth, googleProvider);
+  const result = await signInWithPopup(auth, googleProvider);
+
+  await reload(result.user);
+
+  console.info('[Firebase] Google sign-in result:', {
+    hasEmail: Boolean(result.user.email),
+    emailVerified: result.user.emailVerified,
+    providers: result.user.providerData.map(p => p.providerId),
+  });
+
+  return result;
 }
 
 export async function signOutGoogleCloud() {

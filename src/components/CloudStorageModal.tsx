@@ -88,15 +88,30 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
 
         {/* Body */}
         <div className="p-6 space-y-5">
-          {cloud.error && (
-            <div
-              role="alert"
-              className="flex items-start gap-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs leading-relaxed"
-            >
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{cloud.error}</span>
-            </div>
-          )}
+          {cloud.error && (() => {
+            const urlMatch = cloud.error.match(/https:\/\/console\.firebase\.google\.com\/[^\s)]+/);
+            return (
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] text-xs leading-relaxed"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="space-y-2 min-w-0">
+                  <p className="break-words">{cloud.error}</p>
+                  {urlMatch && (
+                    <a
+                      href={urlMatch[0]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-[#FECACA] text-[#B91C1C] font-semibold hover:bg-[#FEE2E2] transition-colors"
+                    >
+                      Mở cài đặt Firebase Console
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {!cloud.connected ? (
             <div className="space-y-4">

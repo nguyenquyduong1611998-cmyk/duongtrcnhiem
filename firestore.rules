@@ -274,8 +274,7 @@ service cloud.firestore {
           existing().topicId == topicId &&
           exists(/databases/$(database)/documents/topics/$(topicId));
         allow list: if isVerifiedUser() &&
-          existing().visibility == 'public' &&
-          existing().topicId == topicId;
+          existing().visibility == 'public';
         allow create: if isVerifiedUser() &&
           isValidId(topicId) &&
           isValidId(questionId) &&

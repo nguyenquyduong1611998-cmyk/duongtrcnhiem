@@ -41,24 +41,73 @@ import {
 
 const EASE_SMOOTH = [0.16, 1, 0.3, 1] as const;
 
+function extractFirebaseCode(raw: unknown): string {
+  if (raw && typeof raw === 'object' && 'code' in raw && typeof (raw as { code?: unknown }).code === 'string') {
+    return (raw as { code: string }).code;
+  }
+  const msg = raw instanceof Error ? raw.message : String(raw);
+  const match = msg.match(/\((auth\/[a-z0-9-]+|[a-z-]+\/[a-z0-9-]+)\)/i);
+  return match ? match[1] : '';
+}
+
 function formatCloudErrorMessage(raw: unknown): string {
   const msg = raw instanceof Error ? raw.message : String(raw);
+  const code = extractFirebaseCode(raw);
+
   if (msg.includes("Free daily read units per project (free tier database)")) {
     return `Đã vượt hạn mức đọc miễn phí hôm nay. Bạn có thể xem hoặc nâng cấp tại: https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/databases/${FIRESTORE_DATABASE_ID}/data?openUpgradeDialog=true`;
   }
-  if (msg.includes('Quota exceeded')) {
+  if (msg.includes('Quota exceeded') || code.includes('resource-exhausted')) {
     return 'Hạn mức sử dụng cơ sở dữ liệu hôm nay đã hết và sẽ tự đặt lại vào ngày mai.';
   }
-  if (msg.includes('popup-closed-by-user') || msg.includes('cancelled-popup-request')) {
-    return 'Đã hủy cửa sổ đăng nhập Google.';
+  if (
+    code === 'auth/unauthorized-domain' ||
+    msg.includes('auth/unauthorized-domain')
+  ) {
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    return `Tên miền "${host}" chưa được cấp phép đăng nhập Google trong Firebase. Hãy mở Firebase Console (https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/settings) -> Authorized domains -> thêm tên miền "${host}" rồi thử lại.`;
   }
-  if (msg.includes('popup-blocked')) {
-    return 'Trình duyệt đang chặn cửa sổ đăng nhập Google. Vui lòng cho phép popup rồi thử lại.';
+  if (
+    code === 'auth/popup-closed-by-user' ||
+    code === 'auth/cancelled-popup-request' ||
+    msg.includes('popup-closed-by-user') ||
+    msg.includes('cancelled-popup-request')
+  ) {
+    return 'Bạn đã đóng cửa sổ đăng nhập Google trước khi hoàn tất.';
   }
-  if (msg.includes('Missing or insufficient permissions')) {
-    return 'Tài khoản Google này chưa được cấp quyền ghi vào mục quản trị này.';
+  if (code === 'auth/popup-blocked' || msg.includes('popup-blocked')) {
+    return 'Trình duyệt đang chặn cửa sổ bật lên (popup) đăng nhập Google. Vui lòng cho phép popup cho trang này rồi thử lại.';
   }
-  return 'Không thể đồng bộ với cơ sở dữ liệu đám mây lúc này. Dữ liệu vẫn được lưu an toàn trên thiết bị.';
+  if (code === 'auth/operation-not-allowed' || msg.includes('operation-not-allowed')) {
+    return 'Phương thức đăng nhập Google chưa được bật trong Firebase Authentication. Hãy bật Google Sign-In trong Firebase Console.';
+  }
+  if (
+    code === 'auth/network-request-failed' ||
+    msg.includes('network-request-failed') ||
+    msg.includes('the client is offline')
+  ) {
+    return 'Không thể kết nối tới máy chủ Google/Firebase. Vui lòng kiểm tra kết nối Internet rồi thử lại.';
+  }
+  if (
+    code === 'auth/web-storage-unsupported' ||
+    code === 'auth/internal-error' ||
+    msg.includes('web-storage-unsupported') ||
+    msg.includes('auth/internal-error')
+  ) {
+    return 'Trình duyệt đang hạn chế cookie bên thứ ba hoặc bộ nhớ phiên cho đăng nhập Google. Hãy mở trang ở cửa sổ trình duyệt độc lập (không ẩn danh) và thử lại.';
+  }
+  if (
+    msg.includes('Missing or insufficient permissions') ||
+    code.includes('permission-denied')
+  ) {
+    return 'Tài khoản Google này chưa đủ quyền ghi vào mục quản trị dữ liệu này (permission-denied).';
+  }
+  if (msg.includes('failed-precondition') || msg.includes('requires an index')) {
+    return 'Truy vấn cơ sở dữ liệu cần chỉ mục (index) hoặc cấu hình bổ sung trên Firestore.';
+  }
+
+  const detail = code || (msg.length <= 160 ? msg : msg.slice(0, 160) + '...');
+  return `Không thể kết nối hoặc đồng bộ với đám mây (${detail}). Dữ liệu vẫn được lưu an toàn trên thiết bị.`;
 }
 
 export default function App() {
@@ -93,6 +142,7 @@ export default function App() {
   const topicsRef = useRef(topics);
   const attemptsRef = useRef(attempts);
   const seededRef = useRef({ accounts: false, topics: false, attempts: false });
+  const isSeedingRef = useRef(false);
 
   useEffect(() => {
     accountsRef.current = accounts;
@@ -127,6 +177,7 @@ export default function App() {
         setFirebaseUser(null);
         trackerRef.current = createEmptyCloudTracker();
         seededRef.current = { accounts: false, topics: false, attempts: false };
+        isSeedingRef.current = false;
         setHonorEntries([]);
         setCloudState({
           authReady: true,
@@ -176,6 +227,7 @@ export default function App() {
     const tracker = createEmptyCloudTracker();
     trackerRef.current = tracker;
     seededRef.current = { accounts: false, topics: false, attempts: false };
+    isSeedingRef.current = false;
     const isAdmin = cloudState.isCloudAdmin;
 
     const unsubscribe = subscribeToCloudData({
@@ -183,6 +235,7 @@ export default function App() {
       isCloudAdmin: isAdmin,
       tracker,
       onAccounts: (cloudAccounts) => {
+        if (isSeedingRef.current) return;
         if (cloudAccounts.length > 0) {
           seededRef.current.accounts = true;
           const hasRootAdmin = cloudAccounts.some(
@@ -198,14 +251,10 @@ export default function App() {
             cloudAccountCount: merged.length,
             lastSyncedAt: new Date().toISOString(),
           }));
-        } else if (isAdmin && !seededRef.current.accounts && accountsRef.current.length > 0) {
-          seededRef.current.accounts = true;
-          void syncAccountsToFirestore([], accountsRef.current, tracker).catch((err) => {
-            setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-          });
         }
       },
       onTopics: (cloudTopics) => {
+        if (isSeedingRef.current) return;
         if (cloudTopics.length > 0) {
           seededRef.current.topics = true;
           setTopics(cloudTopics);
@@ -215,49 +264,18 @@ export default function App() {
             cloudTopicCount: cloudTopics.length,
             lastSyncedAt: new Date().toISOString(),
           }));
-
-          // If cloud attempts were initially empty, seed them once topics are ready
-          if (
-            isAdmin &&
-            !seededRef.current.attempts &&
-            tracker.attemptIds.size === 0 &&
-            attemptsRef.current.length > 0
-          ) {
-            seededRef.current.attempts = true;
-            void (async () => {
-              for (const att of attemptsRef.current) {
-                await saveSingleAttemptToFirestore(att, firebaseUser.uid, tracker);
-              }
-            })().catch((err) => {
-              setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-            });
-          }
-        } else if (isAdmin && !seededRef.current.topics && topicsRef.current.length > 0) {
-          seededRef.current.topics = true;
-          void syncTopicsToFirestore([], topicsRef.current, tracker).catch((err) => {
-            setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-          });
         }
       },
       onAttempts: (cloudAttempts) => {
+        if (isSeedingRef.current) return;
         if (isAdmin) {
           if (cloudAttempts.length > 0) {
             seededRef.current.attempts = true;
             setAttempts(cloudAttempts);
             saveAttempts(cloudAttempts);
           } else if (seededRef.current.attempts) {
-            // Cloud was explicitly cleared by Admin
             setAttempts([]);
             saveAttempts([]);
-          } else if (tracker.topicIds.size > 0 && attemptsRef.current.length > 0) {
-            seededRef.current.attempts = true;
-            void (async () => {
-              for (const att of attemptsRef.current) {
-                await saveSingleAttemptToFirestore(att, firebaseUser.uid, tracker);
-              }
-            })().catch((err) => {
-              setCloudState((prev) => ({ ...prev, error: formatCloudErrorMessage(err) }));
-            });
           }
           setCloudState((prev) => ({
             ...prev,
@@ -265,7 +283,6 @@ export default function App() {
             lastSyncedAt: new Date().toISOString(),
           }));
         } else {
-          // Regular verified user: merge their cloud attempts with local unsynced cache
           const byId = new Map<string, QuizAttempt>();
           for (const localAtt of attemptsRef.current) byId.set(localAtt.id, localAtt);
           for (const cloudAtt of cloudAttempts) byId.set(cloudAtt.id, cloudAtt);
@@ -285,13 +302,65 @@ export default function App() {
         setHonorEntries(entries);
       },
       onSyncReady: () => {
+        // Sequential, race-free initial seed when Cloud Admin connects to an empty Firestore DB
+        if (
+          isAdmin &&
+          !isSeedingRef.current &&
+          ((!seededRef.current.accounts && tracker.accountIds.size === 0 && accountsRef.current.length > 0) ||
+            (!seededRef.current.topics && tracker.topicIds.size === 0 && topicsRef.current.length > 0) ||
+            (!seededRef.current.attempts && tracker.attemptIds.size === 0 && attemptsRef.current.length > 0))
+        ) {
+          isSeedingRef.current = true;
+          void (async () => {
+            try {
+              if (!seededRef.current.accounts && tracker.accountIds.size === 0 && accountsRef.current.length > 0) {
+                seededRef.current.accounts = true;
+                await syncAccountsToFirestore([], accountsRef.current, tracker);
+              }
+              if (!seededRef.current.topics && tracker.topicIds.size === 0 && topicsRef.current.length > 0) {
+                seededRef.current.topics = true;
+                await syncTopicsToFirestore([], topicsRef.current, tracker);
+              }
+              if (!seededRef.current.attempts && tracker.attemptIds.size === 0 && attemptsRef.current.length > 0) {
+                seededRef.current.attempts = true;
+                for (const att of attemptsRef.current) {
+                  await saveSingleAttemptToFirestore(att, firebaseUser.uid, tracker);
+                }
+              }
+              setCloudState((prev) => ({
+                ...prev,
+                syncing: false,
+                cloudAccountCount: tracker.accountIds.size,
+                cloudTopicCount: tracker.topicIds.size,
+                cloudAttemptCount: tracker.attemptIds.size,
+                lastSyncedAt: new Date().toISOString(),
+                error: null,
+              }));
+            } catch (err) {
+              console.error('Initial cloud seed error:', err);
+              setCloudState((prev) => ({
+                ...prev,
+                syncing: false,
+                error: formatCloudErrorMessage(err),
+              }));
+            } finally {
+              isSeedingRef.current = false;
+            }
+          })();
+          return;
+        }
+
         setCloudState((prev) => ({
           ...prev,
           syncing: false,
+          cloudAccountCount: tracker.accountIds.size,
+          cloudTopicCount: tracker.topicIds.size,
+          cloudAttemptCount: tracker.attemptIds.size,
           lastSyncedAt: new Date().toISOString(),
         }));
       },
       onError: (errMsg) => {
+        console.error('Firestore listener error:', errMsg);
         setCloudState((prev) => ({
           ...prev,
           syncing: false,
@@ -310,6 +379,7 @@ export default function App() {
     try {
       await signInWithGoogleCloud();
     } catch (err) {
+      console.error('Google cloud sign-in failed:', err);
       setCloudState((prev) => ({
         ...prev,
         syncing: false,

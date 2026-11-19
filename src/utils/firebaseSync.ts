@@ -206,8 +206,7 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
           const qPath = `topics/${id}/questions`;
           const qQuery = query(
             collection(db, 'topics', id, 'questions'),
-            where('visibility', '==', 'public'),
-            where('topicId', '==', id)
+            where('visibility', '==', 'public')
           );
           const unsubQ = onSnapshot(
             qQuery,

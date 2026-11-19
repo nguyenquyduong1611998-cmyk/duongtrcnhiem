@@ -374,19 +374,36 @@ export default function App() {
     };
   }, [cloudState.authReady, cloudState.connected, cloudState.isCloudAdmin, firebaseUser]);
 
-  const handleConnectCloud = useCallback(async () => {
-    setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
-    try {
-      await signInWithGoogleCloud();
-    } catch (err) {
-      console.error('Google cloud sign-in failed:', err);
-      setCloudState((prev) => ({
-        ...prev,
-        syncing: false,
-        error: formatCloudErrorMessage(err),
-      }));
-    }
-  }, []);
+  
+const handleConnectCloud = useCallback(async () => {
+  console.info('[Firebase] Bắt đầu đăng nhập Google');
+
+  setCloudState((prev) => ({
+    ...prev,
+    syncing: true,
+    error: null,
+  }));
+
+  try {
+    const result = await signInWithGoogleCloud();
+
+    console.info('[Firebase] Google đăng nhập thành công', {
+      hasUser: Boolean(result.user),
+      emailVerified: result.user.emailVerified,
+    });
+
+    console.info('[Firebase] Đang chờ kiểm tra quyền và đồng bộ Firestore');
+  } catch (err) {
+    console.error('[Firebase] Google đăng nhập thất bại:', err);
+
+    setCloudState((prev) => ({
+      ...prev,
+      syncing: false,
+      error: formatCloudErrorMessage(err),
+    }));
+  }
+}, []);
+
 
   const handleDisconnectCloud = useCallback(async () => {
     setCloudState((prev) => ({ ...prev, syncing: true, error: null }));

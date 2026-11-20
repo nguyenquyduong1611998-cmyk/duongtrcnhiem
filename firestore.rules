@@ -384,13 +384,11 @@ function isBootstrappedAdmin() {
         isValidQuizAttempt(incoming(), attemptId) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
-        existsAfter(/databases/$(database)/documents/topics/$(incoming().topicId)) && (
-          (isVerifiedUser() && incoming().ownerUid == request.auth.uid) ||
-          (
-            incoming().ownerUid == 'unit_account' &&
-            isValidActiveUnitAccount(incoming().accountId, incoming().accountUsername)
-          )
-        );
+        
+existsAfter(/databases/$(database)/documents/topics/$(incoming().topicId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
       // Terminal state locking: submitted attempts cannot be edited by regular users; admin-only override
       allow update: if isVerifiedUser() &&
         isValidId(attemptId) &&
@@ -418,13 +416,11 @@ function isBootstrappedAdmin() {
       allow create: if isValidId(entryId) &&
         isValidHonorEntry(incoming(), entryId) &&
         incoming().createdAt == request.time &&
-        existsAfter(/databases/$(database)/documents/attempts/$(entryId)) && (
-          (isVerifiedUser() && incoming().ownerUid == request.auth.uid) ||
-          (
-            incoming().ownerUid == 'unit_account' &&
-            isValidActiveUnitAccount(incoming().accountId, incoming().accountUsername)
-          )
-        );
+        
+existsAfter(/databases/$(database)/documents/attempts/$(entryId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
       allow update: if false;
       allow delete: if isVerifiedUser() && isValidId(entryId) && isAdmin();
     }

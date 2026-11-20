@@ -763,48 +763,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
   }
 };
 
-    const next = [enrichedAttempt, ...attemptsRef.current];
-    setAttempts(next);
-    saveAttempts(next);
-
-    if (cloudState.connected && firebaseUser) {
-      const uid = firebaseUser.uid;
-      const isAdmin = cloudState.isCloudAdmin;
-      void enqueueCloudWrite(async () => {
-        const saved = await saveSingleAttemptToFirestore(
-          enrichedAttempt,
-          uid,
-          trackerRef.current,
-          {
-            accountId: enrichedAttempt.accountId,
-            accounts: accountsRef.current,
-            isCloudAdmin: isAdmin,
-            localTopics: topicsRef.current,
-          }
-        );
-        if (!saved) {
-          throw new Error(
-            'Chuyên đề của bài thi này chưa tồn tại trên Firebase Firestore. Quản trị viên cần kết nối đám mây và đồng bộ bộ đề trước.'
-          );
-        }
-      });
-    } else if (enrichedAttempt.accountId) {
-      // Student/guest device without Google Sign-In: automatically sync attempt directly to Firestore
-      void saveSingleAttemptToFirestore(
-        enrichedAttempt,
-        'unit_account',
-        trackerRef.current,
-        {
-          accountId: enrichedAttempt.accountId,
-          accounts: accountsRef.current,
-          isCloudAdmin: false,
-          localTopics: topicsRef.current,
-        }
-      ).catch((err) => {
-        console.warn('Unit account auto-sync attempt skipped:', err);
-      });
-    }
-  };
+    
 
   // Honor Board combines shared public cloud honor entries with local/own attempts (even without Google Sign-In!)
   const honorBoardAttempts = useMemo(() => {

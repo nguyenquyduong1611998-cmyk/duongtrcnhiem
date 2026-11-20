@@ -26,3 +26,9 @@ jobs:
         run: bun run lint
       - name: Build website
         run: bun run build
+        
+      - name: Build staging website
+        env:
+          VITE_FIREBASE_ENV: staging
+        run: bun run build
+

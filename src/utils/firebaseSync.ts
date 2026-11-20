@@ -15,7 +15,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import {
-  BOOTSTRAPPED_ADMIN_EMAIL,
+  BOOTSTRAPPED_ADMIN_UID,
   OperationType,
   db,
   handleFirestoreError,
@@ -202,9 +202,11 @@ function timestampToIso(val: unknown, fallbackIso?: string): string {
 
 export async function checkIsCloudAdmin(user: User | null): Promise<boolean> {
  if (!user) return false;
-  if (user.email?.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase()) {
-    return true;
-  }
+  
+if (user.uid === BOOTSTRAPPED_ADMIN_UID) {
+  return true;
+}
+
   const path = `admins/${user.uid}`;
   try {
     const snap = await getDoc(doc(db, 'admins', user.uid));

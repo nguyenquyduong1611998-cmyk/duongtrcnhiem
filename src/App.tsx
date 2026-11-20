@@ -572,14 +572,17 @@ export default function App() {
         return;
       }
 
-      if (!signedInUser.emailVerified) {
-        setCloudState((prev) => ({
-          ...prev,
-          syncing: false,
-          error: 'Tài khoản Google này chưa được xác minh email nên không thể kết nối lưu trữ đám mây.',
-        }));
-        return;
-      }
+      if (!signedInUser) {
+  setCloudState((prev) => ({
+    ...prev,
+    syncing: false,
+    error: 'Không nhận được thông tin tài khoản Google sau khi đăng nhập. Vui lòng thử lại.',
+  }));
+  return;
+}
+
+// Guard against rare cases where onAuthStateChanged does not re-emit for an existing session
+const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
 
       // Guard against rare cases where onAuthStateChanged does not re-emit for an existing session
       const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);

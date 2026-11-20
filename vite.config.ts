@@ -6,7 +6,11 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return { 
-    base: '/duongtrcnhiem/',
+   
+base: process.env.VITE_FIREBASE_ENV === 'staging'
+  ? '/'
+  : '/duongtrcnhiem/',
+
     plugins: [
       react(),
       tailwindcss(),

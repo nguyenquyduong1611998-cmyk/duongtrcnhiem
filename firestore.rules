@@ -23,17 +23,18 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isVerifiedUser() {
+    
+function isVerifiedUser() {
   return isSignedIn()
-    && request.auth.token.firebase.sign_in_provider == 'google.com'
-    && request.auth.token.email is string;
+    && request.auth.token.firebase.sign_in_provider == 'google.com';
 }
 
     // Fast claim-only bootstrapped admin check (safe for allow list without get/exists)
-    function isBootstrappedAdmin() {
-      return isVerifiedUser() &&
-        request.auth.token.email == 'nguyenquyduong1611998@gmail.com';
-    }
+    
+function isBootstrappedAdmin() {
+  return isVerifiedUser()
+    && request.auth.uid == '3zPu6ZrPGLfDNsms17mxHrEwfUF2';
+}
 
     // Full admin check for single-document get/create/update/delete operations
     function isAdmin() {

@@ -7,7 +7,16 @@ import {
     reload,
 } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+
+import productionConfig from '../firebase-applet-config.json';
+import stagingConfig from '../firebase-staging-config.json';
+
+// Chỉ dùng Firebase thử nghiệm khi cấu hình staging
+const isStaging = import.meta.env.VITE_FIREBASE_ENV === 'staging';
+
+const firebaseConfig = isStaging
+  ? stagingConfig
+  : productionConfig;
 
 const app = initializeApp(firebaseConfig);
 
@@ -20,7 +29,11 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export const BOOTSTRAPPED_ADMIN_EMAIL = 'nguyenquyduong1611998@gmail.com';
 
-export const BOOTSTRAPPED_ADMIN_UID = '3zPu6ZrPGLfDNsms17mxHrEwfUF2';
+
+export const BOOTSTRAPPED_ADMIN_UID = isStaging
+  ? ''
+  : '3zPu6ZrPGLfDNsms17mxHrEwfUF2';
+
 
 export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
 export const FIRESTORE_DATABASE_ID = firebaseConfig.firestoreDatabaseId;

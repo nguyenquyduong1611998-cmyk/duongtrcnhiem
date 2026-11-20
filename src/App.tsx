@@ -724,11 +724,45 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     }
   };
 
-  const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
-    const enrichedAttempt: QuizAttempt = {
-      ...newAttempt,
-      accountId: newAttempt.accountId || currentUser?.id,
-    };
+  
+const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
+  const enrichedAttempt: QuizAttempt = {
+    ...newAttempt,
+    accountId: newAttempt.accountId || currentUser?.id,
+  };
+
+  const next = [enrichedAttempt, ...attemptsRef.current];
+
+  setAttempts(next);
+  saveAttempts(next);
+
+  // Chỉ đồng bộ Firestore khi đã đăng nhập Google
+  if (cloudState.connected && firebaseUser) {
+    const uid = firebaseUser.uid;
+    const isAdmin = cloudState.isCloudAdmin;
+
+    void enqueueCloudWrite(async () => {
+      const saved = await saveSingleAttemptToFirestore(
+        enrichedAttempt,
+        uid,
+        trackerRef.current,
+        {
+          accountId: enrichedAttempt.accountId,
+          accounts: accountsRef.current,
+          isCloudAdmin: isAdmin,
+          localTopics: topicsRef.current,
+        }
+      );
+
+      if (!saved) {
+        throw new Error(
+          'Chuyên đề của bài thi này chưa tồn tại trên Firebase Firestore. Quản trị viên cần kết nối đám mây và đồng bộ bộ đề trước.'
+        );
+      }
+    });
+  }
+};
+
     const next = [enrichedAttempt, ...attemptsRef.current];
     setAttempts(next);
     saveAttempts(next);

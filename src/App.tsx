@@ -242,7 +242,7 @@ export default function App() {
         connectTimeoutRef.current = null;
       }
 
-      if (!user || !user.emailVerified) {
+      if (!user) {
         setFirebaseUser(null);
         trackerRef.current = createEmptyCloudTracker();
         setCloudState((prev) => ({

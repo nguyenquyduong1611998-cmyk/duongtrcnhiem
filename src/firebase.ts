@@ -19,6 +19,9 @@ googleProvider.addScope('profile');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 export const BOOTSTRAPPED_ADMIN_EMAIL = 'nguyenquyduong1611998@gmail.com';
+
+export const BOOTSTRAPPED_ADMIN_UID = '3zPu6ZrPGLfDNsms17mxHrEwfUF2';
+
 export const FIREBASE_PROJECT_ID = firebaseConfig.projectId;
 export const FIRESTORE_DATABASE_ID = firebaseConfig.firestoreDatabaseId;
 

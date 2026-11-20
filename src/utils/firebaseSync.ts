@@ -201,7 +201,7 @@ function timestampToIso(val: unknown, fallbackIso?: string): string {
 }
 
 export async function checkIsCloudAdmin(user: User | null): Promise<boolean> {
-  if (!user || !user.emailVerified) return false;
+ if (!user) return false;
   if (user.email?.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase()) {
     return true;
   }

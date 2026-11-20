@@ -583,9 +583,6 @@ export default function App() {
 
 // Guard against rare cases where onAuthStateChanged does not re-emit for an existing session
 const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
-
-      // Guard against rare cases where onAuthStateChanged does not re-emit for an existing session
-      const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
       if (connectAttemptRef.current !== attemptId) return;
       setFirebaseUser(signedInUser);
       setCloudState((prev) => ({

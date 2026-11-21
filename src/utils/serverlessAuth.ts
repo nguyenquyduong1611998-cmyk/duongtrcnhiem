@@ -1,6 +1,9 @@
 import { signInWithCustomToken } from 'firebase/auth';
 import { auth, IS_FIREBASE_STAGING } from '../firebase';
 
+// Only the staging login screen interprets this sentinel; D1 remains authoritative.
+export const SYNTHETIC_RESET_REQUIRED = 'STAGING_UNIT_TEMP_PASSWORD_VERIFIED';
+
 interface DemoStudentAccount {
   id: string;
   username: string;
@@ -40,7 +43,13 @@ async function postStaging(path: string, body: Record<string, unknown>, idToken?
       throw new Error('Cloudflare Functions gặp lỗi khi xử lý yêu cầu (503). Cần xem nhật ký Functions; không nhất thiết thiếu cấu hình.');
     }
     if (res.status === 409 && result?.error === 'TEMPORARY_PASSWORD_VALID_RESET_REQUIRED')
-      throw new Error('Mật khẩu tạm của tài khoản GIẢ đã được D1 xác minh, nhưng vẫn bắt buộc đổi mật khẩu. Chưa cấp quyền đăng nhập Firebase.');
+      throw new Error(SYNTHETIC_RESET_REQUIRED);
+    if (res.status === 409 && result?.error === 'PASSWORD_CHANGED_LOGIN_DISABLED')
+      throw new Error('Mật khẩu mới đã được D1 xác minh. Đăng nhập tài khoản GIẢ vẫn đang tắt trên staging.');
+    if (res.status === 409 && result?.error === 'ACCOUNT_CHANGED_RETRY')
+      throw new Error('Mật khẩu tạm đã thay đổi hoặc tài khoản vừa được chỉnh sửa. Hãy yêu cầu Admin cấp mật khẩu tạm mới.');
+    if (res.status === 400 && result?.error === 'INVALID_NEW_PASSWORD')
+      throw new Error('Mật khẩu mới phải dài 12–128 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt, không có khoảng trắng và khác mật khẩu cũ.');
     if (res.status === 403) throw new Error('Google Admin không được máy chủ xác nhận. Hãy kiểm tra tài khoản Google và kết nối lại.');
     if (res.status === 429) throw new Error('Đã thử đăng nhập quá nhiều lần. Hãy đợi 15 phút.');
     if (res.status === 401) throw new Error('Tên tài khoản hoặc mật khẩu không đúng.');
@@ -171,4 +180,29 @@ export async function verifySyntheticD1TemporaryPassword(
     username:username.trim().toLowerCase(),password,
   });
   throw new Error('Chức năng đăng nhập tài khoản tập trung chưa được kích hoạt.');
+}
+
+/** One-time forced password change for STAGING synthetic accounts only.
+ *  Does not sign in the user, issue a Firebase token or persist the password.
+ */
+export async function changeSyntheticD1Password(
+  username: string, temporaryPassword: string, newPassword: string,
+): Promise<void> {
+  if (!IS_FIREBASE_STAGING || !SYNTHETIC_D1_USERNAME.test(username.trim().toLowerCase())) {
+    throw new Error('Chỉ hỗ trợ tài khoản giả test_unit_ trên staging.');
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 12 ||
+      newPassword.length > 128 || !/[a-z]/.test(newPassword) ||
+      !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) ||
+      !/[^a-zA-Z0-9]/.test(newPassword) || /\\s/.test(newPassword) ||
+      temporaryPassword === newPassword) {
+    throw new Error('Mật khẩu mới phải dài 12–128 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt, không có khoảng trắng và khác mật khẩu cũ.');
+  }
+  const result = await postStaging('/api/auth/student/unit-change-password',{
+    username:username.trim().toLowerCase(),temporaryPassword,newPassword,
+  });
+  if (result.mode!=='synthetic-only' || result.username!==username.trim().toLowerCase() ||
+      result.passwordChanged!==true || result.loginEnabled!==false) {
+    throw new Error('Không nhận được xác nhận đổi mật khẩu từ Cloudflare D1.');
+  }
 }

@@ -25,11 +25,14 @@ import {
   checkIsCloudAdmin,
   createEmptyCloudTracker,
   createStagingTestTopic,
+  createStagingAccountProbe,
+  deleteStagingAccountProbe,
   deleteStagingTestTopic,
   hashUnitPassword,
   mergeAndSyncOnConnect,
   pushAllLocalDataToFirestore,
   readStagingTestTopic,
+  readStagingAccountProbe,
   STAGING_TEST_TOPIC_ID,
   saveSingleAttemptToFirestore,
   subscribeToCloudData,
@@ -679,15 +682,30 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     await deleteStagingTestTopic(firebaseUser);
   }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
 
+  const handleCreateStagingAccountProbe = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || !firebaseUser || !cloudState.connected ||
+        !cloudState.isCloudAdmin || currentUser?.role !== 'admin') {
+      throw new Error('Chỉ tài khoản Admin của Firebase staging được tạo bản ghi giả.');
+    }
+    await createStagingAccountProbe(firebaseUser);
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
+
+  const handleDeleteStagingAccountProbe = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || !firebaseUser || !cloudState.connected ||
+        !cloudState.isCloudAdmin || currentUser?.role !== 'admin') {
+      throw new Error('Chỉ tài khoản Admin của Firebase staging được xóa bản ghi giả.');
+    }
+    await deleteStagingAccountProbe(firebaseUser);
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
+
   const handleSyncCloudNow = useCallback(async () => {
     if (!firebaseUser || !cloudState.connected) return;
     if (IS_FIREBASE_STAGING) {
-      if (currentUser?.role !== 'admin' || !cloudState.isCloudAdmin) {
-        setCloudState((prev) => ({ ...prev, error: 'Chỉ Admin đã xác thực bằng Google quản trị mới được đồng bộ dữ liệu thử nghiệm.' }));
-        return;
-      }
-      const approved = window.confirm('Chỉ dùng dữ liệu thử nghiệm! Bạn có chắc muốn tải dữ liệu hiện có trên trình duyệt lên Firebase staging không?');
-      if (!approved) return;
+      setCloudState((prev) => ({
+        ...prev,
+        error: 'Đồng bộ toàn bộ đang tắt trên staging để không tải tài khoản hoặc kết quả thi thật. Hãy dùng chức năng kiểm thử dữ liệu giả.',
+      }));
+      return;
     }
     await enqueueCloudWrite(async () => {
       await pushAllLocalDataToFirestore({
@@ -747,7 +765,7 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     setAccounts(nextAccounts);
     saveAccounts(nextAccounts);
 
-    if (cloudState.connected && firebaseUser) {
+    if (!IS_FIREBASE_STAGING && cloudState.connected && firebaseUser) {
       if (!cloudState.isCloudAdmin) {
         setCloudState((prev) => ({
           ...prev,
@@ -766,7 +784,7 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     setTopics(nextTopics);
     saveTopics(nextTopics);
 
-    if (cloudState.connected && firebaseUser) {
+    if (!IS_FIREBASE_STAGING && cloudState.connected && firebaseUser) {
       if (!cloudState.isCloudAdmin) {
         setCloudState((prev) => ({
           ...prev,
@@ -784,7 +802,7 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     setAttempts(nextAttempts);
     saveAttempts(nextAttempts);
 
-    if (cloudState.connected && firebaseUser) {
+    if (!IS_FIREBASE_STAGING && cloudState.connected && firebaseUser) {
       const uid = firebaseUser.uid;
       const isAdmin = cloudState.isCloudAdmin;
       void enqueueCloudWrite(async () => {
@@ -813,7 +831,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
   saveAttempts(next);
 
   // Staging student submissions stay local until identity mapping is implemented.
-  if (cloudState.connected && firebaseUser && (!IS_FIREBASE_STAGING || currentUser?.role === 'admin')) {
+  if (!IS_FIREBASE_STAGING && cloudState.connected && firebaseUser) {
     const uid = firebaseUser.uid;
     const isAdmin = cloudState.isCloudAdmin;
 
@@ -1032,6 +1050,10 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onCreateTestTopic={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleCreateStagingTestTopic : undefined}
                   onReadTestTopic={IS_FIREBASE_STAGING ? readStagingTestTopic : undefined}
                   onDeleteTestTopic={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteStagingTestTopic : undefined}
+                  onCreateTestAccount={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleCreateStagingAccountProbe : undefined}
+                  onReadTestAccount={IS_FIREBASE_STAGING ? readStagingAccountProbe : undefined}
+                  onDeleteTestAccount={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteStagingAccountProbe : undefined}
+                  disableBulkSync={IS_FIREBASE_STAGING}
                   onClose={() => setShowCloudModal(false)}
                 />
               )}

@@ -7,7 +7,7 @@ import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
-import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, listSyntheticD1Accounts, createSyntheticD1Account, changeSyntheticD1AccountStatus, deleteSyntheticD1Account, resetSyntheticD1AccountPassword } from './utils/serverlessAuth';
+import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, listSyntheticD1Accounts, createSyntheticD1Account, changeSyntheticD1AccountStatus, deleteSyntheticD1Account, resetSyntheticD1AccountPassword, verifySyntheticD1TemporaryPassword } from './utils/serverlessAuth';
 import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, assertOtherDemoStudentDenied } from './utils/stagingResultProbe';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
@@ -796,6 +796,17 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
   }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role, enqueueCloudWrite]);
 
   const handleLogin = async (username: string, password: string): Promise<string | null> => {
+    // Preflight of synthetic D1 accounts is server-side only. Even a correct
+    // temporary password never grants app or Firebase access at this stage.
+    if (IS_FIREBASE_STAGING && username.trim().toLowerCase().startsWith('test_unit_')) {
+      if (cloudState.isCloudAdmin) return 'Ngắt kết nối Google Admin trước khi kiểm tra mật khẩu tài khoản giả.';
+      try {
+        await verifySyntheticD1TemporaryPassword(username, password);
+        return 'Đăng nhập tài khoản tập trung chưa được kích hoạt trên staging.';
+      } catch (error) {
+        return error instanceof Error ? error.message : 'Không thể xác minh mật khẩu thử nghiệm.';
+      }
+    }
     // Controlled migration: only demo students use Cloudflare's server-side
     // password verifier. Never fall back to local passwords for demo users.
     if (IS_FIREBASE_STAGING && username.trim().toLowerCase().startsWith('test_hv_')) {

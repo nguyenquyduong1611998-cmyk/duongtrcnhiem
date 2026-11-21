@@ -35,6 +35,3 @@ export async function onRequestPost({request,env}){
     return failSafe();
   }
 }
-export async function onRequest({request}){
-  return json({error:'METHOD_NOT_ALLOWED'},405);
-}

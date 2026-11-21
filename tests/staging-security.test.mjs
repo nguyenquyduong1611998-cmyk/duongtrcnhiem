@@ -28,8 +28,11 @@ test('staging uses a separate admin UID without changing production UID', () => 
 test('staging managed accounts require password hashes, not plaintext', () => {
   const managedValidator = between(stagingRules, 'function isValidManagedAccount(', 'function isValidAccountDirectoryEntry(');
   assert.match(managedValidator, /data\.passwordHash is string/);
-  // Catch a previously broken rule where a hash regex was truncated and code was duplicated.
-  assert.match(managedValidator, /data\\.passwordHash\\.matches\\('\^\[a-f0-9\]\\{64\\}\\
+  // Guard against truncated patterns or duplicate validation fragments.
+  assert.ok(managedValidator.includes("data.passwordHash.matches('^[a-f0-9]{64}$')"));
+  assert.equal((managedValidator.match(/data\.fullName is string/g) || []).length, 1);
+  assert.equal((managedValidator.match(/data\.updatedAt is timestamp/g) || []).length, 1);
+  assert.doesNotMatch(managedValidator, /^\) &&$/m);
   assert.doesNotMatch(managedValidator, /data\.password is string/);
   assert.match(sync, /IS_FIREBASE_STAGING\s*\? \{ passwordHash \}\s*: \{ password:/);
   assert.match(sync, /IS_FIREBASE_STAGING && !acc\.password/);

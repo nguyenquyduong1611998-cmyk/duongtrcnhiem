@@ -1,0 +1,433 @@
+// STAGING REVIEW CANDIDATE — do not publish before emulator tests and client migration.
+// This file does not deploy automatically; production firestore.rules is unchanged.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==================== PRIMITIVE HELPERS ====================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    
+function isVerifiedUser() {
+  return isSignedIn()
+    && request.auth.token.firebase.sign_in_provider == 'google.com';
+}
+
+    // Fast claim-only bootstrapped admin check (safe for allow list without get/exists)
+    
+function isBootstrappedAdmin() {
+  return isVerifiedUser()
+    && request.auth.uid == 'aV2S9WYo4tg8XZQSE9snzjeBU203';
+}
+
+    // Full admin check for single-document get/create/update/delete operations
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+
+    // ==================== VALIDATION BLUEPRINTS ====================
+    function isValidAdminUser(data, adminUid) {
+      return data.keys().hasAll(['uid', 'email', 'note', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'note', 'createdAt', 'updatedAt']) &&
+        data.uid is string && data.uid == adminUid && isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.note is string && data.note.size() <= 300 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidManagedAccount(data, accountId) {
+      return data.keys().hasAll([
+          'id', 'scope', 'username', 'passwordHash', 'fullName', 'defaultUnit',
+          'role', 'active', 'createdAtIso', 'updatedAtIso', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'scope', 'username', 'passwordHash', 'fullName', 'defaultUnit',
+          'role', 'active', 'createdAtIso', 'updatedAtIso', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id == accountId && isValidId(data.id) &&
+        data.scope is string && data.scope == 'unit_490' &&
+        data.username is string && data.username.size() >= 1 && data.username.size() <= 64 &&
+        data.passwordHash is string && data.passwordHash.matches('^[a-f0-9]{64} &&
+        data.fullName is string && data.fullName.size() <= 150 &&
+        data.defaultUnit is string && data.defaultUnit.size() <= 200 &&
+        data.role is string && data.role in ['admin', 'student'] &&
+        data.active is bool &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        data.updatedAtIso is string && data.updatedAtIso.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+) &&
+        data.fullName is string && data.fullName.size() <= 150 &&
+        data.defaultUnit is string && data.defaultUnit.size() <= 200 &&
+        data.role is string && data.role in ['admin', 'student'] &&
+        data.active is bool &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        data.updatedAtIso is string && data.updatedAtIso.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAccountDirectoryEntry(data, accountId) {
+      return data.keys().hasAll([
+          'id', 'username', 'usernameLower', 'passwordHash', 'fullName', 'defaultUnit',
+          'role', 'active', 'visibility', 'createdAtIso', 'updatedAtIso', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'username', 'usernameLower', 'passwordHash', 'fullName', 'defaultUnit',
+          'role', 'active', 'visibility', 'createdAtIso', 'updatedAtIso', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id == accountId && isValidId(data.id) &&
+        data.username is string && data.username.size() >= 1 && data.username.size() <= 64 &&
+        data.usernameLower is string && data.usernameLower.size() >= 1 && data.usernameLower.size() <= 64 &&
+        data.passwordHash is string && data.passwordHash.size() == 64 && data.passwordHash.matches('^[a-f0-9]{64}$') &&
+        data.fullName is string && data.fullName.size() <= 150 &&
+        data.defaultUnit is string && data.defaultUnit.size() <= 200 &&
+        data.role is string && data.role in ['admin', 'student'] &&
+        data.active is bool &&
+        data.visibility is string && data.visibility == 'public' &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        data.updatedAtIso is string && data.updatedAtIso.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTopic(data, topicId) {
+      return data.keys().hasAll([
+          'id', 'code', 'title', 'description', 'timeLimitMinutes',
+          'questionCount', 'visibility', 'createdAtIso', 'updatedAtIso',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'code', 'title', 'description', 'timeLimitMinutes',
+          'questionCount', 'visibility', 'createdAtIso', 'updatedAtIso',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id == topicId && isValidId(data.id) &&
+        data.code is string && data.code.size() >= 1 && data.code.size() <= 32 &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 250 &&
+        data.description is string && data.description.size() <= 1500 &&
+        data.timeLimitMinutes is number && data.timeLimitMinutes >= 1 && data.timeLimitMinutes <= 240 &&
+        data.questionCount is number && data.questionCount >= 0 && data.questionCount <= 5000 &&
+        data.visibility is string && data.visibility == 'public' &&
+        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
+        data.updatedAtIso is string && data.updatedAtIso.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTopicQuestion(data, topicId, questionId) {
+      return data.keys().hasAll([
+          'id', 'topicId', 'orderIndex', 'text', 'options',
+          'correctIndex', 'explanation', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'topicId', 'orderIndex', 'text', 'options',
+          'correctIndex', 'explanation', 'visibility', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id == questionId && isValidId(data.id) &&
+        data.topicId is string && data.topicId == topicId && isValidId(data.topicId) &&
+        data.orderIndex is number && data.orderIndex >= 0 && data.orderIndex <= 5000 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 2000 &&
+        data.options is list && data.options.size() == 4 &&
+        data.options[0] is string && data.options[0].size() >= 1 && data.options[0].size() <= 1000 &&
+        data.options[1] is string && data.options[1].size() >= 1 && data.options[1].size() <= 1000 &&
+        data.options[2] is string && data.options[2].size() >= 1 && data.options[2].size() <= 1000 &&
+        data.options[3] is string && data.options[3].size() >= 1 && data.options[3].size() <= 1000 &&
+        data.correctIndex is number && data.correctIndex >= 0 && data.correctIndex <= 3 &&
+        data.explanation is string && data.explanation.size() <= 3000 &&
+        data.visibility is string && data.visibility == 'public' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidQuizAttempt(data, attemptId) {
+      return data.keys().hasAll([
+          'id', 'scope', 'ownerUid', 'accountId', 'accountUsername', 'candidateName', 'unitName',
+          'topicId', 'topicTitle', 'answers', 'correctCount', 'totalCount',
+          'score10', 'grade', 'durationSeconds', 'startedAtIso', 'submittedAtIso',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'scope', 'ownerUid', 'accountId', 'accountUsername', 'candidateName', 'unitName',
+          'topicId', 'topicTitle', 'answers', 'correctCount', 'totalCount',
+          'score10', 'grade', 'durationSeconds', 'startedAtIso', 'submittedAtIso',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.id is string && data.id == attemptId && isValidId(data.id) &&
+        data.scope is string && data.scope == 'unit_490' &&
+        data.ownerUid is string && isValidId(data.ownerUid) &&
+        data.accountId is string && isValidId(data.accountId) &&
+        data.accountUsername is string && data.accountUsername.size() >= 1 && data.accountUsername.size() <= 64 &&
+        data.candidateName is string && data.candidateName.size() >= 1 && data.candidateName.size() <= 150 &&
+        data.unitName is string && data.unitName.size() >= 1 && data.unitName.size() <= 200 &&
+        data.topicId is string && isValidId(data.topicId) &&
+        data.topicTitle is string && data.topicTitle.size() >= 1 && data.topicTitle.size() <= 250 &&
+        data.answers is map && data.answers.size() <= 500 &&
+        data.correctCount is number && data.correctCount >= 0 && data.correctCount <= 5000 &&
+        data.totalCount is number && data.totalCount >= 0 && data.totalCount <= 5000 &&
+        data.correctCount <= data.totalCount &&
+        data.score10 is number && data.score10 >= 0 && data.score10 <= 10 &&
+        data.grade is string && data.grade in ['Giỏi', 'Khá', 'Đạt', 'Yếu'] &&
+        data.durationSeconds is number && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+        data.startedAtIso is string && data.startedAtIso.size() <= 40 &&
+        data.submittedAtIso is string && data.submittedAtIso.size() <= 40 &&
+        data.status is string && data.status == 'submitted' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidHonorEntry(data, entryId) {
+      return data.keys().hasAll([
+          'id', 'attemptId', 'ownerUid', 'accountId', 'visibility', 'accountUsername',
+          'candidateName', 'unitName', 'topicId', 'topicTitle', 'correctCount',
+          'totalCount', 'score10', 'grade', 'durationSeconds',
+          'startedAtIso', 'submittedAtIso', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'attemptId', 'ownerUid', 'accountId', 'visibility', 'accountUsername',
+          'candidateName', 'unitName', 'topicId', 'topicTitle', 'correctCount',
+          'totalCount', 'score10', 'grade', 'durationSeconds',
+          'startedAtIso', 'submittedAtIso', 'createdAt'
+        ]) &&
+        data.id is string && data.id == entryId && isValidId(data.id) &&
+        data.attemptId is string && data.attemptId == entryId && isValidId(data.attemptId) &&
+        data.ownerUid is string && isValidId(data.ownerUid) &&
+        data.accountId is string && isValidId(data.accountId) &&
+        data.visibility is string && data.visibility == 'public' &&
+        data.accountUsername is string && data.accountUsername.size() >= 1 && data.accountUsername.size() <= 64 &&
+        data.candidateName is string && data.candidateName.size() >= 1 && data.candidateName.size() <= 150 &&
+        data.unitName is string && data.unitName.size() >= 1 && data.unitName.size() <= 200 &&
+        data.topicId is string && isValidId(data.topicId) &&
+        data.topicTitle is string && data.topicTitle.size() >= 1 && data.topicTitle.size() <= 250 &&
+        data.correctCount is number && data.correctCount >= 0 && data.correctCount <= 5000 &&
+        data.totalCount is number && data.totalCount >= 0 && data.totalCount <= 5000 &&
+        data.correctCount <= data.totalCount &&
+        data.score10 is number && data.score10 >= 0 && data.score10 <= 10 &&
+        data.grade is string && data.grade in ['Giỏi', 'Khá', 'Đạt', 'Yếu'] &&
+        data.durationSeconds is number && data.durationSeconds >= 0 && data.durationSeconds <= 86400 &&
+        data.startedAtIso is string && data.startedAtIso.size() <= 40 &&
+        data.submittedAtIso is string && data.submittedAtIso.size() <= 40 &&
+        data.createdAt is timestamp;
+    }
+
+    // ==================== COLLECTION RULES ====================
+
+    // 1. Trusted Admins Registry
+    match /admins/{adminUid} {
+      allow get: if isVerifiedUser() && isValidId(adminUid) && (
+        request.auth.uid == adminUid || isBootstrappedAdmin()
+      );
+      allow list: if false;
+      allow create: if isBootstrappedAdmin() &&
+        isValidId(adminUid) &&
+        isValidAdminUser(incoming(), adminUid) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isBootstrappedAdmin() &&
+        isValidId(adminUid) &&
+        isValidAdminUser(incoming(), adminUid) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['email', 'note', 'updatedAt']);
+      allow delete: if isBootstrappedAdmin() &&
+        isValidId(adminUid) &&
+        adminUid != request.auth.uid;
+    }
+
+    // 2. Admin-Only Managed Unit Accounts (hash only; do not store plaintext passwords)
+    match /managed_accounts/{accountId} {
+      allow get: if isVerifiedUser() && isValidId(accountId) && isAdmin();
+      allow list: if isBootstrappedAdmin() && existing().scope == 'unit_490';
+      allow create: if isVerifiedUser() &&
+        isValidId(accountId) &&
+        isValidManagedAccount(incoming(), accountId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() &&
+        isValidId(accountId) &&
+        isValidManagedAccount(incoming(), accountId) &&
+        incoming().id == existing().id &&
+        incoming().scope == existing().scope &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'username', 'passwordHash', 'fullName', 'defaultUnit',
+          'role', 'active', 'updatedAtIso', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(accountId) && isAdmin();
+    }
+
+    // 2b. Hashed Login Directory (Split Collection: zero plaintext passwords, Admin-only write)
+    match /account_directory/{accountId} {
+      allow get: if isValidId(accountId) && isAdmin();
+      allow list: if isBootstrappedAdmin();
+      allow create: if isVerifiedUser() &&
+        isValidId(accountId) &&
+        isValidAccountDirectoryEntry(incoming(), accountId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() &&
+        isValidId(accountId) &&
+        isValidAccountDirectoryEntry(incoming(), accountId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'username', 'usernameLower', 'passwordHash', 'fullName',
+          'defaultUnit', 'role', 'active', 'visibility', 'updatedAtIso', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(accountId) && isAdmin();
+    }
+
+    // 3. Quiz Topics & Questions Subcollection (Published educational content readable by all unit devices, Admin-only write)
+    match /topics/{topicId} {
+      allow get: if isValidId(topicId) && (
+        resource == null || existing().visibility == 'public'
+      );
+      allow list: if existing().visibility == 'public';
+      allow create: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'code', 'title', 'description', 'timeLimitMinutes',
+          'questionCount', 'visibility', 'updatedAtIso', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(topicId) && isAdmin();
+
+      // Master Gate Subcollection: Questions belong to a valid parent topic
+      match /questions/{questionId} {
+        allow get: if isValidId(topicId) &&
+          isValidId(questionId) && (
+            resource == null || (
+              existing().visibility == 'public' &&
+              existing().topicId == topicId &&
+              exists(/databases/$(database)/documents/topics/$(topicId))
+            )
+          );
+        allow list: if existing().visibility == 'public';
+        allow create: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          existsAfter(/databases/$(database)/documents/topics/$(topicId));
+        allow update: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().id == existing().id &&
+          incoming().topicId == existing().topicId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          exists(/databases/$(database)/documents/topics/$(topicId)) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'orderIndex', 'text', 'options', 'correctIndex',
+            'explanation', 'visibility', 'updatedAt'
+          ]);
+        allow delete: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isAdmin();
+      }
+    }
+
+    // 4. Quiz Attempts (Admin + Verified User + Active Unit Account submissions, Terminal State Locked)
+    match /attempts/{attemptId} {
+      allow get: if isValidId(attemptId) && (
+        resource == null ||
+        (isVerifiedUser() && (existing().ownerUid == request.auth.uid || isAdmin()))
+      );
+      allow list: if isVerifiedUser() && (
+        existing().ownerUid == request.auth.uid ||
+        (isBootstrappedAdmin() && existing().scope == 'unit_490')
+      );
+      allow create: if isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/topics/$(incoming().topicId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      // Terminal state locking: submitted attempts cannot be edited by regular users; admin-only override
+      allow update: if isVerifiedUser() &&
+        isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().id == existing().id &&
+        incoming().scope == existing().scope &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().accountId == existing().accountId &&
+        incoming().topicId == existing().topicId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'candidateName', 'unitName', 'topicTitle', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(attemptId) && isAdmin();
+    }
+
+    // 5. Private Honor Entries (paired with QuizAttempts; owner/admin reads only)
+    match /honor_entries/{entryId} {
+      // Contains candidate names and units; owner or administrator only.
+      allow get: if isValidId(entryId) && isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isValidId(entryId) &&
+        isValidHonorEntry(incoming(), entryId) &&
+        incoming().createdAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/attempts/$(entryId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if isVerifiedUser() && isValidId(entryId) && isAdmin();
+    }
+  }
+}

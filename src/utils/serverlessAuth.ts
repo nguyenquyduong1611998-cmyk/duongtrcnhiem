@@ -135,3 +135,22 @@ export async function deleteSyntheticD1Account(idToken: string, username: string
     throw new Error('Máy chủ không xác nhận xóa tài khoản thử nghiệm.');
   }
 }
+
+export interface SyntheticTemporaryCredential {
+  username: string;
+  temporaryPassword: string;
+}
+export async function resetSyntheticD1AccountPassword(
+  idToken: string, username: string,
+): Promise<SyntheticTemporaryCredential> {
+  if (!SYNTHETIC_D1_USERNAME.test(username)) throw new Error('Chỉ hỗ trợ tài khoản test_unit_ giả.');
+  const result = await postStaging('/api/auth/admin/unit-accounts',{
+    action:'reset-password',username,
+  },idToken);
+  if (result.mode !== 'synthetic-only' || result.username !== username ||
+      typeof result.temporaryPassword !== 'string' ||
+      !/^[A-Za-z0-9_-]{20,32}$/.test(result.temporaryPassword)) {
+    throw new Error('Không nhận được mật khẩu tạm hợp lệ từ D1 staging.');
+  }
+  return {username,temporaryPassword:result.temporaryPassword};
+}

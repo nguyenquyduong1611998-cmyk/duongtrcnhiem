@@ -47,15 +47,17 @@ export async function verifySyntheticUnitCredential(db, data) {
   ).bind(username).first();
   const hash=await pbkdf2(password,user?.password_salt||DUMMY_SALT,user?.kdf_iterations||310000);
   if (!user || user.role!=='student' || user.active!==1 ||
-      user.password_reset_required!==1 ||
       !equalSecret(hash,user.password_hash)) {
     await countFailedAttempt(db,username,attempt,now);
     return json({error:GENERIC_LOGIN_ERROR},401);
   }
   await db.prepare('DELETE FROM login_attempts WHERE username=?').bind(username).run();
-  // Correct temporary credential verified on server, but still must be changed.
   // No Firebase UID, token, password or hash is sent to the client.
-  return json({error:'TEMPORARY_PASSWORD_VALID_RESET_REQUIRED',mode:'synthetic-only'},409);
+  // Correct passwords never grant a session while synthetic login is disabled.
+  if (user.password_reset_required===1) {
+    return json({error:'TEMPORARY_PASSWORD_VALID_RESET_REQUIRED',mode:'synthetic-only'},409);
+  }
+  return json({error:'PASSWORD_CHANGED_LOGIN_DISABLED',mode:'synthetic-only'},409);
 }
 
 export async function onRequestPost({request,env}) {

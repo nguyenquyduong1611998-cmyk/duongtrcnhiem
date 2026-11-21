@@ -71,11 +71,11 @@ test('server-side password hashes use random salt and PBKDF2; compare in constan
 
 test('versioned staging KDF avoids Cloudflare 100k per-call cap without reducing total work', async()=>{
   const source=readFileSync(new URL('../functions/_shared/auth.mjs',import.meta.url),'utf8');
-  assert.match(source,/const STAGING_KDF_PREFIX = 'cf-chain-v1\\.'/);
-  assert.match(source,/const PBKDF2_WORKER_MAX_ITERATIONS = 100000/);
-  assert.match(source,/Math\\.min\\(remaining, PBKDF2_WORKER_MAX_ITERATIONS\\)/);
-  assert.match(source,/remaining -= count/);
-  assert.match(source,/stageSalt\\[salt\\.length\\] = stage/);
+  assert.ok(source.includes("const STAGING_KDF_PREFIX = 'cf-chain-v1.'"));
+  assert.ok(source.includes('const PBKDF2_WORKER_MAX_ITERATIONS = 100000'));
+  assert.ok(source.includes('Math.min(remaining, PBKDF2_WORKER_MAX_ITERATIONS)'));
+  assert.ok(source.includes('remaining -= count'));
+  assert.ok(source.includes('stageSalt[salt.length] = stage'));
   const generated=await hashPassword('VALID_DEMO_PASSWORD_1234');
   assert.equal(generated.iterations,310000);
   assert.ok(generated.salt.startsWith('cf-chain-v1.'));

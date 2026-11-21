@@ -27,6 +27,16 @@ jobs:
       - name: Static staging security regression tests
         run: node --test tests/staging-security.test.mjs
 
+      - name: Validate Cloudflare Pages Functions syntax
+        run: |
+          node --check functions/_shared/auth.mjs
+          node --check functions/api/auth/status.js
+          node --check functions/api/auth/student/login.js
+          node --check functions/api/auth/admin/demo.js
+
+      - name: Test Cloudflare D1 demo authentication security
+        run: node --test tests/serverless-auth.test.mjs
+
       - name: Build website
         run: bun run build
         

@@ -39,6 +39,8 @@ interface CloudStorageModalProps {
   onCreateDemoResultProbe?: () => Promise<void>;
   onReadDemoResultProbe?: () => Promise<void>;
   onDeleteDemoResultProbe?: () => Promise<void>;
+  demoStudentUid?: string;
+  onCheckOtherDemoStudentIsolation?: (otherUid: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -64,6 +66,8 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onCreateDemoResultProbe,
   onReadDemoResultProbe,
   onDeleteDemoResultProbe,
+  demoStudentUid,
+  onCheckOtherDemoStudentIsolation,
   onClose,
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -159,6 +163,7 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
     }
   };
 
+  const [otherStudentUid, setOtherStudentUid] = React.useState('');
   const [demoResultBusy, setDemoResultBusy] = React.useState(false);
   const [demoResultMessage, setDemoResultMessage] = React.useState('');
   const [demoResultError, setDemoResultError] = React.useState(false);
@@ -572,6 +577,57 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
               )}
               {!!demoResultMessage && (
                 <p role="status" className={`text-xs ${demoResultError ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>{demoResultMessage}</p>
+              )}
+              {demoStudentUid && (
+                <div className="space-y-1 rounded-md border border-[#DDE3DC] bg-white p-2">
+                  <label htmlFor="demo-student-own-uid" className="text-xs font-semibold text-[#152019]">
+                    UID Firebase của học viên DEMO này
+                  </label>
+                  <input
+                    id="demo-student-own-uid"
+                    type="text"
+                    readOnly
+                    value={demoStudentUid}
+                    onClick={(event) => event.currentTarget.select()}
+                    className="w-full rounded-md border border-[#DDE3DC] bg-[#F5F7F5] px-2 py-2 text-xs text-[#152019]"
+                  />
+                  <p className="text-xs text-[#4B5B50]">
+                    Nhấn vào ô UID rồi Ctrl+C để sao chép. Đây là mã định danh thử nghiệm, không phải mật khẩu.
+                  </p>
+                </div>
+              )}
+              {onCheckOtherDemoStudentIsolation && (
+                <div className="space-y-2 rounded-md border border-[#DDE3DC] bg-white p-2">
+                  <p className="text-xs font-semibold text-[#152019]">Kiểm tra học viên B không thể truy cập kết quả của A</p>
+                  <p className="text-xs leading-relaxed text-[#4B5B50]">
+                    Trên tài khoản B, dán UID của A vào ô bên dưới. A cần có sẵn kết quả GIẢ 7/10.
+                    Chỉ thử collection demo_result_probes. Nếu cấu hình Rules sai, phép thử xóa có thể xóa bản ghi GIẢ của A.
+                  </p>
+                  <label htmlFor="other-demo-student-uid" className="text-xs font-medium text-[#4B5B50]">
+                    UID học viên A (khác UID hiện tại)
+                  </label>
+                  <input
+                    id="other-demo-student-uid"
+                    type="text"
+                    value={otherStudentUid}
+                    onChange={(event) => setOtherStudentUid(event.target.value)}
+                    placeholder="student_..."
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="w-full rounded-md border border-[#DDE3DC] bg-white px-2 py-2 text-xs text-[#152019]"
+                  />
+                  <button
+                    type="button"
+                    disabled={demoResultBusy || !/^student_[a-f0-9]{32}$/.test(otherStudentUid.trim()) || otherStudentUid.trim() === demoStudentUid}
+                    onClick={() => void runDemoResult(
+                      () => onCheckOtherDemoStudentIsolation(otherStudentUid),
+                      'ĐÚNG PHÂN QUYỀN: Firebase từ chối cả đọc lẫn xóa kết quả GIẢ của học viên A (permission-denied). Hãy kiểm tra lại bằng tài khoản A.'
+                    )}
+                    className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-50"
+                  >
+                    Kiểm tra quyền đọc và xóa của học viên B
+                  </button>
+                </div>
               )}
             </div>
           )}

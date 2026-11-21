@@ -8,7 +8,7 @@ import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
 import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent } from './utils/serverlessAuth';
-import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe } from './utils/stagingResultProbe';
+import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, assertOtherDemoStudentDenied } from './utils/stagingResultProbe';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
 import { TopicsView } from './components/TopicsView';
@@ -719,6 +719,10 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     await deleteDemoResultProbe(requireCurrentDemoStudent());
   }, [requireCurrentDemoStudent]);
 
+  const handleCheckOtherDemoStudentIsolation = useCallback(async (otherUid: string) => {
+    await assertOtherDemoStudentDenied(requireCurrentDemoStudent(), otherUid);
+  }, [requireCurrentDemoStudent]);
+
   const handleProvisionDemoStudent = useCallback(async () => {
     if (!IS_FIREBASE_STAGING || currentUser?.role !== 'admin' || !cloudState.isCloudAdmin || !firebaseUser) {
       throw new Error('Cần đăng nhập Admin nội bộ và Google Admin trên staging.');
@@ -1121,6 +1125,8 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onCreateDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleCreateDemoResultProbe : undefined}
                   onReadDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleReadDemoResultProbe : undefined}
                   onDeleteDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleDeleteDemoResultProbe : undefined}
+                  demoStudentUid={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? firebaseUser.uid : undefined}
+                  onCheckOtherDemoStudentIsolation={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleCheckOtherDemoStudentIsolation : undefined}
                   onProvisionDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleProvisionDemoStudent : undefined}
                   onDeleteDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteDemoStudent : undefined}
                   onClose={() => setShowCloudModal(false)}

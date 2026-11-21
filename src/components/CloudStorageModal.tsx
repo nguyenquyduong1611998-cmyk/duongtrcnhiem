@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { CloudStorageState } from '../types';
 import { formatDateTime } from '../utils/grading';
-import { testBackendReady, type DemoStudentCredentials, type SyntheticD1Account } from '../utils/serverlessAuth';
+import { testBackendReady, type DemoStudentCredentials, type SyntheticD1Account, type SyntheticTemporaryCredential } from '../utils/serverlessAuth';
 import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
 
 interface CloudStorageModalProps {
@@ -46,6 +46,7 @@ interface CloudStorageModalProps {
   onCreateSyntheticD1Account?: () => Promise<SyntheticD1Account>;
   onSetSyntheticD1AccountStatus?: (username: string, active: boolean) => Promise<void>;
   onDeleteSyntheticD1Account?: (username: string) => Promise<void>;
+  onResetSyntheticD1AccountPassword?: (username: string) => Promise<SyntheticTemporaryCredential>;
   onClose: () => void;
 }
 
@@ -77,6 +78,7 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onCreateSyntheticD1Account,
   onSetSyntheticD1AccountStatus,
   onDeleteSyntheticD1Account,
+  onResetSyntheticD1AccountPassword,
   onClose,
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -641,12 +643,13 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
             </div>
           )}
           {onListSyntheticD1Accounts && onCreateSyntheticD1Account &&
-            onSetSyntheticD1AccountStatus && onDeleteSyntheticD1Account && (
+            onSetSyntheticD1AccountStatus && onDeleteSyntheticD1Account && onResetSyntheticD1AccountPassword && (
               <SyntheticD1AccountsPanel
                 onList={onListSyntheticD1Accounts}
                 onCreate={onCreateSyntheticD1Account}
                 onSetActive={onSetSyntheticD1AccountStatus}
                 onDelete={onDeleteSyntheticD1Account}
+                onResetPassword={onResetSyntheticD1AccountPassword}
               />
             )}
         </div>

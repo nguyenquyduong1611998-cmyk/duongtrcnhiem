@@ -15,6 +15,7 @@ import { TopicsView } from './components/TopicsView';
 import { DEFAULT_ACCOUNTS } from './data/defaultData';
 import {
   BOOTSTRAPPED_ADMIN_EMAIL,
+  BOOTSTRAPPED_ADMIN_UID,
   FIREBASE_PROJECT_ID,
   FIRESTORE_DATABASE_ID,
   IS_FIREBASE_STAGING,
@@ -205,6 +206,15 @@ export default function App() {
 
   const currentUser =
     accounts.find((a) => a.id === currentUserId && a.active) || null;
+
+  // A browser-local 'admin' role alone cannot grant Admin panel access on staging.
+  // Sensitive operations continue to be enforced by Firebase Security Rules.
+  const adminAccessAllowed = !IS_FIREBASE_STAGING || (
+    currentUser?.role === 'admin' &&
+    cloudState.connected &&
+    cloudState.isCloudAdmin &&
+    firebaseUser?.uid === BOOTSTRAPPED_ADMIN_UID
+  );
 
   // Serialize all Firestore writes in strict FIFO order so topics always finish before attempts
   const enqueueCloudWrite = useCallback((task: () => Promise<void>) => {
@@ -829,6 +839,13 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
   };
 
   const handleUpdateAccounts = (nextAccounts: UserAccount[]) => {
+    if (IS_FIREBASE_STAGING && !adminAccessAllowed) {
+      setCloudState((prev) => ({
+        ...prev,
+        error: 'Cần kết nối Google Admin staging được Firebase xác nhận trước khi sửa dữ liệu quản trị.',
+      }));
+      return;
+    }
     const prevAccounts = accountsRef.current;
     setAccounts(nextAccounts);
     saveAccounts(nextAccounts);
@@ -848,6 +865,13 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
   };
 
   const handleUpdateTopics = (nextTopics: Topic[]) => {
+    if (IS_FIREBASE_STAGING && !adminAccessAllowed) {
+      setCloudState((prev) => ({
+        ...prev,
+        error: 'Cần kết nối Google Admin staging được Firebase xác nhận trước khi sửa dữ liệu quản trị.',
+      }));
+      return;
+    }
     const prevTopics = topicsRef.current;
     setTopics(nextTopics);
     saveTopics(nextTopics);
@@ -867,6 +891,13 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
   };
 
   const handleUpdateAttempts = (nextAttempts: QuizAttempt[]) => {
+    if (IS_FIREBASE_STAGING && !adminAccessAllowed) {
+      setCloudState((prev) => ({
+        ...prev,
+        error: 'Cần kết nối Google Admin staging được Firebase xác nhận trước khi sửa dữ liệu quản trị.',
+      }));
+      return;
+    }
     setAttempts(nextAttempts);
     saveAttempts(nextAttempts);
 
@@ -990,7 +1021,12 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
               currentUser={currentUser}
               activeTab={activeTab}
               cloudConnected={cloudState.connected}
+              adminAccessAllowed={adminAccessAllowed}
               onSelectTab={(tab) => {
+                if (tab === 'admin' && !adminAccessAllowed) {
+                  setShowCloudModal(true);
+                  return;
+                }
                 setActiveQuizTopic(null);
                 setActiveTab(tab);
               }}
@@ -1072,7 +1108,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                           topics={topics}
                         />
                       )}
-                      {activeTab === 'admin' && currentUser.role === 'admin' && (
+                      {activeTab === 'admin' && currentUser.role === 'admin' && adminAccessAllowed && (
                         <AdminPanel
                           currentUser={currentUser}
                           accounts={accounts}

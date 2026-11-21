@@ -70,6 +70,88 @@ export async function testStagingAdminWrite(user: User): Promise<void> {
   }
 }
 
+
+// This synthetic topic is read and written solely through the staging test controls.
+// Never include it in the ordinary local topic cache or a student test session.
+export const STAGING_TEST_TOPIC_ID = 'staging_test_topic_20261121';
+export const STAGING_TEST_TOPIC_TITLE = 'CHUYÊN ĐỀ KIỂM THỬ - DỮ LIỆU GIẢ';
+const STAGING_TEST_QUESTION_ID = 'staging_test_question_01';
+
+export async function createStagingTestTopic(user: User): Promise<void> {
+  if (!IS_FIREBASE_STAGING || user.uid !== BOOTSTRAPPED_ADMIN_UID) {
+    throw new Error('Chỉ Google Admin của Firebase staging được tạo chuyên đề thử.');
+  }
+  const topicRef = doc(db, 'topics', STAGING_TEST_TOPIC_ID);
+  const questionRef = doc(db, 'topics', STAGING_TEST_TOPIC_ID, 'questions', STAGING_TEST_QUESTION_ID);
+  const existing = await getDoc(topicRef);
+  if (existing.exists()) {
+    if (existing.data().title !== STAGING_TEST_TOPIC_TITLE) {
+      throw new Error('ID chuyên đề kiểm thử đã được sử dụng cho nội dung khác. Không ghi đè dữ liệu.');
+    }
+    const q = await getDoc(questionRef);
+    if (!q.exists()) throw new Error('Chuyên đề thử có nhưng thiếu câu hỏi. Không tự ý sửa dữ liệu.');
+    return;
+  }
+  const now = new Date().toISOString();
+  const batch = writeBatch(db);
+  batch.set(topicRef, {
+    id: STAGING_TEST_TOPIC_ID,
+    code: 'TEST-01',
+    title: STAGING_TEST_TOPIC_TITLE,
+    description: 'Dữ liệu hoàn toàn giả để kiểm tra Firebase giữa hai trình duyệt.',
+    timeLimitMinutes: 5,
+    questionCount: 1,
+    visibility: 'public',
+    createdAtIso: now,
+    updatedAtIso: now,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(questionRef, {
+    id: STAGING_TEST_QUESTION_ID,
+    topicId: STAGING_TEST_TOPIC_ID,
+    orderIndex: 0,
+    text: '2 + 2 bằng bao nhiêu? (câu hỏi giả)',
+    options: ['3', '4', '5', '6'],
+    correctIndex: 1,
+    explanation: '2 + 2 = 4.',
+    visibility: 'public',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
+  await readStagingTestTopic();
+}
+
+export async function readStagingTestTopic(): Promise<void> {
+  if (!IS_FIREBASE_STAGING) throw new Error('Chỉ kiểm thử trên Firebase staging.');
+  const topicRef = doc(db, 'topics', STAGING_TEST_TOPIC_ID);
+  const questionRef = doc(db, 'topics', STAGING_TEST_TOPIC_ID, 'questions', STAGING_TEST_QUESTION_ID);
+  const [topic, question] = await Promise.all([getDoc(topicRef), getDoc(questionRef)]);
+  if (!topic.exists()) throw new Error('Firebase chưa có chuyên đề giả. Hãy tạo từ tài khoản Admin trước.');
+  if (!question.exists() || topic.data().title !== STAGING_TEST_TOPIC_TITLE ||
+      question.data().text !== '2 + 2 bằng bao nhiêu? (câu hỏi giả)' ||
+      question.data().correctIndex !== 1) {
+    throw new Error('Dữ liệu chuyên đề thử chưa đầy đủ hoặc không trùng nội dung mong đợi.');
+  }
+}
+
+export async function deleteStagingTestTopic(user: User): Promise<void> {
+  if (!IS_FIREBASE_STAGING || user.uid !== BOOTSTRAPPED_ADMIN_UID) {
+    throw new Error('Chỉ Google Admin của Firebase staging được xóa chuyên đề thử.');
+  }
+  const topicRef = doc(db, 'topics', STAGING_TEST_TOPIC_ID);
+  const existing = await getDoc(topicRef);
+  if (!existing.exists()) return;
+  if (existing.data().title !== STAGING_TEST_TOPIC_TITLE) {
+    throw new Error('Không xóa: chuyên đề không phải dữ liệu thử.');
+  }
+  const batch = writeBatch(db);
+  batch.delete(doc(db, 'topics', STAGING_TEST_TOPIC_ID, 'questions', STAGING_TEST_QUESTION_ID));
+  batch.delete(topicRef);
+  await batch.commit();
+}
+
 export function sanitizeFirestoreId(raw: string, prefix: string): string {
   const cleaned = (raw || '')
     .trim()
@@ -400,6 +482,7 @@ function subscribeTopicsTree(
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
         const id = docSnap.id;
+        if (IS_FIREBASE_STAGING && id === STAGING_TEST_TOPIC_ID) return;
         activeIds.add(id);
 
         topicMetaMap.set(id, {
@@ -1381,6 +1464,7 @@ export async function mergeAndSyncOnConnect(params: {
       query(collection(db, 'topics'), where('visibility', '==', 'public'))
     );
     for (const tDoc of topicSnap.docs) {
+      if (IS_FIREBASE_STAGING && tDoc.id === STAGING_TEST_TOPIC_ID) continue;
       const td = tDoc.data();
       const tid = tDoc.id;
       tracker.topicIds.add(tid);

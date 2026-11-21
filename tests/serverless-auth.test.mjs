@@ -69,6 +69,21 @@ test('server-side password hashes use random salt and PBKDF2; compare in constan
   assert.ok(randomPassword().length>=20);
 });
 
+test('versioned staging KDF avoids Cloudflare 100k per-call cap without reducing total work', async()=>{
+  const source=readFileSync(new URL('../functions/_shared/auth.mjs',import.meta.url),'utf8');
+  assert.match(source,/const STAGING_KDF_PREFIX = 'cf-chain-v1\\.'/);
+  assert.match(source,/const PBKDF2_WORKER_MAX_ITERATIONS = 100000/);
+  assert.match(source,/Math\\.min\\(remaining, PBKDF2_WORKER_MAX_ITERATIONS\\)/);
+  assert.match(source,/remaining -= count/);
+  assert.match(source,/stageSalt\\[salt\\.length\\] = stage/);
+  const generated=await hashPassword('VALID_DEMO_PASSWORD_1234');
+  assert.equal(generated.iterations,310000);
+  assert.ok(generated.salt.startsWith('cf-chain-v1.'));
+  assert.equal(generated.hash,await pbkdf2('VALID_DEMO_PASSWORD_1234',generated.salt,generated.iterations));
+  assert.notEqual(generated.hash,await pbkdf2('INVALID_DEMO_PASSWORD_4567',generated.salt,generated.iterations));
+  await assert.rejects(()=>pbkdf2('VALID_DEMO_PASSWORD_1234','AAAAAAAAAAAAAAAAAAAAAA',310000),/UNSUPPORTED_LEGACY_KDF/);
+});
+
 test('demo usernames never accept legacy admin or arbitrary user characters',()=>{
   assert.equal(usernameKey(' ADMIN '),'admin'); // only normalization, not permitted as demo in route
   assert.equal(usernameKey('  TeSt_Hv_123abc  '),'test_hv_123abc');

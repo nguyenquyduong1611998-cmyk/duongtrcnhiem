@@ -61,3 +61,18 @@ test('staging does not auto-upload on sign-in or reconnect', () => {
   assert.match(app, /window\.confirm\(/);
   assert.match(app, /void signOutGoogleCloud\(\)/);
 });
+
+test('staging smoke test uses isolated Admin-only sync_probes collection', () => {
+  const probe = between(stagingRules, 'match /sync_probes/{probeId}', 'match /honor_entries/{entryId}');
+  assert.match(probe, /allow create: if isBootstrappedAdmin\(\)/);
+  assert.match(probe, /allow get: if isBootstrappedAdmin\(\)/);
+  assert.match(probe, /allow list: if false;/);
+  assert.match(probe, /allow update: if false;/);
+  assert.match(probe, /allow delete: if isBootstrappedAdmin\(\)/);
+  assert.match(sync, /export async function testStagingAdminWrite/);
+  assert.match(sync, /doc\(db, 'sync_probes', nonce\)/);
+  assert.match(sync, /await setDoc\(ref,/);
+  assert.match(sync, /await getDoc\(ref\)/);
+  assert.match(sync, /await deleteDoc\(ref\)/);
+  assert.match(app, /onTestWrite=\{IS_FIREBASE_STAGING \? handleTestStagingWrite : undefined\}/);
+});

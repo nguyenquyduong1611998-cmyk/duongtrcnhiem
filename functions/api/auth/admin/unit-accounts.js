@@ -54,6 +54,34 @@ export async function handleSyntheticUnitAccountAction(db, data) {
     },201);
   }
 
+  if (action === 'reset-password') {
+    if (!isExactFields(data, ['action','username']) || !isSyntheticUsername(data.username)) {
+      return json({error:'INVALID_ACTION_OR_USERNAME'},400);
+    }
+    const username = data.username;
+    const existing = await db.prepare(
+      "SELECT username FROM unit_accounts WHERE username=? AND username GLOB 'test_unit_*'"
+    ).bind(username).first();
+    if (!existing) return json({error:'SYNTHETIC_ACCOUNT_NOT_FOUND'},404);
+
+    // A fresh temporary credential is returned ONCE to the verified staging
+    // Admin only. Never store plaintext or log it. It cannot be used to sign in:
+    // the unit_accounts login path is intentionally not enabled yet.
+    const temporaryPassword = randomPassword();
+    const kdf = await hashPassword(temporaryPassword);
+    const now = Math.floor(Date.now()/1000);
+    const result = await db.prepare(
+      "UPDATE unit_accounts SET password_salt=?,password_hash=?,kdf_iterations=?," +
+      "password_reset_required=1,auth_version=auth_version+1,updated_at=?," +
+      "password_changed_at=? WHERE username=? AND username GLOB 'test_unit_*'"
+    ).bind(kdf.salt,kdf.hash,kdf.iterations,now,now,username).run();
+    if (!result.success || !result.meta || result.meta.changes !== 1) {
+      return json({error:'SYNTHETIC_ACCOUNT_NOT_FOUND'},404);
+    }
+    return json({username,temporaryPassword,mode:'synthetic-only',
+      note:'CHỈ DỮ LIỆU GIẢ: Mật khẩu tạm hiển thị một lần, vẫn yêu cầu đổi và chưa được phép đăng nhập.'});
+  }
+
   if (!['lock','unlock','delete'].includes(action) ||
       !isExactFields(data, ['action','username']) ||
       !isSyntheticUsername(data.username)) {

@@ -73,14 +73,49 @@ export function randomPassword() {
   // 144 bits of entropy; returned only to the provisioning Admin, never persisted.
   return encodeB64(randomBytes(18));
 }
+// Explicitly versioned, multi-stage KDF for staging DEMO credentials only.
+// Workerd limits a single WebCrypto PBKDF2 invocation to 100,000 iterations.
+// Each stage applies a fresh 100k-or-less PBKDF2-SHA256 derivation to the
+// previous stage's 32-byte key, with a distinct domain-separated salt.
+// This is NOT standard PBKDF2(iterations=310000). Do not use for real users
+// without an independent cryptographic review or a managed auth provider.
+const STAGING_KDF_PREFIX = 'cf-chain-v1.';
+const PBKDF2_WORKER_MAX_ITERATIONS = 100000;
+async function derivePbkdf2Key(inputBytes, saltBytes, count) {
+  if (count < 1 || count > PBKDF2_WORKER_MAX_ITERATIONS) throw new Error('INVALID_KDF_CHUNK');
+  const key = await crypto.subtle.importKey('raw', inputBytes, 'PBKDF2', false, ['deriveBits']);
+  const derived = await crypto.subtle.deriveBits({
+    name: 'PBKDF2', salt: saltBytes, iterations: count, hash: 'SHA-256',
+  }, key, 256);
+  return new Uint8Array(derived);
+}
 export async function pbkdf2(password, saltB64, iterations=PBKDF2_ITERATIONS) {
-  if (!Number.isInteger(iterations) || iterations < 310000 || iterations > 650000) throw new Error('INVALID_KDF_PARAMS');
-  const base=await crypto.subtle.importKey('raw',te.encode(password),'PBKDF2',false,['deriveBits']);
-  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:bytesFromB64(saltB64),iterations,hash:'SHA-256'},base,256);
-  return encodeB64(new Uint8Array(bits));
+  if (!Number.isInteger(iterations) || iterations < 310000 || iterations > 650000)
+    throw new Error('INVALID_KDF_PARAMS');
+  if (typeof password !== 'string' || password.length > 128 || password.length === 0)
+    throw new Error('INVALID_DEMO_PASSWORD');
+  if (!saltB64.startsWith(STAGING_KDF_PREFIX)) {
+    // Do not silently produce a different hash for an unversioned record.
+    throw new Error('UNSUPPORTED_LEGACY_KDF');
+  }
+  const salt = bytesFromB64(saltB64.slice(STAGING_KDF_PREFIX.length));
+  if (salt.length !== 16) throw new Error('INVALID_KDF_SALT');
+  let remaining = iterations;
+  let stage = 0;
+  let material = te.encode(password);
+  while (remaining > 0) {
+    const count = Math.min(remaining, PBKDF2_WORKER_MAX_ITERATIONS);
+    const stageSalt = new Uint8Array(salt.length + 1);
+    stageSalt.set(salt);
+    stageSalt[salt.length] = stage;
+    material = await derivePbkdf2Key(material, stageSalt, count);
+    remaining -= count;
+    stage++;
+  }
+  return encodeB64(material);
 }
 export async function hashPassword(password) {
-  const salt=encodeB64(randomBytes(16));
+  const salt = STAGING_KDF_PREFIX + encodeB64(randomBytes(16));
   return {salt, hash:await pbkdf2(password,salt), iterations:PBKDF2_ITERATIONS};
 }
 export function equalSecret(a,b) {

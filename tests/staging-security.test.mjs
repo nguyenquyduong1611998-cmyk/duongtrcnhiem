@@ -194,3 +194,11 @@ test('staging Admin UI requires cloud-verified Google Admin UID, not localStorag
   assert.ok((app.match(/if \(IS_FIREBASE_STAGING && !adminAccessAllowed\)/g) || []).length >= 3);
   assert.ok((navbar.match(/currentUser\.role === 'admin' && adminAccessAllowed/g) || []).length === 2);
 });
+
+test('Admin panel never renders legacy plaintext passwords in its account table', () => {
+  const adminPanel = read('src/components/AdminPanel.tsx');
+  assert.ok(adminPanel.includes('Mật khẩu (ẩn)'));
+  assert.ok(adminPanel.includes('aria-label="Mật khẩu được ẩn"'));
+  assert.ok(adminPanel.includes('type="password"'));
+  assert.ok(!adminPanel.includes("{acc.password || '••••••••'}"));
+});

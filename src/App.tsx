@@ -24,9 +24,12 @@ import { CloudStorageState, MainTab, QuizAttempt, Topic, UserAccount } from './t
 import {
   checkIsCloudAdmin,
   createEmptyCloudTracker,
+  createStagingTestTopic,
+  deleteStagingTestTopic,
   hashUnitPassword,
   mergeAndSyncOnConnect,
   pushAllLocalDataToFirestore,
+  readStagingTestTopic,
   saveSingleAttemptToFirestore,
   subscribeToCloudData,
   subscribeToPublicUnitData,
@@ -643,6 +646,22 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     await testStagingAdminWrite(firebaseUser);
   }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
 
+  const handleCreateStagingTestTopic = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || !firebaseUser || !cloudState.connected ||
+        !cloudState.isCloudAdmin || currentUser?.role !== 'admin') {
+      throw new Error('Chỉ Admin đã kết nối Google staging được tạo chuyên đề giả.');
+    }
+    await createStagingTestTopic(firebaseUser);
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
+
+  const handleDeleteStagingTestTopic = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || !firebaseUser || !cloudState.connected ||
+        !cloudState.isCloudAdmin || currentUser?.role !== 'admin') {
+      throw new Error('Chỉ Admin đã kết nối Google staging được xóa chuyên đề giả.');
+    }
+    await deleteStagingTestTopic(firebaseUser);
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
+
   const handleSyncCloudNow = useCallback(async () => {
     if (!firebaseUser || !cloudState.connected) return;
     if (IS_FIREBASE_STAGING) {
@@ -993,6 +1012,9 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onDisconnect={handleDisconnectCloud}
                   onSyncNow={handleSyncCloudNow}
                   onTestWrite={IS_FIREBASE_STAGING ? handleTestStagingWrite : undefined}
+                  onCreateTestTopic={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleCreateStagingTestTopic : undefined}
+                  onReadTestTopic={IS_FIREBASE_STAGING ? readStagingTestTopic : undefined}
+                  onDeleteTestTopic={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteStagingTestTopic : undefined}
                   onClose={() => setShowCloudModal(false)}
                 />
               )}

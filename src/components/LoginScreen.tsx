@@ -1,19 +1,25 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Eye, EyeOff, Lock, User, AlertCircle, Shield } from 'lucide-react';
+import { SYNTHETIC_RESET_REQUIRED } from '../utils/serverlessAuth';
 
 interface LoginScreenProps {
   onLogin: (username: string, password: string) => Promise<string | null> | string | null;
+  onChangeSyntheticPassword?: (username: string, temporaryPassword: string, newPassword: string) => Promise<string | null>;
 }
 
 const EASE_SMOOTH = [0.16, 1, 0.3, 1] as const;
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onChangeSyntheticPassword }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resetRequired, setResetRequired] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,13 +30,45 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       return;
     }
     setSubmitting(true);
+    setSuccessMessage('');
     try {
-      const err = await onLogin(trimmedUser, password);
-      if (err) {
-        setError(err);
-      } else {
-        setError(null);
+      if (resetRequired && onChangeSyntheticPassword) {
+        if (newPassword !== confirmPassword) {
+          setError('Mật khẩu mới và xác nhận không khớp.');
+          return;
+        }
+        if (newPassword.length < 12 || newPassword.length > 128 ||
+            !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) ||
+            !/[0-9]/.test(newPassword) || !/[^a-zA-Z0-9]/.test(newPassword) ||
+            /\\s/.test(newPassword) || newPassword === password) {
+          setError('Mật khẩu mới cần 12–128 ký tự, có chữ hoa, chữ thường, số, ký tự đặc biệt, không có khoảng trắng và khác mật khẩu tạm.');
+          return;
+        }
+        const err = await onChangeSyntheticPassword(trimmedUser, password, newPassword);
+        if (err) {
+          setError(err);
+        } else {
+          setResetRequired(false);
+          setPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setShowPassword(false);
+          setError(null);
+          setSuccessMessage('Đã đổi mật khẩu của tài khoản GIẢ trên Cloudflare D1. Chưa cấp quyền đăng nhập Firebase.');
+        }
+        return;
       }
+      const err = await onLogin(trimmedUser, password);
+      if (err === SYNTHETIC_RESET_REQUIRED && onChangeSyntheticPassword) {
+        setResetRequired(true);
+        setNewPassword('');
+        setConfirmPassword('');
+        setError(null);
+      } else {
+        setError(err);
+      }
+    } catch {
+      setError('Không thể xác minh tài khoản trên máy chủ thử nghiệm. Vui lòng kiểm tra kết nối.');
     } finally {
       setSubmitting(false);
     }
@@ -112,6 +150,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value);
+                    setResetRequired(false);
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setSuccessMessage('');
                     if (error) setError(null);
                   }}
                   placeholder="Nhập tên tài khoản"
@@ -154,6 +196,39 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               </div>
             </div>
 
+            {resetRequired && onChangeSyntheticPassword && (
+              <div className="space-y-3 rounded-lg border border-[#DDE3DC] bg-[#F3F8F4] p-3">
+                <p role="status" className="text-xs font-semibold text-[#166534]">
+                  Mật khẩu tạm đã được Cloudflare D1 xác minh. Tài khoản GIẢ bắt buộc đổi mật khẩu trước khi tiếp tục.
+                </p>
+                <p className="text-xs text-[#526357]">
+                  Chỉ thử trên staging. Đổi xong vẫn chưa thể đăng nhập; không dùng mật khẩu học viên thật.
+                </p>
+                <label htmlFor="synthetic-new-password" className="block text-xs font-semibold">Mật khẩu mới (GIẢ)</label>
+                <input id="synthetic-new-password" type="password" autoComplete="new-password"
+                  value={newPassword} onChange={(e) => {setNewPassword(e.target.value);setError(null);}}
+                  placeholder="Ít nhất 12 ký tự, chữ hoa/thường, số và ký tự đặc biệt"
+                  className="w-full rounded-lg border border-[#CFD8CE] bg-white px-3 py-2 text-sm"
+                />
+                <label htmlFor="synthetic-confirm-password" className="block text-xs font-semibold">Nhập lại mật khẩu mới</label>
+                <input id="synthetic-confirm-password" type="password" autoComplete="new-password"
+                  value={confirmPassword} onChange={(e) => {setConfirmPassword(e.target.value);setError(null);}}
+                  className="w-full rounded-lg border border-[#CFD8CE] bg-white px-3 py-2 text-sm"
+                />
+                <button type="button" disabled={submitting}
+                  onClick={() => {
+                    setResetRequired(false);setNewPassword('');setConfirmPassword('');setPassword('');setError(null);
+                  }}
+                  className="text-xs text-[#4B5B50] underline disabled:opacity-50"
+                >Hủy đổi mật khẩu</button>
+              </div>
+            )}
+            {!!successMessage && (
+              <p role="status" className="rounded-lg border border-[#A7D7B3] bg-[#F0FFF3] p-3 text-xs text-[#166534]">
+                {successMessage}
+              </p>
+            )}
+
             <AnimatePresence>
               {error && (
                 <motion.div
@@ -175,9 +250,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.985 }}
               transition={{ duration: 0.15, ease: EASE_SMOOTH }}
+              disabled={submitting}
               className="w-full py-2.5 px-4 bg-[#1F4D36] hover:bg-[#173B29] active:bg-[#122E20] text-white font-semibold text-sm rounded-lg shadow-sm hover:shadow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1F4D36] focus-visible:ring-offset-2 cursor-pointer"
             >
-              Đăng nhập
+              {resetRequired ? 'Đổi mật khẩu thử nghiệm' : 'Đăng nhập'}
             </motion.button>
           </form>
         </motion.div>

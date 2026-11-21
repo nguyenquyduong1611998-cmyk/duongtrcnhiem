@@ -73,7 +73,8 @@ test('synthetic password verifier never creates a Firebase session and respects 
 
   row.password_reset_required=0;
   response=await verifySyntheticUnitCredential(db,{username,password:tempPassword});
-  assert.equal(response.status,401); // fail closed until explicit login enable
+  assert.equal(response.status,409); // correct new password, but still no Firebase token
+  assert.deepEqual(await response.json(),{error:'PASSWORD_CHANGED_LOGIN_DISABLED',mode:'synthetic-only'});
   row.password_reset_required=1;
   row.active=0;
   response=await verifySyntheticUnitCredential(db,{username,password:tempPassword});

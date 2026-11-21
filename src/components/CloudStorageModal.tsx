@@ -29,6 +29,10 @@ interface CloudStorageModalProps {
   onCreateTestTopic?: () => Promise<void>;
   onReadTestTopic?: () => Promise<void>;
   onDeleteTestTopic?: () => Promise<void>;
+  onCreateTestAccount?: () => Promise<void>;
+  onReadTestAccount?: () => Promise<void>;
+  onDeleteTestAccount?: () => Promise<void>;
+  disableBulkSync?: boolean;
   onClose: () => void;
 }
 
@@ -45,7 +49,11 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onCreateTestTopic,
   onReadTestTopic,
   onDeleteTestTopic,
-  onClose,
+  onCreateTestAccount,
+  onReadTestAccount,
+  onDeleteTestAccount,
+  disableBulkSync = false,
+  onClose:
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = React.useState('');
@@ -80,6 +88,24 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
       setTopicTestMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setTopicTestBusy(false);
+    }
+  };
+
+  const [accountTestBusy, setAccountTestBusy] = React.useState(false);
+  const [accountTestMessage, setAccountTestMessage] = React.useState('');
+  const [accountTestError, setAccountTestError] = React.useState(false);
+  const handleAccountTest = async (fn: () => Promise<void>, success: string) => {
+    setAccountTestBusy(true);
+    setAccountTestError(false);
+    setAccountTestMessage('');
+    try {
+      await fn();
+      setAccountTestMessage(success);
+    } catch (error) {
+      setAccountTestError(true);
+      setAccountTestMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAccountTestBusy(false);
     }
   };
 
@@ -167,9 +193,9 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                   <span>Chưa đăng nhập Quản trị đám mây</span>
                 </div>
                 <p className="text-xs text-[#4B5B50] leading-relaxed">
-                  Tài khoản học viên/khách luôn tự động nhận bộ đề và danh sách tài khoản mới nhất từ
-                  Firebase Firestore mà không cần đăng nhập Google. Quản trị viên hãy kết nối Google
-                  để đẩy mọi chỉnh sửa lên đám mây cho tất cả thiết bị khác.
+                  {disableBulkSync
+                    ? 'Đây là phiên bản thử nghiệm. Chỉ sử dụng dữ liệu giả để kiểm tra Firebase; đồng bộ tài khoản học viên thật đang bị khóa.'
+                    : 'Tài khoản học viên/khách có thể nhận bộ đề công khai từ Firebase. Quản trị viên cần đăng nhập Google để quản lý dữ liệu.'}
                 </p>
               </div>
 
@@ -239,7 +265,9 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                 </p>
                 {cloud.isCloudAdmin && (
                   <p className="text-xs text-[#166534]/85">
-                    Mọi thay đổi tài khoản, bộ đề và câu hỏi sẽ tự động đồng bộ trực tiếp sang thiết bị học viên.
+                    {disableBulkSync
+                      ? 'Đang kiểm thử trên Firebase staging. Đồng bộ tài khoản, bộ đề và kết quả thật đang bị khóa để bảo vệ dữ liệu.'
+                      : 'Mọi thay đổi tài khoản, bộ đề và câu hỏi sẽ tự động đồng bộ trực tiếp sang thiết bị học viên.'}
                   </p>
                 )}
                 {cloud.lastSyncedAt && (
@@ -294,12 +322,12 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
                 <button
                   type="button"
-                  disabled={cloud.syncing}
+                  disabled={cloud.syncing || disableBulkSync}
                   onClick={() => void onSyncNow()}
                   className="flex-1 py-2.5 px-4 bg-[#1F4D36] hover:bg-[#173B29] disabled:opacity-60 text-white text-xs sm:text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <RefreshCw className={`w-4 h-4 ${cloud.syncing ? 'animate-spin' : ''}`} />
-                  <span>{cloud.syncing ? 'Đang đồng bộ...' : 'Đồng bộ ngay lên đám mây'}</span>
+                  <span>{disableBulkSync ? 'Đồng bộ toàn bộ đang khóa trên staging' : cloud.syncing ? 'Đang đồng bộ...' : 'Đồng bộ ngay lên đám mây'}</span>
                 </button>
 
                 <button
@@ -357,6 +385,49 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
             </div>
           )}
 
+          {onReadTestAccount && (
+            <div className="space-y-2 rounded-xl border border-[#DDE3DC] bg-[#FAFBF9] p-3">
+              <p className="text-sm font-bold text-[#152019]">Kiểm thử dữ liệu tài khoản giả</p>
+              <p className="text-xs leading-relaxed text-[#4B5B50]">
+                Bản ghi thử chỉ chứa tên đăng nhập giả, vai trò và trạng thái.
+                Không chứa mật khẩu, tên học viên hay dữ liệu thực tế.
+                Đây chưa phải phép thử đăng nhập hoặc đồng bộ tài khoản học viên thật.
+              </p>
+              {onCreateTestAccount && (
+                <button
+                  type="button"
+                  disabled={accountTestBusy || cloud.syncing}
+                  onClick={() => void handleAccountTest(onCreateTestAccount, 'Admin đã tạo và đọc lại dữ liệu tài khoản giả trên Firestore.')}
+                  className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-60"
+                >
+                  Tạo tài khoản giả trên Firebase
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={accountTestBusy}
+                onClick={() => void handleAccountTest(onReadTestAccount, 'Đọc thành công dữ liệu tài khoản giả từ Firebase.')}
+                className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-60"
+              >
+                Đọc tài khoản giả từ Firebase
+              </button>
+              {onDeleteTestAccount && (
+                <button
+                  type="button"
+                  disabled={accountTestBusy || cloud.syncing}
+                  onClick={() => void handleAccountTest(onDeleteTestAccount, 'Đã xóa dữ liệu tài khoản giả khỏi Firebase.')}
+                  className="w-full rounded-md border border-[#B91C1C] px-3 py-2 text-sm font-semibold text-[#B91C1C] disabled:opacity-60"
+                >
+                  Xóa tài khoản giả sau khi kiểm thử
+                </button>
+              )}
+              {!!accountTestMessage && (
+                <p role="status" className={`text-xs ${accountTestError ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
+                  {accountTestMessage}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>

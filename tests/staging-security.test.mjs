@@ -9,6 +9,7 @@ const productionRules = read('firestore.rules');
 const firebase = read('src/firebase.ts');
 const sync = read('src/utils/firebaseSync.ts');
 const app = read('src/App.tsx');
+const storage = read('src/utils/storage.ts');
 
 function between(text, start, end) {
   const i = text.indexOf(start);
@@ -87,4 +88,15 @@ test('synthetic topic does not replace or leak ordinary local study data', () =>
   assert.ok(sync.includes("collection(db, 'managed_accounts')") || sync.includes("'managed_accounts'"));
   assert.match(app, /onCreateTestTopic=\{IS_FIREBASE_STAGING/);
   assert.match(app, /onReadTestTopic=\{IS_FIREBASE_STAGING \? readStagingTestTopic : undefined\}/);
+});
+
+test('staging synthetic topic never persists as a normal local topic or overwrites real topics', () => {
+  assert.match(storage, /function withoutSyntheticTopic\(topics: Topic\[\]\)/);
+  assert.ok(storage.includes("topics.filter((t) => t.id !== SYNTHETIC_TOPIC_ID)"));
+  assert.ok(storage.includes('const recovered = cleaned.length > 0 ? cleaned : DEFAULT_TOPICS'));
+  assert.ok(storage.includes('JSON.stringify(withoutSyntheticTopic(topics))'));
+  assert.ok(app.includes('function mergeTopicsSafely(local: Topic[], cloud: Topic[])'));
+  assert.ok(app.includes('if (topic.id !== STAGING_TEST_TOPIC_ID) byId.set(topic.id, topic)'));
+  assert.ok(app.includes('const nextTopics = mergeTopicsSafely(topicsRef.current, cloudTopics)'));
+  assert.ok(app.includes('topics={IS_FIREBASE_STAGING ? topics.filter((t) => t.id !== STAGING_TEST_TOPIC_ID) : topics}'));
 });

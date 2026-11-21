@@ -26,6 +26,9 @@ interface CloudStorageModalProps {
   onDisconnect: () => Promise<void>;
   onSyncNow: () => Promise<void>;
   onTestWrite?: () => Promise<void>;
+  onCreateTestTopic?: () => Promise<void>;
+  onReadTestTopic?: () => Promise<void>;
+  onDeleteTestTopic?: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -39,6 +42,9 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onDisconnect,
   onSyncNow,
   onTestWrite,
+  onCreateTestTopic,
+  onReadTestTopic,
+  onDeleteTestTopic,
   onClose,
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -56,6 +62,24 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
       setTestStatus('error');
       const detail = error instanceof Error ? error.message : String(error);
       setTestMessage(`Kiểm thử chưa thành công: ${detail}`);
+    }
+  };
+
+  const [topicTestBusy, setTopicTestBusy] = React.useState(false);
+  const [topicTestMessage, setTopicTestMessage] = React.useState('');
+  const [topicTestError, setTopicTestError] = React.useState(false);
+  const handleTopicTest = async (fn: () => Promise<void>, success: string) => {
+    setTopicTestBusy(true);
+    setTopicTestError(false);
+    setTopicTestMessage('');
+    try {
+      await fn();
+      setTopicTestMessage(success);
+    } catch (error) {
+      setTopicTestError(true);
+      setTopicTestMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTopicTestBusy(false);
     }
   };
 
@@ -290,6 +314,49 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
               </div>
             </div>
           )}
+          {onReadTestTopic && (
+            <div className="space-y-2 rounded-xl border border-[#DDE3DC] bg-[#FAFBF9] p-3">
+              <p className="text-sm font-bold text-[#152019]">Kiểm tra đồng bộ chuyên đề giả</p>
+              <p className="text-xs leading-relaxed text-[#4B5B50]">
+                Chỉ tạo một chuyên đề giả trên Firebase staging, không đưa dữ liệu tài khoản,
+                kết quả thi hay chuyên đề đang lưu trên máy lên đám mây.
+              </p>
+              {onCreateTestTopic && (
+                <button
+                  type="button"
+                  disabled={topicTestBusy || cloud.syncing}
+                  onClick={() => void handleTopicTest(onCreateTestTopic, 'Đã tạo và đọc lại 1 chuyên đề giả trên Firebase. Hãy kiểm tra collection topics trong Firestore Data.')}
+                  className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-60"
+                >
+                  Tạo 1 chuyên đề giả trên Firebase
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={topicTestBusy}
+                onClick={() => void handleTopicTest(onReadTestTopic, 'Đọc thành công chuyên đề giả và câu hỏi từ Firebase.')}
+                className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-60"
+              >
+                Đọc chuyên đề giả từ Firebase
+              </button>
+              {onDeleteTestTopic && (
+                <button
+                  type="button"
+                  disabled={topicTestBusy || cloud.syncing}
+                  onClick={() => void handleTopicTest(onDeleteTestTopic, 'Đã xóa chuyên đề giả khỏi Firebase.')}
+                  className="w-full rounded-md border border-[#B91C1C] px-3 py-2 text-sm font-semibold text-[#B91C1C] disabled:opacity-60"
+                >
+                  Xóa chuyên đề giả sau khi kiểm thử
+                </button>
+              )}
+              {!!topicTestMessage && (
+                <p role="status" className={`text-xs ${topicTestError ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>
+                  {topicTestMessage}
+                </p>
+              )}
+            </div>
+          )}
+
         </div>
       </motion.div>
     </motion.div>

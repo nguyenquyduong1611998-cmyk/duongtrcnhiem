@@ -1,6 +1,13 @@
 import { DEFAULT_ACCOUNTS, DEFAULT_ATTEMPTS, DEFAULT_TOPICS } from '../data/defaultData';
 import { QuizAttempt, SystemBackupPayload, Topic, UserAccount } from '../types';
 
+// Keep synthetic staging topic tests out of the normal learning-data cache.
+const IS_STAGING = import.meta.env.VITE_FIREBASE_ENV === 'staging';
+const SYNTHETIC_TOPIC_ID = 'staging_test_topic_20261121';
+function withoutSyntheticTopic(topics: Topic[]): Topic[] {
+  return IS_STAGING ? topics.filter((t) => t.id !== SYNTHETIC_TOPIC_ID) : topics;
+}
+
 const KEYS = {
   ACCOUNTS: 'tinhoc490_accounts_v1',
   TOPICS: 'tinhoc490_topics_v1',
@@ -53,11 +60,19 @@ export function loadTopics(): Topic[] {
     localStorage.setItem(KEYS.TOPICS, JSON.stringify(DEFAULT_TOPICS));
     return DEFAULT_TOPICS;
   }
+  const cleaned = withoutSyntheticTopic(parsed);
+  if (cleaned.length !== parsed.length) {
+    // A prior staging build may have replaced all real topics with the one test
+    // document. Restore bundled demo topics in that one specific case.
+    const recovered = cleaned.length > 0 ? cleaned : DEFAULT_TOPICS;
+    localStorage.setItem(KEYS.TOPICS, JSON.stringify(recovered));
+    return recovered;
+  }
   return parsed;
 }
 
 export function saveTopics(topics: Topic[]): void {
-  localStorage.setItem(KEYS.TOPICS, JSON.stringify(topics));
+  localStorage.setItem(KEYS.TOPICS, JSON.stringify(withoutSyntheticTopic(topics)));
 }
 
 export function loadAttempts(): QuizAttempt[] {

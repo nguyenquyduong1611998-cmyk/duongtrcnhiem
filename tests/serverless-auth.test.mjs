@@ -26,6 +26,35 @@ test('Cloudflare Functions fail closed until staging D1 and Firebase secrets are
   assert.equal(adminResult.status,503);
 });
 
+test('status confirms D1 binding and both required tables without returning secrets', async()=>{
+  const env = {
+    AUTH_DB: {
+      prepare: (sql) => {
+        assert.ok(sql.includes('sqlite_master'));
+        return {all: async()=>({results:[{name:'demo_students'},{name:'login_attempts'}]})};
+      },
+    },
+    STAGING_AUTH_ENABLED: 'false',
+    FIREBASE_PROJECT_ID: PROJECT_ID,
+  };
+  const result=await (await status({env})).json();
+  assert.equal(result.d1Connected,true);
+  assert.equal(result.tablesReady,true);
+  assert.equal(result.ready,false);
+  assert.equal(Object.keys(result).includes('FIREBASE_PRIVATE_KEY'),false);
+  const missingTable=await (await status({env:{
+    AUTH_DB:{prepare:()=>({all:async()=>({results:[{name:'demo_students'}]})})},
+  }})).json();
+  assert.equal(missingTable.d1Connected,true);
+  assert.equal(missingTable.tablesReady,false);
+  assert.equal(missingTable.ready,false);
+  const inaccessible=await (await status({env:{
+    AUTH_DB:{prepare:()=>({all:async()=>{throw new Error('db inaccessible');}})},
+  }})).json();
+  assert.equal(inaccessible.d1Connected,false);
+  assert.equal(inaccessible.ready,false);
+});
+
 test('server-side password hashes use random salt and PBKDF2; compare in constant work',async()=>{
   const a=await hashPassword('STRONG_DEMO_PASS_1234');
   const b=await hashPassword('STRONG_DEMO_PASS_1234');

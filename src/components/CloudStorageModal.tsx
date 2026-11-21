@@ -36,6 +36,9 @@ interface CloudStorageModalProps {
   disableBulkSync?: boolean;
   onProvisionDemoStudent?: () => Promise<DemoStudentCredentials>;
   onDeleteDemoStudent?: (username: string) => Promise<void>;
+  onCreateDemoResultProbe?: () => Promise<void>;
+  onReadDemoResultProbe?: () => Promise<void>;
+  onDeleteDemoResultProbe?: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -58,6 +61,9 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   disableBulkSync = false,
   onProvisionDemoStudent,
   onDeleteDemoStudent,
+  onCreateDemoResultProbe,
+  onReadDemoResultProbe,
+  onDeleteDemoResultProbe,
   onClose,
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -150,6 +156,25 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
       setDemoMessage(error instanceof Error ? error.message : 'Không thể xóa demo.');
     } finally {
       setDemoBusy(false);
+    }
+  };
+
+  const [demoResultBusy, setDemoResultBusy] = React.useState(false);
+  const [demoResultMessage, setDemoResultMessage] = React.useState('');
+  const [demoResultError, setDemoResultError] = React.useState(false);
+  const runDemoResult = async (action: () => Promise<void>, message: string) => {
+    if (demoResultBusy) return;
+    setDemoResultBusy(true);
+    setDemoResultError(false);
+    setDemoResultMessage('');
+    try {
+      await action();
+      setDemoResultMessage(message);
+    } catch (error) {
+      setDemoResultError(true);
+      setDemoResultMessage(error instanceof Error ? error.message : 'Không thể đọc dữ liệu giả từ Firebase.');
+    } finally {
+      setDemoResultBusy(false);
     }
   };
 
@@ -507,6 +532,47 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                 </div>
               )}
               {!!demoMessage && <p role="status" className="text-xs text-[#4B5B50]">{demoMessage}</p>}
+            </div>
+          )}
+          {onReadDemoResultProbe && (
+            <div className="space-y-2 rounded-xl border border-[#DDE3DC] bg-[#FAFBF9] p-3">
+              <p className="text-sm font-bold text-[#152019]">Kiểm thử kết quả GIẢ theo UID Firebase</p>
+              <p className="text-xs text-[#4B5B50]">
+                Chỉ lưu một kết quả giả cố định 7/10 vào collection riêng.
+                Không gửi bài thi, tên thật hay lịch sử học tập lên đám mây.
+                Đăng nhập cùng học viên DEMO trên trình duyệt khác để đọc lại.
+              </p>
+              {onCreateDemoResultProbe && (
+                <button
+                  type="button"
+                  disabled={demoResultBusy}
+                  onClick={() => void runDemoResult(onCreateDemoResultProbe, 'Đã ghi và đọc lại kết quả giả 7/10 theo UID học viên trên Firebase.')}
+                  className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-50"
+                >
+                  Tạo kết quả GIẢ 7/10 trên Firebase
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={demoResultBusy}
+                onClick={() => void runDemoResult(onReadDemoResultProbe, 'Đã đọc kết quả giả 7/10 của chính UID học viên từ máy chủ Firebase.')}
+                className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-50"
+              >
+                Đọc kết quả GIẢ từ Firebase
+              </button>
+              {onDeleteDemoResultProbe && (
+                <button
+                  type="button"
+                  disabled={demoResultBusy}
+                  onClick={() => void runDemoResult(onDeleteDemoResultProbe, 'Đã xóa kết quả giả của chính UID học viên khỏi Firebase.')}
+                  className="w-full rounded-md border border-[#B91C1C] px-3 py-2 text-sm font-semibold text-[#B91C1C] disabled:opacity-50"
+                >
+                  Xóa kết quả GIẢ sau kiểm thử
+                </button>
+              )}
+              {!!demoResultMessage && (
+                <p role="status" className={`text-xs ${demoResultError ? 'text-[#B91C1C]' : 'text-[#166534]'}`}>{demoResultMessage}</p>
+              )}
             </div>
           )}
         </div>

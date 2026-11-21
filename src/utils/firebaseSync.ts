@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import {
   BOOTSTRAPPED_ADMIN_UID,
+  IS_FIREBASE_STAGING,
   OperationType,
   db,
   handleFirestoreError,
@@ -259,7 +260,8 @@ function parseAccountDoc(id: string, d: Record<string, unknown>): UserAccount {
   return {
     id,
     username: String(d.username || ''),
-    password: String(d.password || ''),
+    password: IS_FIREBASE_STAGING ? '' : String(d.password || ''),
+    passwordHash: IS_FIREBASE_STAGING ? String(d.passwordHash || '') : undefined,
     fullName: String(d.fullName || ''),
     defaultUnit: String(d.defaultUnit || ''),
     role: d.role === 'admin' ? 'admin' : 'student',
@@ -446,29 +448,34 @@ export function subscribeToPublicUnitData(handlers: SubscribePublicUnitHandlers)
   unsubscribers.push(subscribeTopicsTree(tracker, onTopics, reportSnapshotError));
 
   
-  // 3. Live public honor board & student attempt summaries
-  const honorQuery = query(
-    collection(db, 'honor_entries'),
-    where('visibility', '==', 'public')
-  );
-  const unsubHonor = onSnapshot(
-    honorQuery,
-    (snapshot) => {
-      const nextIds = new Set<string>();
-      const list: QuizAttempt[] = [];
-      snapshot.forEach((docSnap) => {
-        nextIds.add(docSnap.id);
-        list.push(parseAttemptDoc(docSnap.id, docSnap.data()));
-      });
-      list.sort(
-        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
-      );
-      tracker.honorEntryIds = nextIds;
-      onHonorEntries(list);
-    },
-    (err) => reportSnapshotError(err, OperationType.LIST, 'honor_entries')
-  );
-  unsubscribers.push(unsubHonor);
+  // The staging honor board contains personal names and units.
+  // Do not query it before Google authentication.
+  if (!IS_FIREBASE_STAGING) {
+    // 3. Live public honor board & student attempt summaries
+    const honorQuery = query(
+      collection(db, 'honor_entries'),
+      where('visibility', '==', 'public')
+    );
+    const unsubHonor = onSnapshot(
+      honorQuery,
+      (snapshot) => {
+        const nextIds = new Set<string>();
+        const list: QuizAttempt[] = [];
+        snapshot.forEach((docSnap) => {
+          nextIds.add(docSnap.id);
+          list.push(parseAttemptDoc(docSnap.id, docSnap.data()));
+        });
+        list.sort(
+          (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+        );
+        tracker.honorEntryIds = nextIds;
+        onHonorEntries(list);
+      },
+      (err) => reportSnapshotError(err, OperationType.LIST, 'honor_entries')
+    );
+    unsubscribers.push(unsubHonor);
+
+  }
 
   return () => {
     for (const unsub of unsubscribers) unsub();
@@ -548,11 +555,10 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
   );
   unsubscribers.push(unsubAttempts);
 
-  // 4. Subscribe to Public Honor Entries
-  const honorQuery = query(
-    collection(db, 'honor_entries'),
-    where('visibility', '==', 'public')
-  );
+  // On staging, non-admin Google users can only subscribe to their own results.
+  const honorQuery = IS_FIREBASE_STAGING && !isCloudAdmin
+    ? query(collection(db, 'honor_entries'), where('ownerUid', '==', user.uid))
+    : query(collection(db, 'honor_entries'), where('visibility', '==', 'public'));
   const unsubHonor = onSnapshot(
     honorQuery,
     (snapshot) => {
@@ -577,12 +583,14 @@ export function subscribeToCloudData(handlers: SubscribeCloudHandlers): () => vo
   };
 }
 
-function buildAccountCreatePayload(acc: UserAccount, docId: string) {
+function buildAccountCreatePayload(acc: UserAccount, docId: string, passwordHash: string) {
   return {
     id: docId,
     scope: 'unit_490' as const,
     username: clampString(acc.username, 64, 'user'),
-    password: clampString(acc.password, 128, '123456'),
+    ...(IS_FIREBASE_STAGING
+      ? { passwordHash }
+      : { password: clampString(acc.password, 128, '123456') }),
     fullName: clampString(acc.fullName, 150, ''),
     defaultUnit: clampString(acc.defaultUnit, 200, ''),
     role: acc.role === 'admin' ? 'admin' : 'student',
@@ -594,10 +602,12 @@ function buildAccountCreatePayload(acc: UserAccount, docId: string) {
   };
 }
 
-function buildAccountUpdatePayload(acc: UserAccount) {
+function buildAccountUpdatePayload(acc: UserAccount, passwordHash: string) {
   return {
     username: clampString(acc.username, 64, 'user'),
-    password: clampString(acc.password, 128, '123456'),
+    ...(IS_FIREBASE_STAGING
+      ? { passwordHash }
+      : { password: clampString(acc.password, 128, '123456') }),
     fullName: clampString(acc.fullName, 150, ''),
     defaultUnit: clampString(acc.defaultUnit, 200, ''),
     role: acc.role === 'admin' ? 'admin' : 'student',
@@ -804,6 +814,11 @@ export async function syncAccountsToFirestore(
     const docId = sanitizeFirestoreId(acc.id, 'acc');
     const prev = prevMap.get(acc.id);
     const hasChanged = !prev || JSON.stringify(prev) !== JSON.stringify(acc);
+    // Never invent a default password for staging cloud accounts.
+    if (IS_FIREBASE_STAGING && !acc.password &&
+        !(acc.passwordHash && /^[a-f0-9]{64}$/.test(acc.passwordHash))) {
+      throw new Error(`Tài khoản "${acc.username}" chưa có mật khẩu hoặc mã băm hợp lệ; đã hủy đồng bộ để bảo vệ dữ liệu.`);
+    }
     const passwordHash = acc.password
       ? await hashUnitPassword(acc.username, acc.password)
       : acc.passwordHash && /^[a-f0-9]{64}$/.test(acc.passwordHash)
@@ -825,14 +840,14 @@ export async function syncAccountsToFirestore(
 
     if (!existsInCloud) {
       try {
-        await setDoc(ref, buildAccountCreatePayload(acc, docId));
+        await setDoc(ref, buildAccountCreatePayload(acc, docId, passwordHash));
         tracker.accountIds.add(docId);
       } catch (error) {
         handleFirestoreError(error, OperationType.CREATE, path);
       }
     } else if (hasChanged) {
       try {
-        await updateDoc(ref, buildAccountUpdatePayload(acc));
+        await updateDoc(ref, buildAccountUpdatePayload(acc, passwordHash));
         tracker.accountIds.add(docId);
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, path);

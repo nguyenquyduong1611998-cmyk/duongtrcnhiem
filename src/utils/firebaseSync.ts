@@ -152,6 +152,73 @@ export async function deleteStagingTestTopic(user: User): Promise<void> {
   await batch.commit();
 }
 
+
+/**
+ * Staging-only cross-browser account metadata probe.
+ * This is a fake student record, NOT a real login account.
+ * Never carries a password, password hash, person name, or unit information.
+ */
+export const STAGING_ACCOUNT_PROBE_ID = 'synthetic_student_01';
+const STAGING_ACCOUNT_PROBE_USERNAME = 'hocvien_gia_lap_01';
+const STAGING_ACCOUNT_PROBE_MARKER = 'SYNTHETIC_ONLY';
+
+export async function createStagingAccountProbe(user: User): Promise<void> {
+  if (!IS_FIREBASE_STAGING || user.uid !== BOOTSTRAPPED_ADMIN_UID) {
+    throw new Error('Chỉ Google Admin của Firebase staging được tạo tài khoản giả.');
+  }
+  const ref = doc(db, 'account_sync_probes', STAGING_ACCOUNT_PROBE_ID);
+  const current = await getDoc(ref);
+  if (current.exists()) {
+    await readStagingAccountProbe();
+    return;
+  }
+  await setDoc(ref, {
+    id: STAGING_ACCOUNT_PROBE_ID,
+    username: STAGING_ACCOUNT_PROBE_USERNAME,
+    role: 'student',
+    active: true,
+    marker: STAGING_ACCOUNT_PROBE_MARKER,
+    createdAt: serverTimestamp(),
+  });
+  await readStagingAccountProbe();
+}
+
+export async function readStagingAccountProbe(): Promise<void> {
+  if (!IS_FIREBASE_STAGING) {
+    throw new Error('Chỉ được kiểm tra tài khoản giả trên Firebase staging.');
+  }
+  const ref = doc(db, 'account_sync_probes', STAGING_ACCOUNT_PROBE_ID);
+  const snapshot = await getDoc(ref);
+  if (!snapshot.exists()) {
+    throw new Error('Chưa có tài khoản giả trên Firebase. Admin cần tạo trước.');
+  }
+  const data = snapshot.data();
+  const keys = Object.keys(data).sort();
+  const expectedKeys = ['active', 'createdAt', 'id', 'marker', 'role', 'username'];
+  if (JSON.stringify(keys) !== JSON.stringify(expectedKeys) ||
+      data.id !== STAGING_ACCOUNT_PROBE_ID ||
+      data.username !== STAGING_ACCOUNT_PROBE_USERNAME ||
+      data.role !== 'student' ||
+      data.active !== true ||
+      data.marker !== STAGING_ACCOUNT_PROBE_MARKER) {
+    throw new Error('Bản ghi tài khoản giả không đúng mẫu, đã dừng để bảo vệ dữ liệu.');
+  }
+}
+
+export async function deleteStagingAccountProbe(user: User): Promise<void> {
+  if (!IS_FIREBASE_STAGING || user.uid !== BOOTSTRAPPED_ADMIN_UID) {
+    throw new Error('Chỉ Google Admin của Firebase staging được xóa tài khoản giả.');
+  }
+  const ref = doc(db, 'account_sync_probes', STAGING_ACCOUNT_PROBE_ID);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  if (snap.data().marker !== STAGING_ACCOUNT_PROBE_MARKER ||
+      snap.data().username !== STAGING_ACCOUNT_PROBE_USERNAME) {
+    throw new Error('Không xóa: đây không phải tài khoản giả của phép thử.');
+  }
+  await deleteDoc(ref);
+}
+
 export function sanitizeFirestoreId(raw: string, prefix: string): string {
   const cleaned = (raw || '')
     .trim()

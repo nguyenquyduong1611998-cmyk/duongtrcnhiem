@@ -15,6 +15,7 @@ import {
   BOOTSTRAPPED_ADMIN_EMAIL,
   FIREBASE_PROJECT_ID,
   FIRESTORE_DATABASE_ID,
+  IS_FIREBASE_STAGING,
   auth,
   signInWithGoogleCloud,
   signOutGoogleCloud,
@@ -369,9 +370,18 @@ export default function App() {
     };
   }, [cloudState.connected]);
 
-  // Step 1 on Google connect: Deterministic 2-way merge & auto-push -> Step 2: Authenticated Live onSnapshot
+  // Connect to cloud. On staging, read-only initialization requires an internal admin session.
   useEffect(() => {
     if (!cloudState.authReady || !cloudState.connected || !firebaseUser) {
+      return;
+    }
+    // A Google admin token must never import data from a student/guest local session.
+    if (IS_FIREBASE_STAGING && currentUser?.role !== 'admin') {
+      setCloudState((prev) => ({
+        ...prev,
+        syncing: false,
+        error: 'Bản thử nghiệm chỉ cho phép quản trị viên nội bộ kết nối dữ liệu đám mây. Học viên tạm thời chưa đồng bộ trên staging.',
+      }));
       return;
     }
 
@@ -392,6 +402,7 @@ export default function App() {
           localAttempts: attemptsRef.current,
           defaultAdminAccount: DEFAULT_ACCOUNTS[0],
           tracker,
+          allowUploads: !IS_FIREBASE_STAGING,
         });
 
         if (cancelled) return;
@@ -503,11 +514,11 @@ export default function App() {
       cancelled = true;
       if (unsubscribeListeners) unsubscribeListeners();
     };
-  }, [cloudState.authReady, cloudState.connected, cloudState.isCloudAdmin, firebaseUser]);
+  }, [cloudState.authReady, cloudState.connected, cloudState.isCloudAdmin, firebaseUser, currentUser?.id, currentUser?.role]);
 
   // Auto re-sync when network connection comes back online
   useEffect(() => {
-    if (!cloudState.connected || !firebaseUser) return;
+    if (!cloudState.connected || !firebaseUser || IS_FIREBASE_STAGING) return;
     const handleOnline = () => {
       void enqueueCloudWrite(async () => {
         await pushAllLocalDataToFirestore({
@@ -538,6 +549,14 @@ export default function App() {
   }, []);
 
   const handleConnectCloud = useCallback(async () => {
+    if (IS_FIREBASE_STAGING && currentUser?.role !== 'admin') {
+      setCloudState((prev) => ({
+        ...prev,
+        syncing: false,
+        error: 'Chỉ tài khoản Admin nội bộ được kết nối Firebase staging. Học viên chưa được bật chức năng đồng bộ.',
+      }));
+      return;
+    }
     const attemptId = ++connectAttemptRef.current;
     if (connectTimeoutRef.current !== null) {
       window.clearTimeout(connectTimeoutRef.current);
@@ -600,7 +619,7 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
         error: formatCloudErrorMessage(err),
       }));
     }
-  }, []);
+  }, [currentUser?.role]);
 
   const handleDisconnectCloud = useCallback(async () => {
     setCloudState((prev) => ({ ...prev, syncing: true, error: null }));
@@ -617,6 +636,14 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
 
   const handleSyncCloudNow = useCallback(async () => {
     if (!firebaseUser || !cloudState.connected) return;
+    if (IS_FIREBASE_STAGING) {
+      if (currentUser?.role !== 'admin' || !cloudState.isCloudAdmin) {
+        setCloudState((prev) => ({ ...prev, error: 'Chỉ Admin đã xác thực bằng Google quản trị mới được đồng bộ dữ liệu thử nghiệm.' }));
+        return;
+      }
+      const approved = window.confirm('Chỉ dùng dữ liệu thử nghiệm! Bạn có chắc muốn tải dữ liệu hiện có trên trình duyệt lên Firebase staging không?');
+      if (!approved) return;
+    }
     await enqueueCloudWrite(async () => {
       await pushAllLocalDataToFirestore({
         accounts: accountsRef.current,
@@ -627,7 +654,7 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
         tracker: trackerRef.current,
       });
     });
-  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, enqueueCloudWrite]);
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role, enqueueCloudWrite]);
 
   const handleLogin = async (username: string, password: string): Promise<string | null> => {
     const matched = accountsRef.current.find(
@@ -660,6 +687,10 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
   };
 
   const handleLogout = () => {
+    // Do not leave a privileged staging Google session active after internal logout.
+    if (IS_FIREBASE_STAGING) {
+      void signOutGoogleCloud().catch((error) => console.error('Staging Google sign-out failed:', error));
+    }
     setCurrentUserId(null);
     saveSessionUserId(null);
     setActiveQuizTopic(null);
@@ -736,8 +767,8 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
   setAttempts(next);
   saveAttempts(next);
 
-  // Chỉ đồng bộ Firestore khi đã đăng nhập Google
-  if (cloudState.connected && firebaseUser) {
+  // Staging student submissions stay local until identity mapping is implemented.
+  if (cloudState.connected && firebaseUser && (!IS_FIREBASE_STAGING || currentUser?.role === 'admin')) {
     const uid = firebaseUser.uid;
     const isAdmin = cloudState.isCloudAdmin;
 

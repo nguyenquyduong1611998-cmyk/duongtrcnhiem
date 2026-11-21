@@ -13,7 +13,8 @@ import {
 } from 'lucide-react';
 import { CloudStorageState } from '../types';
 import { formatDateTime } from '../utils/grading';
-import { testBackendReady, type DemoStudentCredentials } from '../utils/serverlessAuth';
+import { testBackendReady, type DemoStudentCredentials, type SyntheticD1Account } from '../utils/serverlessAuth';
+import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
 
 interface CloudStorageModalProps {
   cloud: CloudStorageState;
@@ -41,6 +42,10 @@ interface CloudStorageModalProps {
   onDeleteDemoResultProbe?: () => Promise<void>;
   demoStudentUid?: string;
   onCheckOtherDemoStudentIsolation?: (otherUid: string) => Promise<void>;
+  onListSyntheticD1Accounts?: () => Promise<SyntheticD1Account[]>;
+  onCreateSyntheticD1Account?: () => Promise<SyntheticD1Account>;
+  onSetSyntheticD1AccountStatus?: (username: string, active: boolean) => Promise<void>;
+  onDeleteSyntheticD1Account?: (username: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -68,6 +73,10 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onDeleteDemoResultProbe,
   demoStudentUid,
   onCheckOtherDemoStudentIsolation,
+  onListSyntheticD1Accounts,
+  onCreateSyntheticD1Account,
+  onSetSyntheticD1AccountStatus,
+  onDeleteSyntheticD1Account,
   onClose,
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -631,6 +640,15 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
               )}
             </div>
           )}
+          {onListSyntheticD1Accounts && onCreateSyntheticD1Account &&
+            onSetSyntheticD1AccountStatus && onDeleteSyntheticD1Account && (
+              <SyntheticD1AccountsPanel
+                onList={onListSyntheticD1Accounts}
+                onCreate={onCreateSyntheticD1Account}
+                onSetActive={onSetSyntheticD1AccountStatus}
+                onDelete={onDeleteSyntheticD1Account}
+              />
+            )}
         </div>
       </motion.div>
     </motion.div>

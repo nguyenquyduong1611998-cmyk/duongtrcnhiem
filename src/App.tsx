@@ -7,7 +7,7 @@ import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
-import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent } from './utils/serverlessAuth';
+import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, listSyntheticD1Accounts, createSyntheticD1Account, changeSyntheticD1AccountStatus, deleteSyntheticD1Account } from './utils/serverlessAuth';
 import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, assertOtherDemoStudentDenied } from './utils/stagingResultProbe';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
@@ -733,6 +733,30 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     await assertOtherDemoStudentDenied(requireCurrentDemoStudent(), otherUid);
   }, [requireCurrentDemoStudent]);
 
+  const getVerifiedStagingAdminIdToken = useCallback(async (): Promise<string> => {
+    if (!IS_FIREBASE_STAGING || !adminAccessAllowed || !firebaseUser ||
+        firebaseUser.uid !== BOOTSTRAPPED_ADMIN_UID) {
+      throw new Error('Cần đăng nhập Google Admin staging trước khi quản lý tài khoản giả trong D1.');
+    }
+    return firebaseUser.getIdToken();
+  }, [adminAccessAllowed, firebaseUser]);
+
+  const handleListSyntheticD1Accounts = useCallback(async () => {
+    return listSyntheticD1Accounts(await getVerifiedStagingAdminIdToken());
+  }, [getVerifiedStagingAdminIdToken]);
+
+  const handleCreateSyntheticD1Account = useCallback(async () => {
+    return createSyntheticD1Account(await getVerifiedStagingAdminIdToken());
+  }, [getVerifiedStagingAdminIdToken]);
+
+  const handleSetSyntheticD1AccountStatus = useCallback(async (username: string, active: boolean) => {
+    await changeSyntheticD1AccountStatus(await getVerifiedStagingAdminIdToken(), username, active);
+  }, [getVerifiedStagingAdminIdToken]);
+
+  const handleDeleteSyntheticD1Account = useCallback(async (username: string) => {
+    await deleteSyntheticD1Account(await getVerifiedStagingAdminIdToken(), username);
+  }, [getVerifiedStagingAdminIdToken]);
+
   const handleProvisionDemoStudent = useCallback(async () => {
     if (!IS_FIREBASE_STAGING || currentUser?.role !== 'admin' || !cloudState.isCloudAdmin || !firebaseUser) {
       throw new Error('Cần đăng nhập Admin nội bộ và Google Admin trên staging.');
@@ -1163,6 +1187,10 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onDeleteDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleDeleteDemoResultProbe : undefined}
                   demoStudentUid={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? firebaseUser.uid : undefined}
                   onCheckOtherDemoStudentIsolation={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleCheckOtherDemoStudentIsolation : undefined}
+                  onListSyntheticD1Accounts={IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticD1Accounts : undefined}
+                  onCreateSyntheticD1Account={IS_FIREBASE_STAGING && adminAccessAllowed ? handleCreateSyntheticD1Account : undefined}
+                  onSetSyntheticD1AccountStatus={IS_FIREBASE_STAGING && adminAccessAllowed ? handleSetSyntheticD1AccountStatus : undefined}
+                  onDeleteSyntheticD1Account={IS_FIREBASE_STAGING && adminAccessAllowed ? handleDeleteSyntheticD1Account : undefined}
                   onProvisionDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleProvisionDemoStudent : undefined}
                   onDeleteDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteDemoStudent : undefined}
                   onClose={() => setShowCloudModal(false)}

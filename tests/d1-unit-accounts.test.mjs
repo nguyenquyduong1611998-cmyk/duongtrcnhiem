@@ -26,6 +26,13 @@ function fakeD1() {
         }),
         bind(...args) {
           return {
+            async first() {
+              if (sql.startsWith('SELECT username FROM unit_accounts')) {
+                const item = rows.get(args[0]);
+                return item ? {username:item.username} : null;
+              }
+              throw new Error('UNEXPECTED_SQL_FIRST');
+            },
             async run() {
               if (sql.startsWith('INSERT INTO unit_accounts')) {
                 const [username, uid, salt, hash, iterations, created, updated] = args;
@@ -36,6 +43,19 @@ function fakeD1() {
                   password_reset_required:1,active:0,auth_version:1,
                   created_at:created, updated_at:updated,
                 });
+                return {success:true,meta:{changes:1}};
+              }
+              if (sql.startsWith('UPDATE unit_accounts SET password_salt=')) {
+                const [salt, hash, iterations, updatedAt, passwordChangedAt, username] = args;
+                const row=rows.get(username);
+                if (!row) return {success:true,meta:{changes:0}};
+                row.password_salt=salt;
+                row.password_hash=hash;
+                row.kdf_iterations=iterations;
+                row.password_reset_required=1;
+                row.password_changed_at=passwordChangedAt;
+                row.updated_at=updatedAt;
+                row.auth_version++;
                 return {success:true,meta:{changes:1}};
               }
               if (sql.startsWith('UPDATE unit_accounts')) {
@@ -117,6 +137,36 @@ test('Admin action handler can only manage synthetic D1 accounts and returns no 
   assert.ok(!JSON.stringify(listed).includes(stored.password_salt));
   assert.ok(!JSON.stringify(listed).includes(stored.firebase_uid));
 
+  const oldHash = stored.password_hash;
+  const oldSalt = stored.password_salt;
+  const oldUid = stored.firebase_uid;
+  const oldAuthVersion = stored.auth_version;
+  assert.equal(
+    (await handleSyntheticUnitAccountAction(db,{action:'reset-password',username:'admin'})).status,400
+  );
+  assert.equal(
+    (await handleSyntheticUnitAccountAction(db,{action:'reset-password',username})).status,200
+  );
+  const passwordResponse=await dataOf(await handleSyntheticUnitAccountAction(db,{
+    action:'reset-password',username
+  }));
+  assert.equal(passwordResponse.mode,'synthetic-only');
+  assert.equal(passwordResponse.username,username);
+  assert.match(passwordResponse.temporaryPassword,/^[A-Za-z0-9_-]{24}$/);
+  assert.notEqual(stored.password_hash,oldHash);
+  assert.notEqual(stored.password_salt,oldSalt);
+  assert.equal(stored.firebase_uid,oldUid);
+  assert.equal(stored.active,0);
+  assert.equal(stored.password_reset_required,1);
+  assert.equal(stored.auth_version,oldAuthVersion+2);
+  assert.equal(stored.kdf_iterations,310000);
+  assert.ok(!JSON.stringify(stored).includes(passwordResponse.temporaryPassword));
+  assert.equal(
+    (await handleSyntheticUnitAccountAction(db,{
+      action:'reset-password',username:'test_unit_aaaaaaaaaaaa',
+    })).status,404
+  );
+
   assert.equal((await handleSyntheticUnitAccountAction(db,{action:'unlock',username:'admin'})).status,400);
   assert.equal((await handleSyntheticUnitAccountAction(db,{action:'lock',username:'hocvien01'})).status,400);
   assert.equal((await handleSyntheticUnitAccountAction(db,{action:'delete',username:'test_unit_../../admin'})).status,400);
@@ -150,8 +200,13 @@ test('new D1 manager never enables real account logins or exposes raw credential
   assert.ok(api.includes("const username = 'test_unit_'"));
   assert.ok(api.includes('randomPassword()'));
   assert.ok(api.includes('password_reset_required'));
+  assert.ok(api.includes("action === 'reset-password'"));
+  assert.ok(api.includes("if (!await verifiedGoogleAdmin(request))"));
   assert.ok(api.includes("active,password_reset_required"));
   assert.ok(ui.includes('CHƯA thể dùng để đăng nhập'));
+  assert.ok(ui.includes('Cấp mật khẩu tạm (GIẢ)'));
+  assert.ok(ui.includes("type={revealPassword ? 'text' : 'password'}"));
+  assert.ok(ui.includes('Đóng và xóa khỏi màn hình'));
   assert.ok(ui.includes('onList: () => Promise<SyntheticD1Account[]>'));
   assert.ok(app.includes('IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticD1Accounts : undefined'));
   assert.ok(app.includes('firebaseUser.uid !== BOOTSTRAPPED_ADMIN_UID'));

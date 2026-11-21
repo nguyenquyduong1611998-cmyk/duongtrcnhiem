@@ -70,7 +70,8 @@ function isBootstrappedAdmin() {
         data.id is string && data.id == accountId && isValidId(data.id) &&
         data.scope is string && data.scope == 'unit_490' &&
         data.username is string && data.username.size() >= 1 && data.username.size() <= 64 &&
-        data.passwordHash is string && data.passwordHash.matches('^[a-f0-9]{64} &&
+        data.passwordHash is string &&
+        data.passwordHash.matches('^[a-f0-9]{64}$') &&
         data.fullName is string && data.fullName.size() <= 150 &&
         data.defaultUnit is string && data.defaultUnit.size() <= 200 &&
         data.role is string && data.role in ['admin', 'student'] &&
@@ -81,18 +82,7 @@ function isBootstrappedAdmin() {
         data.updatedAt is timestamp;
     }
 
-) &&
-        data.fullName is string && data.fullName.size() <= 150 &&
-        data.defaultUnit is string && data.defaultUnit.size() <= 200 &&
-        data.role is string && data.role in ['admin', 'student'] &&
-        data.active is bool &&
-        data.createdAtIso is string && data.createdAtIso.size() <= 40 &&
-        data.updatedAtIso is string && data.updatedAtIso.size() <= 40 &&
-        data.createdAt is timestamp &&
-        data.updatedAt is timestamp;
-    }
-
-    function isValidAccountDirectoryEntry(data, accountId) {
+        function isValidAccountDirectoryEntry(data, accountId) {
       return data.keys().hasAll([
           'id', 'username', 'usernameLower', 'passwordHash', 'fullName', 'defaultUnit',
           'role', 'active', 'visibility', 'createdAtIso', 'updatedAtIso', 'createdAt', 'updatedAt'

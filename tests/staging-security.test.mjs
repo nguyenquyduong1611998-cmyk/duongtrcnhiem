@@ -28,6 +28,41 @@ test('staging uses a separate admin UID without changing production UID', () => 
 test('staging managed accounts require password hashes, not plaintext', () => {
   const managedValidator = between(stagingRules, 'function isValidManagedAccount(', 'function isValidAccountDirectoryEntry(');
   assert.match(managedValidator, /data\.passwordHash is string/);
+  // Catch a previously broken rule where a hash regex was truncated and code was duplicated.
+  assert.match(managedValidator, /data\\.passwordHash\\.matches\\('\^\[a-f0-9\]\\{64\\}\\
+  assert.doesNotMatch(managedValidator, /data\.password is string/);
+  assert.match(sync, /IS_FIREBASE_STAGING\s*\? \{ passwordHash \}\s*: \{ password:/);
+  assert.match(sync, /IS_FIREBASE_STAGING && !acc\.password/);
+});
+
+test('account directory on staging is admin-only', () => {
+  const block = between(stagingRules, 'match \/account_directory\/{accountId}', 'match \/topics\/{topicId}');
+  assert.match(block, /allow get: if isValidId\(accountId\) && isAdmin\(\);/);
+  assert.match(block, /allow list: if isBootstrappedAdmin\(\);/);
+  assert.doesNotMatch(block, /allow list: if existing\(\)\.visibility == 'public'/);
+});
+
+test('personally identifiable honor entries require Google identity and owner or admin', () => {
+  const block = stagingRules.slice(stagingRules.indexOf('match /honor_entries/{entryId}'));
+  assert.match(block, /allow get: if isValidId\(entryId\) && isVerifiedUser\(\)/);
+  assert.match(block, /existing\(\)\.ownerUid == request\.auth\.uid \|\| isAdmin\(\)/);
+  assert.match(block, /allow list: if isVerifiedUser\(\)/);
+  assert.match(sync, /if \(!IS_FIREBASE_STAGING\) \{/);
+  assert.match(sync, /IS_FIREBASE_STAGING && !isCloudAdmin/);
+});
+
+test('staging does not auto-upload on sign-in or reconnect', () => {
+  assert.match(app, /allowUploads: !IS_FIREBASE_STAGING/);
+  assert.match(app, /!cloudState\.connected \|\| !firebaseUser \|\| IS_FIREBASE_STAGING/);
+  assert.match(app, /IS_FIREBASE_STAGING && currentUser\?\.role !== 'admin'/);
+  assert.match(app, /window\.confirm\(/);
+  assert.match(app, /void signOutGoogleCloud\(\)/);
+});
+\\)/);
+  assert.equal((managedValidator.match(/data\\.fullName is string/g) || []).length, 1);
+  assert.equal((managedValidator.match(/data\\.updatedAt is timestamp/g) || []).length, 1);
+  assert.doesNotMatch(managedValidator, /^\\) &&$/m);
+
   assert.doesNotMatch(managedValidator, /data\.password is string/);
   assert.match(sync, /IS_FIREBASE_STAGING\s*\? \{ passwordHash \}\s*: \{ password:/);
   assert.match(sync, /IS_FIREBASE_STAGING && !acc\.password/);

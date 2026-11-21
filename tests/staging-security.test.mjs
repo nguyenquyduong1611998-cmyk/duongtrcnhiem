@@ -76,3 +76,15 @@ test('staging smoke test uses isolated Admin-only sync_probes collection', () =>
   assert.match(sync, /await deleteDoc\(ref\)/);
   assert.match(app, /onTestWrite=\{IS_FIREBASE_STAGING \? handleTestStagingWrite : undefined\}/);
 });
+
+test('synthetic topic does not replace or leak ordinary local study data', () => {
+  assert.ok(sync.includes("STAGING_TEST_TOPIC_ID = 'staging_test_topic_20261121'"));
+  assert.ok(sync.includes('IS_FIREBASE_STAGING && id === STAGING_TEST_TOPIC_ID'));
+  assert.ok(sync.includes('IS_FIREBASE_STAGING && tDoc.id === STAGING_TEST_TOPIC_ID'));
+  assert.ok(sync.includes('export async function createStagingTestTopic'));
+  assert.ok(sync.includes('export async function readStagingTestTopic'));
+  assert.ok(sync.includes('export async function deleteStagingTestTopic'));
+  assert.ok(sync.includes("collection(db, 'managed_accounts')") || sync.includes("'managed_accounts'"));
+  assert.match(app, /onCreateTestTopic=\{IS_FIREBASE_STAGING/);
+  assert.match(app, /onReadTestTopic=\{IS_FIREBASE_STAGING \? readStagingTestTopic : undefined\}/);
+});

@@ -175,12 +175,12 @@ test('Admin action handler can only manage synthetic D1 accounts and returns no 
   assert.equal(result.status,200);
   assert.equal(db.rows.get(username).active,1);
   assert.equal(db.rows.get(username).password_reset_required,1);
-  assert.equal(db.rows.get(username).auth_version,2);
+  assert.equal(db.rows.get(username).auth_version,oldAuthVersion+3);
 
   result=await handleSyntheticUnitAccountAction(db,{action:'lock',username});
   assert.equal(result.status,200);
   assert.equal(db.rows.get(username).active,0);
-  assert.equal(db.rows.get(username).auth_version,3);
+  assert.equal(db.rows.get(username).auth_version,oldAuthVersion+4);
 
   result=await handleSyntheticUnitAccountAction(db,{action:'delete',username});
   assert.equal(result.status,200);

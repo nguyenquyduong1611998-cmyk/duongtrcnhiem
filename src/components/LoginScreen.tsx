@@ -40,7 +40,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onChangeSynth
         if (newPassword.length < 12 || newPassword.length > 128 ||
             !/[a-z]/.test(newPassword) || !/[A-Z]/.test(newPassword) ||
             !/[0-9]/.test(newPassword) || !/[^a-zA-Z0-9]/.test(newPassword) ||
-            /\\s/.test(newPassword) || newPassword === password) {
+            /\s/.test(newPassword) || newPassword === password) {
           setError('Mật khẩu mới cần 12–128 ký tự, có chữ hoa, chữ thường, số, ký tự đặc biệt, không có khoảng trắng và khác mật khẩu tạm.');
           return;
         }

@@ -8,6 +8,7 @@ import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
 import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent } from './utils/serverlessAuth';
+import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe } from './utils/stagingResultProbe';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
 import { TopicsView } from './components/TopicsView';
@@ -699,6 +700,25 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     await deleteStagingAccountProbe(firebaseUser);
   }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
 
+  const requireCurrentDemoStudent = useCallback((): User => {
+    if (!IS_FIREBASE_STAGING || !firebaseUser || !cloudState.connected ||
+        currentUser?.role !== 'student' || currentUser.id !== firebaseUser.uid ||
+        !/^student_[a-f0-9]{32}$/.test(firebaseUser.uid)) {
+      throw new Error('Hãy đăng nhập đúng học viên DEMO bằng Cloudflare Functions.');
+    }
+    return firebaseUser;
+  }, [firebaseUser, cloudState.connected, currentUser?.role, currentUser?.id]);
+
+  const handleCreateDemoResultProbe = useCallback(async () => {
+    await createDemoResultProbe(requireCurrentDemoStudent());
+  }, [requireCurrentDemoStudent]);
+  const handleReadDemoResultProbe = useCallback(async () => {
+    await readDemoResultProbe(requireCurrentDemoStudent());
+  }, [requireCurrentDemoStudent]);
+  const handleDeleteDemoResultProbe = useCallback(async () => {
+    await deleteDemoResultProbe(requireCurrentDemoStudent());
+  }, [requireCurrentDemoStudent]);
+
   const handleProvisionDemoStudent = useCallback(async () => {
     if (!IS_FIREBASE_STAGING || currentUser?.role !== 'admin' || !cloudState.isCloudAdmin || !firebaseUser) {
       throw new Error('Cần đăng nhập Admin nội bộ và Google Admin trên staging.');
@@ -1098,6 +1118,9 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onReadTestAccount={IS_FIREBASE_STAGING ? readStagingAccountProbe : undefined}
                   onDeleteTestAccount={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteStagingAccountProbe : undefined}
                   disableBulkSync={IS_FIREBASE_STAGING}
+                  onCreateDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleCreateDemoResultProbe : undefined}
+                  onReadDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleReadDemoResultProbe : undefined}
+                  onDeleteDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleDeleteDemoResultProbe : undefined}
                   onProvisionDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleProvisionDemoStudent : undefined}
                   onDeleteDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteDemoStudent : undefined}
                   onClose={() => setShowCloudModal(false)}

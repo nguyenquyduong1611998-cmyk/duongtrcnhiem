@@ -25,6 +25,7 @@ interface CloudStorageModalProps {
   onCancelConnect: () => void;
   onDisconnect: () => Promise<void>;
   onSyncNow: () => Promise<void>;
+  onTestWrite?: () => Promise<void>;
   onClose: () => void;
 }
 
@@ -37,8 +38,27 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onCancelConnect,
   onDisconnect,
   onSyncNow,
+  onTestWrite,
   onClose,
 }) => {
+  const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
+  const [testMessage, setTestMessage] = React.useState('');
+
+  const handleTestWrite = async () => {
+    if (!onTestWrite) return;
+    setTestStatus('running');
+    setTestMessage('');
+    try {
+      await onTestWrite();
+      setTestStatus('success');
+      setTestMessage('Thành công: Firebase cho phép Admin ghi, đọc lại và xóa dữ liệu thử. Không tải tài khoản hoặc kết quả thi lên đám mây.');
+    } catch (error) {
+      setTestStatus('error');
+      const detail = error instanceof Error ? error.message : String(error);
+      setTestMessage(`Kiểm thử chưa thành công: ${detail}`);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -225,6 +245,27 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                   <div className="text-xs text-[#64756A]">Tài khoản</div>
                 </div>
               </div>
+
+              {onTestWrite && cloud.isCloudAdmin && (
+                <div className="space-y-2 border border-[#DDE3DC] bg-[#FAFBF9] p-3 rounded-lg">
+                  <button
+                    type="button"
+                    disabled={testStatus === 'running' || cloud.syncing}
+                    onClick={() => void handleTestWrite()}
+                    className="w-full py-2.5 px-3 rounded-md border border-[#1F4D36] text-[#1F4D36] disabled:opacity-60 text-sm font-semibold hover:bg-[#EAF2EC] transition-colors"
+                  >
+                    {testStatus === 'running' ? 'Đang kiểm tra quyền ghi Firebase...' : 'Kiểm tra quyền ghi Firebase (dữ liệu giả)'}
+                  </button>
+                  <p className="text-xs text-[#4B5B50]">
+                    Chỉ thử ghi, đọc và xóa một bản ghi kỹ thuật. Không đồng bộ chuyên đề, tài khoản hay bài thi đang có.
+                  </p>
+                  {testStatus !== 'idle' && testStatus !== 'running' && (
+                    <p role="status" className={`text-xs ${testStatus === 'success' ? 'text-[#166534]' : 'text-[#B91C1C]'}`}>
+                      {testMessage}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
                 <button

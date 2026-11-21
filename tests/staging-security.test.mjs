@@ -59,7 +59,7 @@ test('staging does not auto-upload on sign-in or reconnect', () => {
   assert.match(app, /allowUploads: !IS_FIREBASE_STAGING/);
   assert.match(app, /!cloudState\.connected \|\| !firebaseUser \|\| IS_FIREBASE_STAGING/);
   assert.match(app, /IS_FIREBASE_STAGING && currentUser\?\.role !== 'admin'/);
-  assert.match(app, /window\.confirm\(/);
+  assert.ok(app.includes('Đồng bộ toàn bộ đang tắt trên staging'));
   assert.match(app, /void signOutGoogleCloud\(\)/);
 });
 

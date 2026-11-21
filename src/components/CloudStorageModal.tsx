@@ -127,7 +127,7 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
         exit={{ opacity: 0, scale: 0.96, y: 10 }}
         transition={{ duration: 0.22, ease: EASE_SMOOTH }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white border border-[#DDE3DC] rounded-xl w-full max-w-lg shadow-xl overflow-hidden"
+        className="bg-white border border-[#DDE3DC] rounded-xl w-full max-w-lg max-h-[90vh] shadow-xl overflow-y-auto"
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#DDE3DC] bg-[#FAFBF9] flex items-center justify-between gap-4">

@@ -53,7 +53,7 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onReadTestAccount,
   onDeleteTestAccount,
   disableBulkSync = false,
-  onClose:
+  onClose,
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = React.useState('');

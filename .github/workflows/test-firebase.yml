@@ -24,6 +24,9 @@ jobs:
         run: bun install
       - name: Check TypeScript
         run: bun run lint
+      - name: Static staging security regression tests
+        run: node --test tests/staging-security.test.mjs
+
       - name: Build website
         run: bun run build
         

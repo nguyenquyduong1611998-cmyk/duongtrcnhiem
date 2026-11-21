@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { CloudStorageState } from '../types';
 import { formatDateTime } from '../utils/grading';
+import { testBackendReady, type DemoStudentCredentials } from '../utils/serverlessAuth';
 
 interface CloudStorageModalProps {
   cloud: CloudStorageState;
@@ -33,6 +34,8 @@ interface CloudStorageModalProps {
   onReadTestAccount?: () => Promise<void>;
   onDeleteTestAccount?: () => Promise<void>;
   disableBulkSync?: boolean;
+  onProvisionDemoStudent?: () => Promise<DemoStudentCredentials>;
+  onDeleteDemoStudent?: (username: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -53,6 +56,8 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onReadTestAccount,
   onDeleteTestAccount,
   disableBulkSync = false,
+  onProvisionDemoStudent,
+  onDeleteDemoStudent,
   onClose,
 }) => {
   const [testStatus, setTestStatus] = React.useState<'idle' | 'running' | 'success' | 'error'>('idle');
@@ -106,6 +111,45 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
       setAccountTestMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setAccountTestBusy(false);
+    }
+  };
+
+  const [demoReady, setDemoReady] = React.useState(false);
+  const [demoBusy, setDemoBusy] = React.useState(false);
+  const [demoCredentials, setDemoCredentials] = React.useState<DemoStudentCredentials | null>(null);
+  const [demoMessage, setDemoMessage] = React.useState('');
+  React.useEffect(() => {
+    let active = true;
+    if (onProvisionDemoStudent) {
+      void testBackendReady().then(ok => {if (active) setDemoReady(ok);});
+    }
+    return () => {active = false;};
+  }, [onProvisionDemoStudent]);
+
+  const handleCreateDemo = async () => {
+    if (!onProvisionDemoStudent) return;
+    setDemoBusy(true);
+    setDemoMessage('');
+    try {
+      setDemoCredentials(await onProvisionDemoStudent());
+      setDemoMessage('Đã tạo tài khoản giả. Dùng tên đăng nhập và mật khẩu hiển thị ở dưới để thử trên trình duyệt thứ hai.');
+    } catch (error) {
+      setDemoMessage(error instanceof Error ? error.message : 'Không thể tạo demo.');
+    } finally {
+      setDemoBusy(false);
+    }
+  };
+  const handleDeleteDemo = async () => {
+    if (!demoCredentials || !onDeleteDemoStudent) return;
+    setDemoBusy(true);
+    try {
+      await onDeleteDemoStudent(demoCredentials.username);
+      setDemoCredentials(null);
+      setDemoMessage('Đã xóa thông tin đăng nhập demo khỏi Cloudflare D1. Nếu đang đăng nhập demo trên thiết bị khác, hãy đăng xuất tại đó.');
+    } catch (error) {
+      setDemoMessage(error instanceof Error ? error.message : 'Không thể xóa demo.');
+    } finally {
+      setDemoBusy(false);
     }
   };
 
@@ -426,6 +470,43 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                   {accountTestMessage}
                 </p>
               )}
+            </div>
+          )}
+          {onProvisionDemoStudent && (
+            <div className="space-y-2 rounded-xl border border-[#DDE3DC] bg-[#FAFBF9] p-3">
+              <p className="text-sm font-bold text-[#152019]">Đăng nhập học viên bằng Cloudflare Functions (thử nghiệm)</p>
+              <p className="text-xs text-[#4B5B50]">
+                Tạo tài khoản GIẢ để thử đăng nhập bằng tên và mật khẩu.
+                Cloudflare D1 giữ mã băm; website không lưu mật khẩu. Chưa áp dụng cho học viên thật.
+              </p>
+              <p className={`text-xs ${demoReady ? 'text-[#166534]' : 'text-[#B91C1C]'}`}>
+                {demoReady ? 'Máy chủ đăng nhập staging đã cấu hình.' : 'Máy chủ chưa sẵn sàng: cần cấu hình D1 và Firebase secret trên Cloudflare.'}
+              </p>
+              <button
+                type="button"
+                disabled={!demoReady || demoBusy || !!demoCredentials}
+                onClick={() => void handleCreateDemo()}
+                className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-sm font-semibold text-[#1F4D36] disabled:opacity-50"
+              >
+                Tạo học viên DEMO có mật khẩu
+              </button>
+              {demoCredentials && (
+                <div className="space-y-1 rounded-md border border-[#DDE3DC] bg-white p-2">
+                  <p className="text-xs text-[#4B5B50]">Chỉ hiển thị mật khẩu lúc này. Không chụp ảnh có mật khẩu.</p>
+                  <p className="break-all text-xs">Tên đăng nhập: <strong>{demoCredentials.username}</strong></p>
+                  <p className="break-all text-xs">Mật khẩu demo: <strong>{demoCredentials.password}</strong></p>
+                  <p className="text-xs text-[#4B5B50]">Trên trình duyệt thứ hai, dùng ô đăng nhập hiện có. Không dùng mật khẩu admin.</p>
+                  <button
+                    type="button"
+                    disabled={demoBusy}
+                    onClick={() => void handleDeleteDemo()}
+                    className="w-full rounded-md border border-[#B91C1C] px-3 py-2 text-sm font-semibold text-[#B91C1C] disabled:opacity-50"
+                  >
+                    Xóa tài khoản DEMO khỏi D1
+                  </button>
+                </div>
+              )}
+              {!!demoMessage && <p role="status" className="text-xs text-[#4B5B50]">{demoMessage}</p>}
             </div>
           )}
         </div>

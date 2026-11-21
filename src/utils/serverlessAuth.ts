@@ -194,7 +194,7 @@ export async function changeSyntheticD1Password(
   if (typeof newPassword !== 'string' || newPassword.length < 12 ||
       newPassword.length > 128 || !/[a-z]/.test(newPassword) ||
       !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) ||
-      !/[^a-zA-Z0-9]/.test(newPassword) || /\\s/.test(newPassword) ||
+      !/[^a-zA-Z0-9]/.test(newPassword) || /\s/.test(newPassword) ||
       temporaryPassword === newPassword) {
     throw new Error('Mật khẩu mới phải dài 12–128 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt, không có khoảng trắng và khác mật khẩu cũ.');
   }

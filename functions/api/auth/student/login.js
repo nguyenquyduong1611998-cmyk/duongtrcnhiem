@@ -2,7 +2,8 @@ import {
   requireStaging,json,checkRequest,smallJson,usernameKey,pbkdf2,equalSecret,
   mintFirebaseToken,GENERIC_LOGIN_ERROR, noSecrets,failSafe
 } from '../../../_shared/auth.mjs';
-const DUMMY_SALT='AAAAAAAAAAAAAAAAAAAAAA';
+// Dummy record uses the same versioned KDF path as a real demo record.
+const DUMMY_SALT='cf-chain-v1.AAAAAAAAAAAAAAAAAAAAAA';
 const WINDOW_SECONDS=15*60;
 const MAX_FAILURES=5;
 

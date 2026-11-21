@@ -7,6 +7,7 @@ import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
+import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent } from './utils/serverlessAuth';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
 import { TopicsView } from './components/TopicsView';
@@ -698,6 +699,19 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     await deleteStagingAccountProbe(firebaseUser);
   }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
 
+  const handleProvisionDemoStudent = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || currentUser?.role !== 'admin' || !cloudState.isCloudAdmin || !firebaseUser) {
+      throw new Error('Cần đăng nhập Admin nội bộ và Google Admin trên staging.');
+    }
+    return provisionDemoStudent(await firebaseUser.getIdToken());
+  }, [currentUser?.role, cloudState.isCloudAdmin, firebaseUser]);
+  const handleDeleteDemoStudent = useCallback(async (username: string) => {
+    if (!IS_FIREBASE_STAGING || currentUser?.role !== 'admin' || !cloudState.isCloudAdmin || !firebaseUser) {
+      throw new Error('Cần đăng nhập Admin nội bộ và Google Admin trên staging.');
+    }
+    await deleteDemoStudent(await firebaseUser.getIdToken(), username);
+  }, [currentUser?.role, cloudState.isCloudAdmin, firebaseUser]);
+
   const handleSyncCloudNow = useCallback(async () => {
     if (!firebaseUser || !cloudState.connected) return;
     if (IS_FIREBASE_STAGING) {
@@ -720,6 +734,36 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
   }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role, enqueueCloudWrite]);
 
   const handleLogin = async (username: string, password: string): Promise<string | null> => {
+    // Controlled migration: only demo students use Cloudflare's server-side
+    // password verifier. Never fall back to local passwords for demo users.
+    if (IS_FIREBASE_STAGING && username.trim().toLowerCase().startsWith('test_hv_')) {
+      if (cloudState.isCloudAdmin) return 'Hãy ngắt kết nối Google Admin trước khi thử đăng nhập học viên.';
+      try {
+        const serverAccount = await loginWithStagingUsername(username, password);
+        const now = new Date().toISOString();
+        const account: UserAccount = {
+          id: serverAccount.id,
+          username: serverAccount.username,
+          password: '', // no password or hash in the browser's local account directory
+          fullName: 'Học viên GIẢ LẬP',
+          defaultUnit: 'Đơn vị GIẢ LẬP',
+          role: 'student',
+          active: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const next = [...accountsRef.current.filter(a => a.id !== account.id), account];
+        setAccounts(next);
+        saveAccounts(next);
+        setCurrentUserId(account.id);
+        saveSessionUserId(account.id);
+        setActiveTab('topics');
+        setActiveQuizTopic(null);
+        return null;
+      } catch (error) {
+        return error instanceof Error ? error.message : 'Không thể xác thực học viên thử nghiệm.';
+      }
+    }
     const matched = accountsRef.current.find(
       (a) => a.username.toLowerCase() === username.toLowerCase()
     );
@@ -1054,6 +1098,8 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onReadTestAccount={IS_FIREBASE_STAGING ? readStagingAccountProbe : undefined}
                   onDeleteTestAccount={IS_FIREBASE_STAGING && cloudState.connected && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteStagingAccountProbe : undefined}
                   disableBulkSync={IS_FIREBASE_STAGING}
+                  onProvisionDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleProvisionDemoStudent : undefined}
+                  onDeleteDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteDemoStudent : undefined}
                   onClose={() => setShowCloudModal(false)}
                 />
               )}

@@ -182,3 +182,15 @@ test('cross-student read and delete probes must be denied by Firestore Rules', (
   assert.ok(cloudModal.includes('UID Firebase của học viên DEMO này'));
   assert.ok(cloudModal.includes('Kiểm tra quyền đọc và xóa của học viên B'));
 });
+
+test('staging Admin UI requires cloud-verified Google Admin UID, not localStorage role', () => {
+  const navbar = read('src/components/Navbar.tsx');
+  assert.ok(app.includes('const adminAccessAllowed = !IS_FIREBASE_STAGING || ('));
+  assert.ok(app.includes('firebaseUser?.uid === BOOTSTRAPPED_ADMIN_UID'));
+  assert.ok(app.includes('cloudState.isCloudAdmin'));
+  assert.ok(app.includes('adminAccessAllowed={adminAccessAllowed}'));
+  assert.ok(app.includes("activeTab === 'admin' && currentUser.role === 'admin' && adminAccessAllowed"));
+  assert.ok(app.includes('if (IS_FIREBASE_STAGING && !adminAccessAllowed)'));
+  assert.ok((app.match(/if \(IS_FIREBASE_STAGING && !adminAccessAllowed\)/g) || []).length >= 3);
+  assert.ok((navbar.match(/currentUser\.role === 'admin' && adminAccessAllowed/g) || []).length === 2);
+});

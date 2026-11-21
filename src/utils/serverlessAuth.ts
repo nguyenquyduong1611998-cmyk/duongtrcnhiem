@@ -39,6 +39,8 @@ async function postStaging(path: string, body: Record<string, unknown>, idToken?
         throw new Error('Máy chủ chưa xóa được bản ghi DEMO trong D1.');
       throw new Error('Cloudflare Functions gặp lỗi khi xử lý yêu cầu (503). Cần xem nhật ký Functions; không nhất thiết thiếu cấu hình.');
     }
+    if (res.status === 409 && result?.error === 'TEMPORARY_PASSWORD_VALID_RESET_REQUIRED')
+      throw new Error('Mật khẩu tạm của tài khoản GIẢ đã được D1 xác minh, nhưng vẫn bắt buộc đổi mật khẩu. Chưa cấp quyền đăng nhập Firebase.');
     if (res.status === 403) throw new Error('Google Admin không được máy chủ xác nhận. Hãy kiểm tra tài khoản Google và kết nối lại.');
     if (res.status === 429) throw new Error('Đã thử đăng nhập quá nhiều lần. Hãy đợi 15 phút.');
     if (res.status === 401) throw new Error('Tên tài khoản hoặc mật khẩu không đúng.');
@@ -153,4 +155,20 @@ export async function resetSyntheticD1AccountPassword(
     throw new Error('Không nhận được mật khẩu tạm hợp lệ từ D1 staging.');
   }
   return {username,temporaryPassword:result.temporaryPassword};
+}
+
+/**
+ * STAGING ONLY: verifies a synthetic temporary password on the Cloudflare
+ * backend. Does not grant access, save the password, or sign in to Firebase.
+ */
+export async function verifySyntheticD1TemporaryPassword(
+  username: string, password: string,
+): Promise<void> {
+  if (!IS_FIREBASE_STAGING || !SYNTHETIC_D1_USERNAME.test(username.trim().toLowerCase())) {
+    throw new Error('Chỉ hỗ trợ tài khoản giả test_unit_ trên staging.');
+  }
+  await postStaging('/api/auth/student/unit-verify',{
+    username:username.trim().toLowerCase(),password,
+  });
+  throw new Error('Chức năng đăng nhập tài khoản tập trung chưa được kích hoạt.');
 }

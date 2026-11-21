@@ -158,3 +158,27 @@ test('student UI result probe cannot touch real attempts, account directory or l
   assert.doesNotMatch(resultProbe, /collection\(db, ['"]attempts['"]/);
   assert.doesNotMatch(resultProbe, /localStorage/);
 });
+
+test('cross-student read and delete probes must be denied by Firestore Rules', () => {
+  const rule = between(stagingRules, 'match /demo_result_probes/{ownerUid}', 'match /topics/{topicId}');
+  assert.equal((rule.match(/request\.auth\.uid == ownerUid/g) || []).length, 3);
+  assert.ok(rule.includes("allow get: if request.auth != null"));
+  assert.ok(rule.includes("allow delete: if request.auth != null"));
+  assert.ok(rule.includes('allow update: if false;'));
+  assert.ok(rule.includes('allow list: if false;'));
+  assert.ok(resultProbe.includes('export async function assertOtherDemoStudentDenied('));
+  assert.ok(resultProbe.includes("targetUid === student.uid"));
+  assert.ok(resultProbe.includes("doc(db, 'demo_result_probes', targetUid)"));
+  assert.ok(resultProbe.includes('await getDocFromServer(targetRef)'));
+  assert.ok(resultProbe.includes('await deleteDoc(targetRef)'));
+  assert.ok(resultProbe.includes("code === 'permission-denied'"));
+  assert.ok(resultProbe.indexOf('await getDocFromServer(targetRef)') < resultProbe.indexOf('await deleteDoc(targetRef)'));
+  assert.ok(resultProbe.includes('if (!isPermissionDenied(error))'));
+  assert.ok(resultProbe.includes('if (isPermissionDenied(deleteError)) return'));
+  assert.ok(resultProbe.includes('CẢNH BÁO: Firebase cho phép học viên B đọc'));
+  assert.ok(resultProbe.includes('CẢNH BÁO: Firebase cho phép học viên B xóa'));
+  assert.ok(app.includes('assertOtherDemoStudentDenied(requireCurrentDemoStudent(), otherUid)'));
+  assert.ok(app.includes('demoStudentUid={IS_FIREBASE_STAGING'));
+  assert.ok(cloudModal.includes('UID Firebase của học viên DEMO này'));
+  assert.ok(cloudModal.includes('Kiểm tra quyền đọc và xóa của học viên B'));
+});

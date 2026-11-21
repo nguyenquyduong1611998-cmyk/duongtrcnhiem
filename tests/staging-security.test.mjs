@@ -100,3 +100,29 @@ test('staging synthetic topic never persists as a normal local topic or overwrit
   assert.ok(app.includes('const nextTopics = mergeTopicsSafely(topicsRef.current, cloudTopics)'));
   assert.ok(app.includes('topics={IS_FIREBASE_STAGING ? topics.filter((t) => t.id !== STAGING_TEST_TOPIC_ID) : topics}'));
 });
+
+test('synthetic account test contains no real credentials or sensitive fields', () => {
+  const probeRule = between(stagingRules, 'match /account_sync_probes/{probeId}', 'match /topics/{topicId}');
+  assert.ok(probeRule.includes("probeId == 'synthetic_student_01'"));
+  assert.ok(probeRule.includes("incoming().username == 'hocvien_gia_lap_01'"));
+  assert.ok(probeRule.includes("incoming().marker == 'SYNTHETIC_ONLY'"));
+  assert.match(probeRule, /allow list: if false;/);
+  assert.match(probeRule, /allow update: if false;/);
+  assert.ok(probeRule.includes('isBootstrappedAdmin()'));
+  assert.ok(probeRule.includes("request.resource.data.keys().hasOnly(["));
+  assert.ok(!probeRule.includes("'password'"));
+  assert.ok(!probeRule.includes("'passwordHash'"));
+  assert.ok(!probeRule.includes("'fullName'"));
+  assert.ok(!probeRule.includes("'defaultUnit'"));
+  assert.ok(sync.includes("export async function createStagingAccountProbe"));
+  assert.ok(sync.includes("export async function readStagingAccountProbe"));
+  assert.ok(sync.includes("export async function deleteStagingAccountProbe"));
+  assert.ok(sync.includes("doc(db, 'account_sync_probes', STAGING_ACCOUNT_PROBE_ID)"));
+});
+
+test('staging normal account, topic, result uploads and bulk sync stay blocked', () => {
+  assert.ok(app.includes('if (!IS_FIREBASE_STAGING && cloudState.connected && firebaseUser)'));
+  assert.ok(app.includes('if (IS_FIREBASE_STAGING) {\n      setCloudState((prev) => ({'));
+  assert.ok(app.includes('onReadTestAccount={IS_FIREBASE_STAGING ? readStagingAccountProbe : undefined}'));
+  assert.ok(app.includes('disableBulkSync={IS_FIREBASE_STAGING}'));
+});

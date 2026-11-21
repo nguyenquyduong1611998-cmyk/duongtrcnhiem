@@ -33,9 +33,13 @@ jobs:
           node --check functions/api/auth/status.js
           node --check functions/api/auth/student/login.js
           node --check functions/api/auth/admin/demo.js
+          node --check functions/api/auth/admin/unit-accounts.js
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
+
+      - name: Test synthetic D1 account management API
+        run: node --test tests/d1-unit-accounts.test.mjs
 
       - name: Build website
         run: bun run build

@@ -305,7 +305,8 @@ function isBootstrappedAdmin() {
     // real names, or any information about actual students.
     match /account_sync_probes/{probeId} {
       allow get: if probeId == 'synthetic_student_01' &&
-        existing().marker == 'SYNTHETIC_ONLY';
+        (isBootstrappedAdmin() ||
+          (resource != null && existing().marker == 'SYNTHETIC_ONLY'));
       allow list: if false;
       allow create: if isBootstrappedAdmin() &&
         probeId == 'synthetic_student_01' &&

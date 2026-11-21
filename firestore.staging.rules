@@ -300,6 +300,33 @@ function isBootstrappedAdmin() {
       allow delete: if isVerifiedUser() && isValidId(accountId) && isAdmin();
     }
 
+    // Synthetic account metadata for staging-only cross-browser verification.
+    // Not an identity or login directory: it never contains passwords, hashes,
+    // real names, or any information about actual students.
+    match /account_sync_probes/{probeId} {
+      allow get: if probeId == 'synthetic_student_01' &&
+        existing().marker == 'SYNTHETIC_ONLY';
+      allow list: if false;
+      allow create: if isBootstrappedAdmin() &&
+        probeId == 'synthetic_student_01' &&
+        request.resource.data.keys().hasAll([
+          'id', 'username', 'role', 'active', 'marker', 'createdAt'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'id', 'username', 'role', 'active', 'marker', 'createdAt'
+        ]) &&
+        incoming().id == probeId &&
+        incoming().username == 'hocvien_gia_lap_01' &&
+        incoming().role == 'student' &&
+        incoming().active == true &&
+        incoming().marker == 'SYNTHETIC_ONLY' &&
+        incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() &&
+        probeId == 'synthetic_student_01' &&
+        existing().marker == 'SYNTHETIC_ONLY';
+    }
+
     // 3. Quiz Topics & Questions Subcollection (Published educational content readable by all unit devices, Admin-only write)
     match /topics/{topicId} {
       allow get: if isValidId(topicId) && (

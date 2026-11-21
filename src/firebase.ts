@@ -12,9 +12,9 @@ import productionConfig from '../firebase-applet-config.json';
 import stagingConfig from '../firebase-staging-config.json';
 
 // Chỉ dùng Firebase thử nghiệm khi cấu hình staging
-const isStaging = import.meta.env.VITE_FIREBASE_ENV === 'staging';
+export const IS_FIREBASE_STAGING = import.meta.env.VITE_FIREBASE_ENV === 'staging';
 
-const firebaseConfig = isStaging
+const firebaseConfig = IS_FIREBASE_STAGING
   ? stagingConfig
   : productionConfig;
 
@@ -31,7 +31,7 @@ export const BOOTSTRAPPED_ADMIN_EMAIL = 'nguyenquyduong1611998@gmail.com';
 
 
 
-export const BOOTSTRAPPED_ADMIN_UID = isStaging
+export const BOOTSTRAPPED_ADMIN_UID = IS_FIREBASE_STAGING
   ? 'aV2S9WYo4tg8XZQSE9snzjeBU203'
   : '3zPu6ZrPGLfDNsms17mxHrEwfUF2';
 

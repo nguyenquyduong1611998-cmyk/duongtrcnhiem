@@ -445,27 +445,7 @@ export function subscribeToPublicUnitData(handlers: SubscribePublicUnitHandlers)
   // 1. Live published topics + questions
   unsubscribers.push(subscribeTopicsTree(tracker, onTopics, reportSnapshotError));
 
-  // 2. Live hashed account directory (zero plaintext passwords)
-  const dirQuery = query(
-    collection(db, 'account_directory'),
-    where('visibility', '==', 'public')
-  );
-  const unsubDir = onSnapshot(
-    dirQuery,
-    (snapshot) => {
-      const nextIds = new Set<string>();
-      const list: AccountDirectoryRecord[] = [];
-      snapshot.forEach((docSnap) => {
-        nextIds.add(docSnap.id);
-        list.push(parseAccountDirectoryDoc(docSnap.id, docSnap.data()));
-      });
-      tracker.directoryIds = nextIds;
-      onDirectoryAccounts(list);
-    },
-    (err) => reportSnapshotError(err, OperationType.LIST, 'account_directory')
-  );
-  unsubscribers.push(unsubDir);
-
+  
   // 3. Live public honor board & student attempt summaries
   const honorQuery = query(
     collection(db, 'honor_entries'),

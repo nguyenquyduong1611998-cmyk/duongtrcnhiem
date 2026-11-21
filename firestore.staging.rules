@@ -328,6 +328,459 @@ function isBootstrappedAdmin() {
         existing().marker == 'SYNTHETIC_ONLY';
     }
 
+    // STAGING ONLY: immutable synthetic result owned by a Firebase custom UID.
+    // Never used by real quiz grading or historical attempts.
+    match /demo_result_probes/{ownerUid} {
+      allow get: if request.auth != null &&
+        request.auth.uid == ownerUid &&
+        ownerUid.matches('^student_[a-f0-9]{32} (Published educational content readable by all unit devices, Admin-only write)
+    match /topics/{topicId} {
+      allow get: if isValidId(topicId) && (
+        resource == null || existing().visibility == 'public'
+      );
+      allow list: if existing().visibility == 'public';
+      allow create: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'code', 'title', 'description', 'timeLimitMinutes',
+          'questionCount', 'visibility', 'updatedAtIso', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(topicId) && isAdmin();
+
+      // Master Gate Subcollection: Questions belong to a valid parent topic
+      match /questions/{questionId} {
+        allow get: if isValidId(topicId) &&
+          isValidId(questionId) && (
+            resource == null || (
+              existing().visibility == 'public' &&
+              existing().topicId == topicId &&
+              exists(/databases/$(database)/documents/topics/$(topicId))
+            )
+          );
+        allow list: if existing().visibility == 'public';
+        allow create: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          existsAfter(/databases/$(database)/documents/topics/$(topicId));
+        allow update: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().id == existing().id &&
+          incoming().topicId == existing().topicId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          exists(/databases/$(database)/documents/topics/$(topicId)) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'orderIndex', 'text', 'options', 'correctIndex',
+            'explanation', 'visibility', 'updatedAt'
+          ]);
+        allow delete: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isAdmin();
+      }
+    }
+
+    // 4. Quiz Attempts (Admin + Verified User + Active Unit Account submissions, Terminal State Locked)
+    match /attempts/{attemptId} {
+      allow get: if isValidId(attemptId) && (
+        resource == null ||
+        (isVerifiedUser() && (existing().ownerUid == request.auth.uid || isAdmin()))
+      );
+      allow list: if isVerifiedUser() && (
+        existing().ownerUid == request.auth.uid ||
+        (isBootstrappedAdmin() && existing().scope == 'unit_490')
+      );
+      allow create: if isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/topics/$(incoming().topicId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      // Terminal state locking: submitted attempts cannot be edited by regular users; admin-only override
+      allow update: if isVerifiedUser() &&
+        isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().id == existing().id &&
+        incoming().scope == existing().scope &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().accountId == existing().accountId &&
+        incoming().topicId == existing().topicId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'candidateName', 'unitName', 'topicTitle', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(attemptId) && isAdmin();
+    }
+
+    // Staging-only permission probe; accepts no user, account, quiz or topic data.
+    // The website writes a short-lived record and verifies it can read and delete it.
+    match /sync_probes/{probeId} {
+      allow get: if isBootstrappedAdmin() && isValidId(probeId);
+      allow list: if false;
+      allow create: if isBootstrappedAdmin() && isValidId(probeId) &&
+        request.resource.data.keys().hasAll(['uid', 'nonce', 'createdAt']) &&
+        request.resource.data.keys().hasOnly(['uid', 'nonce', 'createdAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.nonce is string &&
+        request.resource.data.nonce.size() >= 12 &&
+        request.resource.data.nonce.size() <= 80 &&
+        request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(probeId) &&
+        existing().uid == request.auth.uid;
+    }
+
+    // 5. Private Honor Entries (paired with QuizAttempts; owner/admin reads only)
+    match /honor_entries/{entryId} {
+      // Contains candidate names and units; owner or administrator only.
+      allow get: if isValidId(entryId) && isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isValidId(entryId) &&
+        isValidHonorEntry(incoming(), entryId) &&
+        incoming().createdAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/attempts/$(entryId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if isVerifiedUser() && isValidId(entryId) && isAdmin();
+    }
+  }
+}
+) &&
+        request.auth.token.firebase.sign_in_provider == 'custom';
+      allow list: if false;
+      allow create: if request.auth != null &&
+        request.auth.uid == ownerUid &&
+        ownerUid.matches('^student_[a-f0-9]{32} (Published educational content readable by all unit devices, Admin-only write)
+    match /topics/{topicId} {
+      allow get: if isValidId(topicId) && (
+        resource == null || existing().visibility == 'public'
+      );
+      allow list: if existing().visibility == 'public';
+      allow create: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'code', 'title', 'description', 'timeLimitMinutes',
+          'questionCount', 'visibility', 'updatedAtIso', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(topicId) && isAdmin();
+
+      // Master Gate Subcollection: Questions belong to a valid parent topic
+      match /questions/{questionId} {
+        allow get: if isValidId(topicId) &&
+          isValidId(questionId) && (
+            resource == null || (
+              existing().visibility == 'public' &&
+              existing().topicId == topicId &&
+              exists(/databases/$(database)/documents/topics/$(topicId))
+            )
+          );
+        allow list: if existing().visibility == 'public';
+        allow create: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          existsAfter(/databases/$(database)/documents/topics/$(topicId));
+        allow update: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().id == existing().id &&
+          incoming().topicId == existing().topicId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          exists(/databases/$(database)/documents/topics/$(topicId)) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'orderIndex', 'text', 'options', 'correctIndex',
+            'explanation', 'visibility', 'updatedAt'
+          ]);
+        allow delete: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isAdmin();
+      }
+    }
+
+    // 4. Quiz Attempts (Admin + Verified User + Active Unit Account submissions, Terminal State Locked)
+    match /attempts/{attemptId} {
+      allow get: if isValidId(attemptId) && (
+        resource == null ||
+        (isVerifiedUser() && (existing().ownerUid == request.auth.uid || isAdmin()))
+      );
+      allow list: if isVerifiedUser() && (
+        existing().ownerUid == request.auth.uid ||
+        (isBootstrappedAdmin() && existing().scope == 'unit_490')
+      );
+      allow create: if isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/topics/$(incoming().topicId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      // Terminal state locking: submitted attempts cannot be edited by regular users; admin-only override
+      allow update: if isVerifiedUser() &&
+        isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().id == existing().id &&
+        incoming().scope == existing().scope &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().accountId == existing().accountId &&
+        incoming().topicId == existing().topicId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'candidateName', 'unitName', 'topicTitle', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(attemptId) && isAdmin();
+    }
+
+    // Staging-only permission probe; accepts no user, account, quiz or topic data.
+    // The website writes a short-lived record and verifies it can read and delete it.
+    match /sync_probes/{probeId} {
+      allow get: if isBootstrappedAdmin() && isValidId(probeId);
+      allow list: if false;
+      allow create: if isBootstrappedAdmin() && isValidId(probeId) &&
+        request.resource.data.keys().hasAll(['uid', 'nonce', 'createdAt']) &&
+        request.resource.data.keys().hasOnly(['uid', 'nonce', 'createdAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.nonce is string &&
+        request.resource.data.nonce.size() >= 12 &&
+        request.resource.data.nonce.size() <= 80 &&
+        request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(probeId) &&
+        existing().uid == request.auth.uid;
+    }
+
+    // 5. Private Honor Entries (paired with QuizAttempts; owner/admin reads only)
+    match /honor_entries/{entryId} {
+      // Contains candidate names and units; owner or administrator only.
+      allow get: if isValidId(entryId) && isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isValidId(entryId) &&
+        isValidHonorEntry(incoming(), entryId) &&
+        incoming().createdAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/attempts/$(entryId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if isVerifiedUser() && isValidId(entryId) && isAdmin();
+    }
+  }
+}
+) &&
+        request.auth.token.firebase.sign_in_provider == 'custom' &&
+        request.resource.data.keys().hasAll([
+          'ownerUid', 'marker', 'resultType', 'score', 'createdAt'
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          'ownerUid', 'marker', 'resultType', 'score', 'createdAt'
+        ]) &&
+        request.resource.data.ownerUid == ownerUid &&
+        request.resource.data.marker == 'SYNTHETIC_ONLY' &&
+        request.resource.data.resultType == 'DEMO_SYNC_PROBE' &&
+        request.resource.data.score == 7 &&
+        request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if request.auth != null &&
+        request.auth.uid == ownerUid &&
+        ownerUid.matches('^student_[a-f0-9]{32} (Published educational content readable by all unit devices, Admin-only write)
+    match /topics/{topicId} {
+      allow get: if isValidId(topicId) && (
+        resource == null || existing().visibility == 'public'
+      );
+      allow list: if existing().visibility == 'public';
+      allow create: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isAdmin();
+      allow update: if isVerifiedUser() &&
+        isValidId(topicId) &&
+        isValidTopic(incoming(), topicId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'code', 'title', 'description', 'timeLimitMinutes',
+          'questionCount', 'visibility', 'updatedAtIso', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(topicId) && isAdmin();
+
+      // Master Gate Subcollection: Questions belong to a valid parent topic
+      match /questions/{questionId} {
+        allow get: if isValidId(topicId) &&
+          isValidId(questionId) && (
+            resource == null || (
+              existing().visibility == 'public' &&
+              existing().topicId == topicId &&
+              exists(/databases/$(database)/documents/topics/$(topicId))
+            )
+          );
+        allow list: if existing().visibility == 'public';
+        allow create: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          existsAfter(/databases/$(database)/documents/topics/$(topicId));
+        allow update: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isValidTopicQuestion(incoming(), topicId, questionId) &&
+          incoming().id == existing().id &&
+          incoming().topicId == existing().topicId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          isAdmin() &&
+          exists(/databases/$(database)/documents/topics/$(topicId)) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'orderIndex', 'text', 'options', 'correctIndex',
+            'explanation', 'visibility', 'updatedAt'
+          ]);
+        allow delete: if isVerifiedUser() &&
+          isValidId(topicId) &&
+          isValidId(questionId) &&
+          isAdmin();
+      }
+    }
+
+    // 4. Quiz Attempts (Admin + Verified User + Active Unit Account submissions, Terminal State Locked)
+    match /attempts/{attemptId} {
+      allow get: if isValidId(attemptId) && (
+        resource == null ||
+        (isVerifiedUser() && (existing().ownerUid == request.auth.uid || isAdmin()))
+      );
+      allow list: if isVerifiedUser() && (
+        existing().ownerUid == request.auth.uid ||
+        (isBootstrappedAdmin() && existing().scope == 'unit_490')
+      );
+      allow create: if isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/topics/$(incoming().topicId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      // Terminal state locking: submitted attempts cannot be edited by regular users; admin-only override
+      allow update: if isVerifiedUser() &&
+        isValidId(attemptId) &&
+        isValidQuizAttempt(incoming(), attemptId) &&
+        incoming().id == existing().id &&
+        incoming().scope == existing().scope &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().accountId == existing().accountId &&
+        incoming().topicId == existing().topicId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isAdmin() &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'candidateName', 'unitName', 'topicTitle', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser() && isValidId(attemptId) && isAdmin();
+    }
+
+    // Staging-only permission probe; accepts no user, account, quiz or topic data.
+    // The website writes a short-lived record and verifies it can read and delete it.
+    match /sync_probes/{probeId} {
+      allow get: if isBootstrappedAdmin() && isValidId(probeId);
+      allow list: if false;
+      allow create: if isBootstrappedAdmin() && isValidId(probeId) &&
+        request.resource.data.keys().hasAll(['uid', 'nonce', 'createdAt']) &&
+        request.resource.data.keys().hasOnly(['uid', 'nonce', 'createdAt']) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.nonce is string &&
+        request.resource.data.nonce.size() >= 12 &&
+        request.resource.data.nonce.size() <= 80 &&
+        request.resource.data.createdAt == request.time;
+      allow update: if false;
+      allow delete: if isBootstrappedAdmin() && isValidId(probeId) &&
+        existing().uid == request.auth.uid;
+    }
+
+    // 5. Private Honor Entries (paired with QuizAttempts; owner/admin reads only)
+    match /honor_entries/{entryId} {
+      // Contains candidate names and units; owner or administrator only.
+      allow get: if isValidId(entryId) && isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isAdmin());
+      allow list: if isVerifiedUser() &&
+        (existing().ownerUid == request.auth.uid || isBootstrappedAdmin());
+      allow create: if isValidId(entryId) &&
+        isValidHonorEntry(incoming(), entryId) &&
+        incoming().createdAt == request.time &&
+        
+existsAfter(/databases/$(database)/documents/attempts/$(entryId)) &&
+isVerifiedUser() &&
+incoming().ownerUid == request.auth.uid;
+
+      allow update: if false;
+      allow delete: if isVerifiedUser() && isValidId(entryId) && isAdmin();
+    }
+  }
+}
+) &&
+        request.auth.token.firebase.sign_in_provider == 'custom' &&
+        resource.data.ownerUid == ownerUid &&
+        resource.data.marker == 'SYNTHETIC_ONLY' &&
+        resource.data.resultType == 'DEMO_SYNC_PROBE';
+    }
+
     // 3. Quiz Topics & Questions Subcollection (Published educational content readable by all unit devices, Admin-only write)
     match /topics/{topicId} {
       allow get: if isValidId(topicId) && (

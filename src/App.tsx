@@ -7,7 +7,7 @@ import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
-import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, listSyntheticD1Accounts, createSyntheticD1Account, changeSyntheticD1AccountStatus, deleteSyntheticD1Account } from './utils/serverlessAuth';
+import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, listSyntheticD1Accounts, createSyntheticD1Account, changeSyntheticD1AccountStatus, deleteSyntheticD1Account, resetSyntheticD1AccountPassword } from './utils/serverlessAuth';
 import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, assertOtherDemoStudentDenied } from './utils/stagingResultProbe';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
@@ -757,6 +757,10 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     await deleteSyntheticD1Account(await getVerifiedStagingAdminIdToken(), username);
   }, [getVerifiedStagingAdminIdToken]);
 
+  const handleResetSyntheticD1AccountPassword = useCallback(async (username: string) => {
+    return resetSyntheticD1AccountPassword(await getVerifiedStagingAdminIdToken(), username);
+  }, [getVerifiedStagingAdminIdToken]);
+
   const handleProvisionDemoStudent = useCallback(async () => {
     if (!IS_FIREBASE_STAGING || currentUser?.role !== 'admin' || !cloudState.isCloudAdmin || !firebaseUser) {
       throw new Error('Cần đăng nhập Admin nội bộ và Google Admin trên staging.');
@@ -1191,6 +1195,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onCreateSyntheticD1Account={IS_FIREBASE_STAGING && adminAccessAllowed ? handleCreateSyntheticD1Account : undefined}
                   onSetSyntheticD1AccountStatus={IS_FIREBASE_STAGING && adminAccessAllowed ? handleSetSyntheticD1AccountStatus : undefined}
                   onDeleteSyntheticD1Account={IS_FIREBASE_STAGING && adminAccessAllowed ? handleDeleteSyntheticD1Account : undefined}
+                  onResetSyntheticD1AccountPassword={IS_FIREBASE_STAGING && adminAccessAllowed ? handleResetSyntheticD1AccountPassword : undefined}
                   onProvisionDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleProvisionDemoStudent : undefined}
                   onDeleteDemoStudent={IS_FIREBASE_STAGING && cloudState.isCloudAdmin && currentUser?.role === 'admin' ? handleDeleteDemoStudent : undefined}
                   onClose={() => setShowCloudModal(false)}

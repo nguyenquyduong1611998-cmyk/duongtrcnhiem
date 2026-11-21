@@ -1,16 +1,17 @@
 import React from 'react';
-import type { SyntheticD1Account } from '../utils/serverlessAuth';
+import type { SyntheticD1Account, SyntheticTemporaryCredential } from '../utils/serverlessAuth';
 
 interface Props {
   onList: () => Promise<SyntheticD1Account[]>;
   onCreate: () => Promise<SyntheticD1Account>;
   onSetActive: (username: string, active: boolean) => Promise<void>;
   onDelete: (username: string) => Promise<void>;
+  onResetPassword: (username: string) => Promise<SyntheticTemporaryCredential>;
 }
 
 /** Staging-only Admin tool; database never returns raw passwords or password hashes. */
 export const SyntheticD1AccountsPanel: React.FC<Props> = ({
-  onList, onCreate, onSetActive, onDelete,
+  onList, onCreate, onSetActive, onDelete, onResetPassword,
 }) => {
   const [accounts, setAccounts] = React.useState<SyntheticD1Account[]>([]);
   const [loaded, setLoaded] = React.useState(false);
@@ -18,6 +19,32 @@ export const SyntheticD1AccountsPanel: React.FC<Props> = ({
   const [error, setError] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [deletePending, setDeletePending] = React.useState<string | null>(null);
+  const [resetPending, setResetPending] = React.useState<string | null>(null);
+  const [temporaryCredential, setTemporaryCredential] = React.useState<SyntheticTemporaryCredential | null>(null);
+  const [revealPassword, setRevealPassword] = React.useState(false);
+
+  const resetPassword = async (username: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError(false);
+    setMessage('');
+    setTemporaryCredential(null);
+    setRevealPassword(false);
+    try {
+      const credential = await onResetPassword(username);
+      setTemporaryCredential(credential);
+      setResetPending(null);
+      setMessage('Đã cấp mật khẩu tạm cho tài khoản GIẢ. Mật khẩu chỉ có trong cửa sổ này, chưa thể dùng đăng nhập.');
+      setAccounts(await onList());
+      setLoaded(true);
+    } catch (cause) {
+      setError(true);
+      setMessage(cause instanceof Error ? cause.message : 'Không thể cấp mật khẩu tạm.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
 
   async function perform(operation: () => Promise<string>, refresh = true) {
     if (busy) return;
@@ -65,6 +92,36 @@ export const SyntheticD1AccountsPanel: React.FC<Props> = ({
         })}
         className="w-full rounded-md border border-[#1F4D36] px-3 py-2 text-xs font-semibold text-[#1F4D36] disabled:opacity-50"
       >Tạo 1 tài khoản giả test_unit_ trong D1</button>
+      {temporaryCredential && (
+        <div className="space-y-2 rounded-md border border-[#DDE3DC] bg-white p-3">
+          <p className="text-xs font-semibold text-[#152019]">
+            Mật khẩu tạm của tài khoản GIẢ: {temporaryCredential.username}
+          </p>
+          <p className="text-xs text-[#B91C1C]">
+            Chỉ hiển thị trong phiên này. KHÔNG chụp ảnh mật khẩu hoặc gửi vào chat.
+            Không phải mật khẩu của học viên thật, và chưa thể đăng nhập bằng mật khẩu này.
+          </p>
+          <input
+            type={revealPassword ? 'text' : 'password'}
+            readOnly
+            value={temporaryCredential.temporaryPassword}
+            autoComplete="off"
+            aria-label="Mật khẩu tạm của tài khoản giả"
+            onClick={(event) => event.currentTarget.select()}
+            className="w-full rounded-md border border-[#DDE3DC] bg-[#FAFBF9] p-2 font-mono text-xs"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setRevealPassword((value) => !value)}
+              className="rounded-md border border-[#1F4D36] px-2 py-1.5 text-xs text-[#1F4D36]">
+              {revealPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            </button>
+            <button type="button" onClick={() => {setTemporaryCredential(null);setRevealPassword(false);}}
+              className="rounded-md border border-[#CFD8CE] px-2 py-1.5 text-xs">
+              Đóng và xóa khỏi màn hình
+            </button>
+          </div>
+        </div>
+      )}
       {loaded && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-[#152019]">Số tài khoản thử nghiệm: {accounts.length}</p>
@@ -80,6 +137,21 @@ export const SyntheticD1AccountsPanel: React.FC<Props> = ({
               </p>
               <p className="text-xs text-[#64756A]">Chưa hỗ trợ đăng nhập bằng bảng này.</p>
               <div className="flex flex-wrap gap-2">
+                {resetPending === account.username ? (
+                  <>
+                    <button type="button" disabled={busy}
+                      onClick={() => void resetPassword(account.username)}
+                      className="rounded-md border border-[#1F4D36] px-2 py-1.5 text-xs font-semibold text-[#1F4D36] disabled:opacity-50"
+                    >Xác nhận cấp mật khẩu tạm</button>
+                    <button type="button" disabled={busy} onClick={() => setResetPending(null)}
+                      className="rounded-md border border-[#CFD8CE] px-2 py-1.5 text-xs">Hủy</button>
+                  </>
+                ) : (
+                  <button type="button" disabled={busy}
+                    onClick={() => {setResetPending(account.username);setDeletePending(null);}}
+                    className="rounded-md border border-[#1F4D36] px-2 py-1.5 text-xs font-semibold text-[#1F4D36] disabled:opacity-50"
+                  >Cấp mật khẩu tạm (GIẢ)</button>
+                )}
                 <button
                   type="button" disabled={busy}
                   onClick={() => void perform(async () => {

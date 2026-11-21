@@ -33,6 +33,7 @@ import {
   syncAccountsToFirestore,
   syncAttemptsDiffToFirestore,
   syncTopicsToFirestore,
+  testStagingAdminWrite,
 } from './utils/firebaseSync';
 import {
   loadAccounts,
@@ -634,6 +635,14 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     }
   }, []);
 
+  const handleTestStagingWrite = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || !firebaseUser || !cloudState.connected ||
+        !cloudState.isCloudAdmin || currentUser?.role !== 'admin') {
+      throw new Error('Cần đăng nhập cả Admin nội bộ và Google Admin trên Firebase staging.');
+    }
+    await testStagingAdminWrite(firebaseUser);
+  }, [firebaseUser, cloudState.connected, cloudState.isCloudAdmin, currentUser?.role]);
+
   const handleSyncCloudNow = useCallback(async () => {
     if (!firebaseUser || !cloudState.connected) return;
     if (IS_FIREBASE_STAGING) {
@@ -983,6 +992,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onCancelConnect={handleCancelConnectCloud}
                   onDisconnect={handleDisconnectCloud}
                   onSyncNow={handleSyncCloudNow}
+                  onTestWrite={IS_FIREBASE_STAGING ? handleTestStagingWrite : undefined}
                   onClose={() => setShowCloudModal(false)}
                 />
               )}

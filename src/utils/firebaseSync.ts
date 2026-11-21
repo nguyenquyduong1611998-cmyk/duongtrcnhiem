@@ -1269,6 +1269,7 @@ export async function mergeAndSyncOnConnect(params: {
   localAttempts: QuizAttempt[];
   defaultAdminAccount: UserAccount;
   tracker: CloudSnapshotTracker;
+  allowUploads?: boolean;
 }): Promise<{
   accounts: UserAccount[];
   topics: Topic[];
@@ -1283,6 +1284,7 @@ export async function mergeAndSyncOnConnect(params: {
     localAttempts,
     defaultAdminAccount,
     tracker,
+    allowUploads = true,
   } = params;
 
   // 1. Fetch & merge Accounts + backfill /account_directory (Cloud Admin only)
@@ -1330,7 +1332,7 @@ export async function mergeAndSyncOnConnect(params: {
       const id = sanitizeFirestoreId(a.id, 'acc');
       return !tracker.accountIds.has(id) || !tracker.directoryIds.has(id);
     });
-    if (needsSync.length > 0) {
+    if (allowUploads && needsSync.length > 0) {
       await syncAccountsToFirestore([], needsSync, tracker, false);
     }
   }
@@ -1384,7 +1386,7 @@ export async function mergeAndSyncOnConnect(params: {
     }
   }
 
-  if (isCloudAdmin && localOnlyTopics.length > 0) {
+  if (allowUploads && isCloudAdmin && localOnlyTopics.length > 0) {
     await syncTopicsToFirestore([], localOnlyTopics, tracker, false);
   }
   const mergedTopics = Array.from(topicsById.values()).sort((a, b) =>
@@ -1417,12 +1419,14 @@ export async function mergeAndSyncOnConnect(params: {
     }
   }
 
-  for (const att of localOnlyAttempts) {
-    await saveSingleAttemptToFirestore(att, user.uid, tracker, {
-      accounts: mergedAccounts,
-      isCloudAdmin,
-      localTopics: mergedTopics,
-    });
+  if (allowUploads) {
+    for (const att of localOnlyAttempts) {
+      await saveSingleAttemptToFirestore(att, user.uid, tracker, {
+        accounts: mergedAccounts,
+        isCloudAdmin,
+        localTopics: mergedTopics,
+      });
+    }
   }
 
   const mergedAttempts = Array.from(attemptsById.values()).sort(

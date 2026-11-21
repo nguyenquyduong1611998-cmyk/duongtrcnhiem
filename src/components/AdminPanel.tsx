@@ -836,7 +836,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     Mật khẩu <span className="text-[#B91C1C]">*</span>
                   </label>
                   <input
-                    type="text"
+                    type="password"
+                    autoComplete="new-password"
                     value={accPassword}
                     onChange={(e) => setAccPassword(e.target.value)}
                     placeholder="Nhập mật khẩu"
@@ -977,7 +978,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <thead>
                     <tr className="border-b border-[#DDE3DC] text-xs font-bold uppercase tracking-wider text-[#4B5B50] bg-[#FAFBF9]">
                       <th className="py-3 px-4">Tài khoản</th>
-                      <th className="py-3 px-4">Mật khẩu</th>
+                      <th className="py-3 px-4">Mật khẩu (ẩn)</th>
                       <th className="py-3 px-4">Thông tin / Đơn vị</th>
                       <th className="py-3 px-4">Trạng thái</th>
                       <th className="py-3 px-4 text-right">Thao tác</th>
@@ -995,7 +996,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                           </td>
                           <td className="py-3.5 px-4 font-mono-num text-xs text-[#243329]">
-                            {acc.password || '••••••••'}
+                            <span aria-label="Mật khẩu được ẩn">••••••••</span>
                           </td>
                           <td className="py-3.5 px-4">
                             <div className="font-medium text-[#152019]">

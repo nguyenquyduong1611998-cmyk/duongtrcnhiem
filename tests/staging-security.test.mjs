@@ -1,0 +1,58 @@
+// Static regression checks only. These do not replace Firestore Emulator tests.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+const stagingRules = read('firestore.staging.rules');
+const productionRules = read('firestore.rules');
+const firebase = read('src/firebase.ts');
+const sync = read('src/utils/firebaseSync.ts');
+const app = read('src/App.tsx');
+
+function between(text, start, end) {
+  const i = text.indexOf(start);
+  assert.ok(i >= 0, `Expected section: ${start}`);
+  const j = text.indexOf(end, i + start.length);
+  assert.ok(j >= 0, `Expected section end: ${end}`);
+  return text.slice(i, j);
+}
+
+test('staging uses a separate admin UID without changing production UID', () => {
+  assert.match(stagingRules, /request\.auth\.uid == 'aV2S9WYo4tg8XZQSE9snzjeBU203'/);
+  assert.match(productionRules, /request\.auth\.uid == '3zPu6ZrPGLfDNsms17mxHrEwfUF2'/);
+  assert.doesNotMatch(productionRules, /aV2S9WYo4tg8XZQSE9snzjeBU203/);
+  assert.match(firebase, /export const IS_FIREBASE_STAGING = import\.meta\.env\.VITE_FIREBASE_ENV === 'staging'/);
+});
+
+test('staging managed accounts require password hashes, not plaintext', () => {
+  const managedValidator = between(stagingRules, 'function isValidManagedAccount(', 'function isValidAccountDirectoryEntry(');
+  assert.match(managedValidator, /data\.passwordHash is string/);
+  assert.doesNotMatch(managedValidator, /data\.password is string/);
+  assert.match(sync, /IS_FIREBASE_STAGING\s*\? \{ passwordHash \}\s*: \{ password:/);
+  assert.match(sync, /IS_FIREBASE_STAGING && !acc\.password/);
+});
+
+test('account directory on staging is admin-only', () => {
+  const block = between(stagingRules, 'match \/account_directory\/{accountId}', 'match \/topics\/{topicId}');
+  assert.match(block, /allow get: if isValidId\(accountId\) && isAdmin\(\);/);
+  assert.match(block, /allow list: if isBootstrappedAdmin\(\);/);
+  assert.doesNotMatch(block, /allow list: if existing\(\)\.visibility == 'public'/);
+});
+
+test('personally identifiable honor entries require Google identity and owner or admin', () => {
+  const block = stagingRules.slice(stagingRules.indexOf('match /honor_entries/{entryId}'));
+  assert.match(block, /allow get: if isValidId\(entryId\) && isVerifiedUser\(\)/);
+  assert.match(block, /existing\(\)\.ownerUid == request\.auth\.uid \|\| isAdmin\(\)/);
+  assert.match(block, /allow list: if isVerifiedUser\(\)/);
+  assert.match(sync, /if \(!IS_FIREBASE_STAGING\) \{/);
+  assert.match(sync, /IS_FIREBASE_STAGING && !isCloudAdmin/);
+});
+
+test('staging does not auto-upload on sign-in or reconnect', () => {
+  assert.match(app, /allowUploads: !IS_FIREBASE_STAGING/);
+  assert.match(app, /!cloudState\.connected \|\| !firebaseUser \|\| IS_FIREBASE_STAGING/);
+  assert.match(app, /IS_FIREBASE_STAGING && currentUser\?\.role !== 'admin'/);
+  assert.match(app, /window\.confirm\(/);
+  assert.match(app, /void signOutGoogleCloud\(\)/);
+});

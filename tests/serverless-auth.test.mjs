@@ -131,3 +131,17 @@ test('demo backend reports safe, specific failures instead of claiming missing c
   assert.match(client,/D1_WRITE_FAILED/);
   assert.ok(!client.includes("if (res.status === 503) throw new Error('Cloudflare Functions chưa được cấu hình"));
 });
+
+test('phase2 D1 migration is staging-only, synthetic-only, and cannot insert real accounts',()=>{
+  const sql=readFileSync(new URL('../serverless/d1-phase2-staging-accounts.sql',import.meta.url),'utf8');
+  assert.match(sql,/CREATE TABLE IF NOT EXISTS unit_accounts/);
+  assert.match(sql,/username GLOB 'test_unit_\*'/);
+  assert.match(sql,/role = 'student'/);
+  assert.match(sql,/active INTEGER NOT NULL DEFAULT 0/);
+  assert.match(sql,/password_reset_required INTEGER NOT NULL DEFAULT 1/);
+  assert.match(sql,/password_salt TEXT NOT NULL/);
+  assert.match(sql,/password_hash TEXT NOT NULL/);
+  assert.match(sql,/auth_version INTEGER NOT NULL DEFAULT 1/);
+  assert.doesNotMatch(sql,/\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\s+(?:INTO|TABLE|FROM)?\s*(?:unit_accounts|demo_students|login_attempts)\b/i);
+  assert.doesNotMatch(sql,/admin123|hocvien01|hocvien02|123456/);
+});

@@ -33,6 +33,43 @@ import {
 const VALID_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
 const VALID_GRADES: ReadonlySet<string> = new Set(['Giỏi', 'Khá', 'Đạt', 'Yếu']);
 
+/**
+ * Staging-only Admin permission test.
+ * Writes, reads, then deletes one harmless document in a dedicated collection.
+ * No passwords, user accounts, quizzes, scores or topics are transmitted.
+ */
+export async function testStagingAdminWrite(user: User): Promise<void> {
+  if (!IS_FIREBASE_STAGING || user.uid !== BOOTSTRAPPED_ADMIN_UID) {
+    throw new Error('Phép thử chỉ dành cho tài khoản Admin của Firebase staging.');
+  }
+  const nonce = `probe_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  const ref = doc(db, 'sync_probes', nonce);
+  let written = false;
+  try {
+    await setDoc(ref, {
+      uid: user.uid,
+      nonce,
+      createdAt: serverTimestamp(),
+    });
+    written = true;
+    const snapshot = await getDoc(ref);
+    if (!snapshot.exists() || snapshot.data().nonce !== nonce || snapshot.data().uid !== user.uid) {
+      throw new Error('Firebase đã nhận yêu cầu nhưng không đọc lại được dữ liệu kiểm thử.');
+    }
+    await deleteDoc(ref);
+    written = false;
+  } catch (error) {
+    if (written) {
+      try {
+        await deleteDoc(ref);
+      } catch {
+        // Do not hide the original failure. Admin can remove this test document later.
+      }
+    }
+    throw error;
+  }
+}
+
 export function sanitizeFirestoreId(raw: string, prefix: string): string {
   const cleaned = (raw || '')
     .trim()

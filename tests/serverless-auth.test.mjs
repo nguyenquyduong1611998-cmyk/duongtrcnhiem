@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   requireStaging, usernameKey, equalSecret, hashPassword, pbkdf2,
   mintFirebaseToken, decodeSegment, randomPassword, PROJECT_ID
@@ -101,4 +102,17 @@ test('reject invalid method, origin, and large body before reading secrets',asyn
     method:'POST',headers:{'content-type':'text/plain'},body:'{}'
   });
   assert.equal((await login({request:wrongContent,env:{}})).status,415);
+});
+
+test('demo backend reports safe, specific failures instead of claiming missing configuration',()=>{
+  const api=readFileSync(new URL('../functions/api/auth/admin/demo.js', import.meta.url),'utf8');
+  const client=readFileSync(new URL('../src/utils/serverlessAuth.ts', import.meta.url),'utf8');
+  assert.match(api,/phase='password-hash'/);
+  assert.match(api,/phase='d1-write'/);
+  assert.match(api,/PASSWORD_HASH_UNAVAILABLE/);
+  assert.match(api,/D1_WRITE_FAILED/);
+  assert.match(client,/SERVER_NOT_CONFIGURED/);
+  assert.match(client,/PASSWORD_HASH_UNAVAILABLE/);
+  assert.match(client,/D1_WRITE_FAILED/);
+  assert.ok(!client.includes("if (res.status === 503) throw new Error('Cloudflare Functions chưa được cấu hình"));
 });

@@ -10,6 +10,8 @@ const firebase = read('src/firebase.ts');
 const sync = read('src/utils/firebaseSync.ts');
 const app = read('src/App.tsx');
 const storage = read('src/utils/storage.ts');
+const resultProbe = read('src/utils/stagingResultProbe.ts');
+const cloudModal = read('src/components/CloudStorageModal.tsx');
 
 function between(text, start, end) {
   const i = text.indexOf(start);
@@ -125,4 +127,34 @@ test('staging normal account, topic, result uploads and bulk sync stay blocked',
   assert.ok(app.includes('if (IS_FIREBASE_STAGING) {\n      setCloudState((prev) => ({'));
   assert.ok(app.includes('onReadTestAccount={IS_FIREBASE_STAGING ? readStagingAccountProbe : undefined}'));
   assert.ok(app.includes('disableBulkSync={IS_FIREBASE_STAGING}'));
+});
+
+test('synthetic result permissions use strict custom-token UID and immutable fixed data', () => {
+  const rule = between(stagingRules, 'match /demo_result_probes/{ownerUid}', 'match /topics/{topicId}');
+  assert.equal((stagingRules.match(/match \/demo_result_probes\/\{ownerUid\}/g) || []).length, 1);
+  assert.ok(rule.includes("request.auth.uid == ownerUid"));
+  assert.ok(rule.includes("ownerUid.matches('^student_[a-f0-9]{32}$')"));
+  assert.ok(rule.includes("request.auth.token.firebase.sign_in_provider == 'custom'"));
+  assert.ok(rule.includes("allow list: if false;"));
+  assert.ok(rule.includes("allow update: if false;"));
+  assert.ok(rule.includes("request.resource.data.keys().hasOnly(["));
+  assert.ok(rule.includes("request.resource.data.score == 7"));
+  assert.ok(rule.includes("request.resource.data.marker == 'SYNTHETIC_ONLY'"));
+  assert.ok(rule.includes('request.resource.data.createdAt == request.time'));
+  assert.ok(rule.includes("resource.data.marker == 'SYNTHETIC_ONLY'"));
+  assert.doesNotMatch(productionRules, /demo_result_probes/);
+});
+
+test('student UI result probe cannot touch real attempts, account directory or local cache', () => {
+  assert.ok(resultProbe.includes("doc(db, 'demo_result_probes', user.uid)"));
+  assert.ok(resultProbe.includes("getDocFromServer(refFor(student))"));
+  assert.ok(resultProbe.includes("score: FAKE_SCORE"));
+  assert.ok(resultProbe.includes("createdAt: serverTimestamp()"));
+  assert.ok(resultProbe.includes("export async function deleteDemoResultProbe"));
+  assert.ok(app.includes("currentUser.id === firebaseUser?.uid"));
+  assert.ok(app.includes("currentUser?.role === 'student'"));
+  assert.ok(cloudModal.includes('Kiểm thử kết quả GIẢ theo UID Firebase'));
+  assert.ok(cloudModal.includes('Đọc kết quả GIẢ từ Firebase'));
+  assert.doesNotMatch(resultProbe, /collection\(db, ['"]attempts['"]/);
+  assert.doesNotMatch(resultProbe, /localStorage/);
 });

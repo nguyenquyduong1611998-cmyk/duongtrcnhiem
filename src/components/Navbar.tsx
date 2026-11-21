@@ -7,6 +7,7 @@ interface NavbarProps {
   currentUser: UserAccount;
   activeTab: MainTab;
   cloudConnected: boolean;
+  adminAccessAllowed: boolean;
   onSelectTab: (tab: MainTab) => void;
   onOpenCloudStorage: () => void;
   onLogout: () => void;
@@ -18,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   activeTab,
   cloudConnected,
+  adminAccessAllowed,
   onSelectTab,
   onOpenCloudStorage,
   onLogout,
@@ -75,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             );
           })}
-          {currentUser.role === 'admin' && (
+          {currentUser.role === 'admin' && adminAccessAllowed && (
             <button
               type="button"
               onClick={() => onSelectTab('admin')}
@@ -161,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           );
         })}
-        {currentUser.role === 'admin' && (
+        {currentUser.role === 'admin' && adminAccessAllowed && (
           <button
             type="button"
             onClick={() => onSelectTab('admin')}

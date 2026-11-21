@@ -1,5 +1,6 @@
-// STAGING REVIEW CANDIDATE — do not publish before emulator tests and client migration.
-// This file does not deploy automatically; production firestore.rules is unchanged.
+// STAGING-ONLY Firestore Rules for controlled testing with synthetic data.
+// Publish manually only to duongtrcnhiem-staging, never to the production Firebase project.
+// Firestore Emulator behavior tests and real-data migration are still pending.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

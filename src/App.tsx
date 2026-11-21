@@ -30,6 +30,7 @@ import {
   mergeAndSyncOnConnect,
   pushAllLocalDataToFirestore,
   readStagingTestTopic,
+  STAGING_TEST_TOPIC_ID,
   saveSingleAttemptToFirestore,
   subscribeToCloudData,
   subscribeToPublicUnitData,
@@ -124,6 +125,20 @@ function formatCloudErrorMessage(raw: unknown): string {
 
   const detail = code || (msg.length <= 160 ? msg : msg.slice(0, 160) + '...');
   return `Không thể kết nối hoặc đồng bộ với đám mây (${detail}). Dữ liệu vẫn được lưu an toàn trên thiết bị.`;
+}
+
+// On staging, a partial cloud snapshot must never erase topics already on the device.
+// Only the exact synthetic test topic is hidden; real cloud changes merge by document ID.
+function mergeTopicsSafely(local: Topic[], cloud: Topic[]): Topic[] {
+  if (!IS_FIREBASE_STAGING) return cloud;
+  const byId = new Map<string, Topic>();
+  for (const topic of local) {
+    if (topic.id !== STAGING_TEST_TOPIC_ID) byId.set(topic.id, topic);
+  }
+  for (const topic of cloud) {
+    if (topic.id !== STAGING_TEST_TOPIC_ID) byId.set(topic.id, topic);
+  }
+  return Array.from(byId.values()).sort((a, b) => a.code.localeCompare(b.code));
 }
 
 export default function App() {
@@ -302,11 +317,12 @@ export default function App() {
       tracker: publicTracker,
       onTopics: (cloudTopics) => {
         if (cancelled || cloudTopics.length === 0) return;
-        setTopics(cloudTopics);
-        saveTopics(cloudTopics);
+        const nextTopics = mergeTopicsSafely(topicsRef.current, cloudTopics);
+        setTopics(nextTopics);
+        saveTopics(nextTopics);
         setCloudState((prev) => ({
           ...prev,
-          cloudTopicCount: cloudTopics.length,
+          cloudTopicCount: cloudTopics.filter((t) => !IS_FIREBASE_STAGING || t.id !== STAGING_TEST_TOPIC_ID).length,
         }));
       },
       onDirectoryAccounts: (dirAccounts) => {
@@ -455,11 +471,12 @@ export default function App() {
           },
           onTopics: (cloudTopics) => {
             if (activeWriteCountRef.current > 0 || cloudTopics.length === 0) return;
-            setTopics(cloudTopics);
-            saveTopics(cloudTopics);
+            const nextTopics = mergeTopicsSafely(topicsRef.current, cloudTopics);
+            setTopics(nextTopics);
+            saveTopics(nextTopics);
             setCloudState((prev) => ({
               ...prev,
-              cloudTopicCount: cloudTopics.length,
+              cloudTopicCount: cloudTopics.filter((t) => !IS_FIREBASE_STAGING || t.id !== STAGING_TEST_TOPIC_ID).length,
               lastSyncedAt: new Date().toISOString(),
             }));
           },
@@ -950,7 +967,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                     <>
                       {activeTab === 'topics' && (
                         <TopicsView
-                          topics={topics}
+                          topics={IS_FIREBASE_STAGING ? topics.filter((t) => t.id !== STAGING_TEST_TOPIC_ID) : topics}
                           onStartTopic={(topic) => setActiveQuizTopic(topic)}
                         />
                       )}

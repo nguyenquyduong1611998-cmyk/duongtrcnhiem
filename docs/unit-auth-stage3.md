@@ -28,6 +28,18 @@
 
 **Chưa mở tài khoản thật.** Chặng kế tiếp mới thiết kế đăng ký học viên thật, mật khẩu, thu hồi phiên, bảo vệ kết quả và cập nhật Rules staging. Không chạy file SQL hoặc bật biến khi chưa có bước kiểm thử sau đó.
 
+## Chặng 3B — mật khẩu tạm và bắt buộc đổi (đã viết mã, không phát hành)
+
+- Bổ sung `serverless/d1-phase3-pilot-passwords.sql`, đề xuất các bảng **mới, riêng biệt**: `student_pilot_credentials`, `student_pilot_password_attempts`, `student_pilot_password_audit`. Chưa chạy SQL này trên Cloudflare.
+- `functions/api/auth/admin/pilot-password-reset.js`: API cấp lại mật khẩu tạm **chỉ cho tài khoản GIẢ** `pilot_hv_...`, yêu cầu chữ ký Firebase Google Admin và flag riêng `PHASE3_PILOT_PASSWORDS_ENABLED=true`. Mặc định API trả 404. Mật khẩu ngẫu nhiên chỉ được trả về một lần trong phản hồi cho Admin, không lưu mật khẩu gốc trong D1.
+- `functions/api/auth/student/pilot-password-change.js`: xác nhận mật khẩu tạm qua D1 và thay bằng mật khẩu mới ở backend; đối chiếu trạng thái `pending`, kiểm tra độ mạnh, giới hạn 5 lần thử sai trong 15 phút, cập nhật version/CAS, ghi audit, không trả mã băm hoặc token. Mặc định cũng trả 404.
+- Dùng `cf-chain-v1` **chỉ để kiểm thử tài khoản GIẢ**, tương tự mã thử nghiệm trước; thuật toán này KHÔNG phải lựa chọn được duyệt cho người dùng thật. Trước khi dùng với tài khoản thực phải chốt KDF/nhà cung cấp xác thực được đánh giá độc lập.
+- Thành công đổi mật khẩu vẫn trả `loginEnabled:false`; không gọi Firebase Custom Token, không cấp phiên đăng nhập, chưa có frontend mới.
+- Bài thử `scripts/check-phase3-password-flow.mjs` dùng SQLite **trong bộ nhớ** (không gọi Cloudflare), thực hiện cấp/reissue/đổi mật khẩu, invalidation mật khẩu cũ, khóa sau 5 lần sai, chặn tài khoản `disabled`, và xác minh không có phiên đăng nhập. Các hàng rào tĩnh bổ sung vào `tests/phase3-auth-isolation.test.mjs`.
+- Không merge, không bật biến, không triển khai schema lên Cloudflare, không dùng người thật hay dữ liệu thật ở chặng này.
+
+**Vẫn còn thiếu trước khi dùng thật:** thiết kế quản lý danh tính và KDF cho người thật, Firebase UID có kiểm tra, thu hồi phiên hoạt động, Firestore Rules theo UID, tính điểm phía máy chủ, kiểm thử tải và kiểm tra bảo mật riêng.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

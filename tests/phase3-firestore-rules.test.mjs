@@ -81,17 +81,21 @@ test('revoked synthetic student cannot bypass Firestore Rules with a still-valid
     await assertFails(getDoc(doc(googleAdmin,'pilot_session_probes',UID_A)));
 
     // Incorrect claims and tokens cannot inherit a student session.
-    for(const claims of [
-      {...custom(),unitStudent:false},
-      {...custom(),unitAuthVersion:3},
-      {...custom(),unitAuthVersion:'4'},
-      {...custom(),auth_time:time},
-      {...custom(),firebase:{sign_in_provider:'google.com'}},
-      {auth_time:time+100,unitStudent:true,unitAuthVersion:4},
-      {...custom(),unitStudent:undefined},
+    for(const [label,claims] of [
+      ['non-student-claim',{...custom(),unitStudent:false}],
+      ['stale-version',{...custom(),unitAuthVersion:3}],
+      ['string-version',{...custom(),unitAuthVersion:'4'}],
+      ['revoked-auth-time',{...custom(),auth_time:time}],
+      ['google-provider',{...custom(),firebase:{sign_in_provider:'google.com'}}],
+      ['no-provider',{auth_time:time+100,unitStudent:true,unitAuthVersion:4}],
+      ['missing-student-claim',{...custom(),unitStudent:undefined}],
     ]){
       const client=env.authenticatedContext(UID_A,claims).firestore();
-      await assertFails(getDoc(doc(client,'pilot_session_probes',UID_A)));
+      try {
+        await assertFails(getDoc(doc(client,'pilot_session_probes',UID_A)));
+      } catch (error) {
+        throw new Error('Unexpectedly authorized invalid simulated claim: '+label,{cause:error});
+      }
     }
     const unknown=env.authenticatedContext('student_'+'c'.repeat(32),custom()).firestore();
     await assertFails(getDoc(doc(unknown,'pilot_session_probes','student_'+'c'.repeat(32))));

@@ -77,3 +77,28 @@ test('pilot temporary password endpoints remain synthetic-only and unavailable b
   assert.match(sql, /CREATE TABLE IF NOT EXISTS student_pilot_password_audit/);
   assert.doesNotMatch(sql, /ALTER TABLE|DROP TABLE|INSERT INTO|UPDATE\s+|DELETE FROM/i);
 });
+
+test('phase 3 Firestore session Rules remain an isolated proof, never a deployed staging migration', () => {
+  const pilot = source('firestore.phase3.pilot.rules');
+  const existing = source('firestore.staging.rules');
+  const config = JSON.parse(source('firebase.phase3-emulator.json'));
+  assert.equal(config.firestore.rules, 'firestore.phase3.pilot.rules');
+  assert.equal(config.emulators.singleProjectMode, true);
+  assert.match(pilot, /match \/pilot_session_states\/\{studentUid\}/);
+  assert.match(pilot, /match \/pilot_session_probes\/\{ownerUid\}/);
+  assert.match(pilot, /request\.auth\.token\.unitAuthVersion/);
+  assert.match(pilot, /request\.auth\.token\.auth_time/);
+  assert.match(pilot, /revokeAfterSeconds/);
+  assert.match(pilot, /allow list: if false/);
+  assert.match(pilot, /match \/\{document=\*\*\}/);
+  assert.match(pilot, /allow read, write: if false/);
+  for (const forbidden of [
+    'match /attempts/', 'match /managed_accounts/',
+    'match /topics/', 'match /account_directory/',
+    'match /demo_result_probes/',
+  ]) assert.ok(!pilot.includes(forbidden), 'Pilot rules cannot open real app collections');
+  assert.ok(!existing.includes('match /pilot_session_probes/'),
+    'Current staging rules must remain separate from new proof');
+  assert.ok(!existing.includes('match /pilot_session_states/'),
+    'Current staging rules must not be silently changed by this stage');
+});

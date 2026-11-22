@@ -6,7 +6,7 @@ import {
 const STUDENT_UID=/^student_[a-f0-9]{32}$/;
 
 // Only blocks authorization for Cloudflare endpoints guarded by student-session.mjs.
-// Does NOT call Firebase's revokeRefreshTokens or revoke direct Firestore access.
+// Queues a Firestore mirror event but does NOT call Firebase's revokeRefreshTokens\n// or directly revoke Firestore access (a trusted publisher is still needed).
 // Retained as a disabled-by-default synthetic-stage proof until full rollout.
 export async function blockStudentServerAccess(db,data,actorUid) {
   if(actorUid!==ADMIN_UID || !data || Array.isArray(data) ||
@@ -47,13 +47,27 @@ export async function blockStudentServerAccess(db,data,actorUid) {
       'FROM student_auth_identities WHERE firebase_uid=? ' +
       'AND active=0 AND auth_version=? AND last_block_event_id=?'
     ).bind(eventId,actorUid,old.auth_version,newVersion,now,uid,newVersion,eventId),
+    db.prepare(
+      'INSERT INTO student_auth_mirror_outbox ' +
+      '(event_id,firebase_uid,auth_version,revoke_after_seconds,' +
+      'state,attempts,next_attempt_at,created_at,updated_at) ' +
+      "SELECT ?,firebase_uid,auth_version,tokens_valid_after,'pending',0,0,?,? " +
+      'FROM student_auth_identities WHERE firebase_uid=? ' +
+      'AND active=0 AND auth_version=? AND last_block_event_id=? ' +
+      'AND EXISTS (SELECT 1 FROM student_auth_block_audit WHERE event_id=?)'
+    ).bind(eventId,now,now,uid,newVersion,eventId,eventId),
   ];
+  // D1 batch is atomic: disabled identity, audit and retry record commit
+  // together. This does NOT immediately revoke Firestore direct access.
   const results=await db.batch(statements);
-  if(!Array.isArray(results) || results.length!==2 ||
+  if(!Array.isArray(results) || results.length!==3 ||
      results.some(r=>r?.success!==true)) return failSafe();
   if(results[0].meta?.changes!==1) return json({error:'ACCOUNT_CHANGED_RETRY'},409);
-  if(results[1].meta?.changes!==1) return failSafe();
-  return json({blocked:true,alreadyBlocked:false,mode:'server-access-only'});
+  if(results[1].meta?.changes!==1 || results[2].meta?.changes!==1) return failSafe();
+  return json({
+    blocked:true,alreadyBlocked:false,mode:'server-access-only',
+    mirrorStatus:'pending',firestoreAccessConfirmedBlocked:false,
+  });
 }
 
 export async function onRequestPost({request,env}) {

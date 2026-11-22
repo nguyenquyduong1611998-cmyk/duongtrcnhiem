@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS student_auth_identities (
     CHECK (password_reset_required IN (0, 1)),
   tokens_valid_after INTEGER NOT NULL DEFAULT 0
     CHECK (tokens_valid_after >= 0),
+  last_block_event_id TEXT,
   created_at INTEGER NOT NULL CHECK (created_at > 0),
   updated_at INTEGER NOT NULL CHECK (updated_at >= created_at)
 );

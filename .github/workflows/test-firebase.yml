@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - fix-firebase-login
+      - feature/unit-auth-stage3
   workflow_dispatch:
 
 permissions:

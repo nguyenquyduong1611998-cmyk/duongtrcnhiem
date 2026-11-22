@@ -57,6 +57,9 @@ jobs:
       - name: Phase 3 pilot enrollment API security tests
         run: node --test tests/phase3-pilot-enrollments.test.mjs
 
+      - name: Validate phase 3 SQL schema in memory (no remote D1)
+        run: bun run scripts/check-phase3-schema.ts
+
       - name: Build website
         run: bun run build
         

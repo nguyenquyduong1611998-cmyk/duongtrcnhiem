@@ -43,6 +43,7 @@ jobs:
           node --check functions/api/auth/student/pilot-password-change.js
           node --check functions/_shared/student-session.mjs
           node --check functions/api/auth/student/session-check.js
+          node --check functions/api/auth/admin/session-block.js
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -70,6 +71,9 @@ jobs:
 
       - name: Phase 3 signed Firebase ID token and D1 session guard tests
         run: node --test tests/phase3-student-session.test.mjs
+
+      - name: Phase 3 Admin session blocking and audit in local SQLite
+        run: bun run scripts/check-phase3-session-block.mjs
 
       - name: Build website
         run: bun run build

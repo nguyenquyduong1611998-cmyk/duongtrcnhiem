@@ -40,6 +40,20 @@
 
 **Vẫn còn thiếu trước khi dùng thật:** thiết kế quản lý danh tính và KDF cho người thật, Firebase UID có kiểm tra, thu hồi phiên hoạt động, Firestore Rules theo UID, tính điểm phía máy chủ, kiểm thử tải và kiểm tra bảo mật riêng.
 
+## Chặng 3C — xác thực Firebase ID Token và kiểm soát phiên ở Cloudflare (đã viết mã, chưa phát hành)
+
+- `functions/_shared/student-session.mjs`: xác minh **Firebase ID Token** đã được Firebase phát hành (không chấp nhận trực tiếp Firebase Custom Token) bằng RSA-SHA256 qua khóa công khai Google. Bắt buộc đúng issuer/audience `duongtrcnhiem-staging`, `sign_in_provider=custom`, UID dạng `student_...`, claim `unitStudent=true` và `unitAuthVersion` hợp lệ, cùng các mốc thời gian chuẩn. Các claim chỉ được tin sau khi chữ ký đã xác minh.
+- Đối chiếu **trong D1 mỗi yêu cầu Cloudflare được bảo vệ** với `student_auth_identities`: phải `active=1`, đã đổi mật khẩu, phiên bản xác thực khớp, `auth_time` mới hơn `tokens_valid_after`. Bảng đề xuất này **mặc định active=0, bắt đổi mật khẩu**, chưa tạo/đăng ký tài khoản thật.
+- `POST /api/auth/student/session-check`: thử bảo vệ endpoint. Trả 404 trừ khi flag riêng `PHASE3_STUDENT_SESSION_CHECK_ENABLED=true` được bật trên staging; **chưa bật flag**. Endpoint không cấp phiên và không chứa dữ liệu học tập.
+- `POST /api/auth/admin/session-block`: Admin Google được xác minh có thể khóa quyền truy cập tại Cloudflare với `active=0`, tăng `auth_version`, cập nhật `tokens_valid_after` và ghi audit có event ID đồng bộ trong giao dịch D1. Mặc định trả 404 trừ khi có `PHASE3_STUDENT_BLOCK_ENABLED=true`; **chưa bật flag**.
+- `serverless/d1-phase3-session-registry.sql`, `serverless/d1-phase3-session-audit.sql`: bản phác thảo hai bảng riêng, **chưa chạy trên Cloudflare**.
+- `tests/phase3-student-session.test.mjs`: thử RSA chữ ký thật bằng khóa thử trong bộ nhớ; giả mạo chữ ký, sai project/issuer, sai provider, token hết hạn, phiên cũ, sai phiên bản, tài khoản bị vô hiệu hóa đều bị từ chối.
+- `scripts/check-phase3-session-block.mjs`: thử SQL với SQLite trong bộ nhớ, bao gồm khóa phiên, audit, khóa lặp lại, tranh chấp phiên bản và quyền Admin. Không sử dụng Cloudflare/Firebase đang chạy.
+
+**Giới hạn quan trọng:** Đây là cơ chế **chặn truy cập vào API Cloudflare** có gọi `authorizeStudentIdentity` trên mỗi yêu cầu; chưa thu hồi Firebase refresh token và **không tự chặn Firestore truy cập trực tiếp**. Firebase có thể tiếp tục chấp nhận ID token còn hạn nếu Firestore Rules chưa kiểm tra metadata phiên hoặc tài khoản. Trước khi dùng với học viên thật phải triển khai thu hồi refresh token bằng cơ chế Firebase được hỗ trợ và cập nhật Rules (hoặc buộc dữ liệu nhạy cảm đi qua backend), sau đó kiểm thử emulator cho A/B/Admin/đã khóa. <https://firebase.google.com/docs/auth/admin/manage-sessions>.
+
+Tài khoản thật vẫn chưa đăng nhập được: thiếu backend cấp danh tính thực, KDF chuẩn/nhà cung cấp xác thực phù hợp, liên kết `firebase_uid` bền vững, phát custom token có claim phiên bản, và giao diện quản trị/học viên được kiểm thử đầy đủ. Không cấp quyền truy cập thật bằng cách bật flag.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

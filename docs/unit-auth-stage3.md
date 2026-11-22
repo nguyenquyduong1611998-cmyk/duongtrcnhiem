@@ -18,6 +18,16 @@
 - Tệp SQL được nạp vào SQLite trong bộ nhớ thành công; số bản ghi so sánh bằng `COUNT(*)` khớp với Cloudflare D1 ngay tại thời điểm kiểm tra: `unit_accounts=1`, `demo_students=4`, `login_attempts=3`.
 - Phép đếm này **chưa phải** kiểm toán từng hàng hoặc diễn tập khôi phục toàn bộ Cloudflare D1. Cần giữ bản sao lưu an toàn, sao chép thêm vào kho lưu trữ mã hóa, xác minh được khôi phục trong một cơ sở dữ liệu thử nghiệm trước khi migration dữ liệu thật.
 
+## Chặng 3A đã viết trên nhánh riêng — quản lý tài khoản pilot chưa đăng nhập
+
+- Thêm schema `serverless/d1-phase3-pilot-enrollments.sql` chỉ tạo **hai bảng mới**: `student_pilot_enrollments` và `student_pilot_audit`. Không sửa bảng D1 đang chạy. Chưa chạy migration trên Cloudflare.
+- Thêm API `POST /api/auth/admin/pilot-enrollments`, hỗ trợ hai lệnh nội bộ `create` và `list` cho tài khoản GIẢ `pilot_hv_...`. Tài khoản chỉ có trạng thái `pending`, không có mật khẩu, Firebase UID, điểm hay dữ liệu cá nhân. Giới hạn tối đa 100 bản ghi pilot. Ghi audit với UID Admin đã được xác thực.
+- API chỉ được phép hoạt động nếu biến server-only `PHASE3_PILOT_ENROLLMENT_ENABLED=true` được cấu hình **riêng trên staging**; mặc định thiếu biến nên trả 404. Ngoài ra vẫn yêu cầu toàn bộ điều kiện staging hiện có và xác thực chữ ký Google Admin. Chưa thêm biến này lên Cloudflare.
+- API không mở chức năng đăng nhập hoặc cấp Firebase token, không thay đổi tài khoản test_hv_/test_unit_, không gọi vào cơ sở dữ liệu production.
+- Kiểm thử `tests/phase3-pilot-enrollments.test.mjs`, `tests/phase3-auth-isolation.test.mjs` và `scripts/check-phase3-schema.ts` được nối vào GitHub Actions; kiểm tra cú pháp, loại trừ truy cập trái phép, ràng buộc SQLite và build. **Chạy tự động chỉ trên bản mã GitHub, không chạm dữ liệu Cloudflare.**
+
+**Chưa mở tài khoản thật.** Chặng kế tiếp mới thiết kế đăng ký học viên thật, mật khẩu, thu hồi phiên, bảo vệ kết quả và cập nhật Rules staging. Không chạy file SQL hoặc bật biến khi chưa có bước kiểm thử sau đó.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

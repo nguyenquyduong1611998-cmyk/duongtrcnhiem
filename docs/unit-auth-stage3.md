@@ -11,6 +11,13 @@
 - `src/App.tsx` còn đường đăng nhập cục bộ cho tài khoản không thuộc `test_hv_*` và `test_unit_*`; cần chặn mọi đường đi vòng qua backend khi triển khai đăng nhập thật.
 - `firestore.rules` trong repository hiện có nhiều quyền ghi dành riêng cho `google.com`, không tự động tương thích với Firebase Custom Token học viên. Xác minh và triển khai rules **staging** riêng trước khi bật truy cập dữ liệu học viên thật. Không ghi đè rules production chỉ để kiểm thử.
 
+## Mốc sao lưu đã xác minh — 22/11/2026 (staging)
+
+- Đã nhận được bookmark của D1 staging. **Không chạy lệnh restore** trừ khi có sự cố và đã phê duyệt khôi phục.
+- Người vận hành xuất `duongtrcnhiem-auth-staging` bằng Wrangler thành tệp SQL lưu **trên máy tính cá nhân**, không tải lên GitHub.
+- Tệp SQL được nạp vào SQLite trong bộ nhớ thành công; số bản ghi so sánh bằng `COUNT(*)` khớp với Cloudflare D1 ngay tại thời điểm kiểm tra: `unit_accounts=1`, `demo_students=4`, `login_attempts=3`.
+- Phép đếm này **chưa phải** kiểm toán từng hàng hoặc diễn tập khôi phục toàn bộ Cloudflare D1. Cần giữ bản sao lưu an toàn, sao chép thêm vào kho lưu trữ mã hóa, xác minh được khôi phục trong một cơ sở dữ liệu thử nghiệm trước khi migration dữ liệu thật.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

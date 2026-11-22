@@ -6,7 +6,8 @@ import {
 const STUDENT_UID=/^student_[a-f0-9]{32}$/;
 
 // Only blocks authorization for Cloudflare endpoints guarded by student-session.mjs.
-// Queues a Firestore mirror event but does NOT call Firebase's revokeRefreshTokens\n// or directly revoke Firestore access (a trusted publisher is still needed).
+// Queues a Firestore mirror event but does NOT call Firebase's revokeRefreshTokens
+// or directly revoke Firestore access (a trusted publisher is still needed).
 // Retained as a disabled-by-default synthetic-stage proof until full rollout.
 export async function blockStudentServerAccess(db,data,actorUid) {
   if(actorUid!==ADMIN_UID || !data || Array.isArray(data) ||

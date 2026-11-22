@@ -1,0 +1,62 @@
+// PHASE 3D - ISOLATED FIRESTORE EMULATOR PROOF ONLY.
+// DO NOT deploy this file as Firestore rules for staging or production.
+// It deliberately contains NO access to existing content, account directories,
+// demo_result_probes, attempts, topics or grade histories.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Every path is closed unless explicitly opened in this synthetic pilot.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function pilotStudent(uid) {
+      return request.auth != null
+        && request.auth.uid == uid
+        && uid.matches('^student_[a-f0-9]{32}$')
+        && request.auth.token.firebase.sign_in_provider == 'custom'
+        && request.auth.token.unitStudent == true
+        && request.auth.token.unitAuthVersion is int
+        && request.auth.token.unitAuthVersion >= 1
+        && request.auth.token.auth_time is int
+        && exists(/databases/$(database)/documents/pilot_session_states/$(uid))
+        && get(/databases/$(database)/documents/pilot_session_states/$(uid)).data.active == true
+        && get(/databases/$(database)/documents/pilot_session_states/$(uid)).data.authVersion
+            == request.auth.token.unitAuthVersion
+        && get(/databases/$(database)/documents/pilot_session_states/$(uid)).data.revokeAfterSeconds is int
+        && request.auth.token.auth_time >
+          get(/databases/$(database)/documents/pilot_session_states/$(uid)).data.revokeAfterSeconds;
+    }
+
+    // Only an Admin SDK or emulator test harness may manage these documents.
+    // These values must never be populated directly by a student client.
+    match /pilot_session_states/{studentUid} {
+      allow read, write: if false;
+    }
+
+    // Fixed fake score 7/10; NOT actual quiz results.
+    match /pilot_session_probes/{ownerUid} {
+      allow get: if pilotStudent(ownerUid)
+        && resource.data.ownerUid == ownerUid
+        && resource.data.marker == 'SYNTHETIC_ONLY'
+        && resource.data.resultType == 'PHASE3_REVOKE_PROBE';
+      allow list: if false;
+      allow create: if pilotStudent(ownerUid)
+        && request.resource.data.keys().hasAll([
+          'ownerUid', 'marker', 'resultType', 'score'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'ownerUid', 'marker', 'resultType', 'score'
+        ])
+        && request.resource.data.ownerUid == ownerUid
+        && request.resource.data.marker == 'SYNTHETIC_ONLY'
+        && request.resource.data.resultType == 'PHASE3_REVOKE_PROBE'
+        && request.resource.data.score == 7;
+      allow update: if false;
+      allow delete: if pilotStudent(ownerUid)
+        && resource.data.ownerUid == ownerUid
+        && resource.data.marker == 'SYNTHETIC_ONLY'
+        && resource.data.resultType == 'PHASE3_REVOKE_PROBE';
+    }
+  }
+}

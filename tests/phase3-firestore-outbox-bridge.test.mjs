@@ -117,7 +117,8 @@ test('D1 event is durable; trusted Firestore emulator writer closes the direct-r
         // withSecurityRulesDisabled is an Emulator-only trusted server stand-in.
         // Production needs a real Admin SDK/REST service with this same
         // transaction + nondecreasing version/revocation semantics.
-        return env.withSecurityRulesDisabled(async ctx=>{
+        try {
+          return await env.withSecurityRulesDisabled(async ctx=>{
           const serverDb=ctx.firestore();
           const ref=doc(serverDb,'pilot_session_states',desired.firebaseUid);
           return runTransaction(serverDb,async tx=>{
@@ -135,7 +136,12 @@ test('D1 event is durable; trusted Firestore emulator writer closes the direct-r
             tx.set(ref,next);
             return next;
           });
-        });
+          });
+        } catch(error) {
+          // Emulated data only. Never log credentials from a real publisher.
+          console.error('EMULATOR_WRITER_DIAGNOSTIC',error?.name,error?.code,error?.message);
+          throw error;
+        }
       },
     };
     const opts=(n)=>({
@@ -147,6 +153,8 @@ test('D1 event is durable; trusted Firestore emulator writer closes the direct-r
       [uid]).state,'pending');
     await assertSucceeds(getDoc(own)); // still not synchronized
     const delivered=await deliverPilotSessionRevocations(db,trustedWriter,opts(now+10));
+    if(delivered.delivered!==1) console.error('SIMULATED_DELIVERY_DIAGNOSTIC',delivered,
+      first('SELECT state,attempts,next_attempt_at,lease_owner FROM student_auth_mirror_outbox WHERE firebase_uid=?',[uid]));
     assert.equal(delivered.delivered,1);
     assert.equal(first('SELECT state FROM student_auth_mirror_outbox WHERE firebase_uid=?',
       [uid]).state,'delivered');

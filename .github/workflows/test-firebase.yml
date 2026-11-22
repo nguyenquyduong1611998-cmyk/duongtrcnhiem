@@ -49,6 +49,9 @@ jobs:
       - name: Test synthetic D1 password change (no login)
         run: node --test tests/d1-unit-password-change.test.mjs
 
+      - name: Phase 3 isolation guardrails (real login still disabled)
+        run: node --test tests/phase3-auth-isolation.test.mjs
+
       - name: Build website
         run: bun run build
         

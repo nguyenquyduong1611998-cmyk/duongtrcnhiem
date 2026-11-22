@@ -1,7 +1,7 @@
-// Phase 3C - PROPOSED server-side session registry. NOT APPLIED BY COMMIT.
-// Identity-only: no passwords, names, grades, or personally identifying fields.
-// Every account starts disabled and requiring a completed password reset.
-// A Firebase ID token alone is NOT evidence an account is active.
+-- Phase 3C - PROPOSED server-side session registry. NOT APPLIED BY COMMIT.
+-- Identity-only: no passwords, names, grades, or personally identifying fields.
+-- Every account starts disabled and requiring a completed password reset.
+-- A Firebase ID token alone is NOT evidence an account is active.
 CREATE TABLE IF NOT EXISTS student_auth_identities (
   firebase_uid TEXT PRIMARY KEY NOT NULL
     CHECK (

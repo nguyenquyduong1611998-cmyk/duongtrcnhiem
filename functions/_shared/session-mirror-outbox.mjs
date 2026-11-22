@@ -11,7 +11,7 @@
 // - be safe when the same event is retried or arrives after newer versions;
 // - return the committed server state, not merely an HTTP acknowledgement.
 //
-// While an outbox item is pending, D1-protected APIs are already blocked but
+// Timestamps use MAX(...), avoiding a constraint failure if the producer's\n// clock is slightly ahead of the worker clock. Retry ordering stays monotonic.\n// While an outbox item is pending, D1-protected APIs are already blocked but
 // direct Firestore accesses might NOT YET be blocked. No end-to-end revocation
 // guarantee until the trusted writer, monitoring, and Firebase Auth token
 // revocation have been integrated and security-tested.
@@ -69,7 +69,8 @@ export async function deliverPilotSessionRevocations(db,writer,options={}) {
     }
     const claim=await db.prepare(
       "UPDATE student_auth_mirror_outbox SET state='processing'," +
-      'attempts=attempts+1,lease_owner=?,lease_until=?,updated_at=? ' +
+      'attempts=attempts+1,lease_owner=?,lease_until=?,' +
+      'updated_at=MAX(updated_at,?) ' +
       'WHERE event_id=? AND attempts=? AND ( ' +
       "(state='pending' AND next_attempt_at<=?) OR " +
       "(state='processing' AND lease_until<=?) )"
@@ -93,7 +94,8 @@ export async function deliverPilotSessionRevocations(db,writer,options={}) {
         throw new Error('REVOCATION_NOT_CONFIRMED');
       const ack=await db.prepare(
         "UPDATE student_auth_mirror_outbox SET state='delivered'," +
-        'lease_owner=NULL,lease_until=NULL,delivered_at=?,updated_at=? ' +
+        'lease_owner=NULL,lease_until=NULL,delivered_at=MAX(created_at,?),' +
+        'updated_at=MAX(updated_at,?) ' +
         "WHERE event_id=? AND state='processing' " +
         'AND lease_owner=? AND attempts=?'
       ).bind(now,now,row.event_id,leaseOwner,newAttempt).run();
@@ -108,7 +110,9 @@ export async function deliverPilotSessionRevocations(db,writer,options={}) {
       // Never print or persist an auth credential, token or raw network error.
       const retry=await db.prepare(
         "UPDATE student_auth_mirror_outbox SET state='pending'," +
-        'lease_owner=NULL,lease_until=NULL,next_attempt_at=?,updated_at=? ' +
+        'lease_owner=NULL,lease_until=NULL,' +
+        'next_attempt_at=MAX(created_at,?),' +
+        'updated_at=MAX(updated_at,?) ' +
         "WHERE event_id=? AND state='processing' " +
         'AND lease_owner=? AND attempts=?'
       ).bind(now+backoffSeconds(newAttempt),now,

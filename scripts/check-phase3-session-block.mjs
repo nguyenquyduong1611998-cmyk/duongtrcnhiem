@@ -18,6 +18,7 @@ sqlite.exec('PRAGMA foreign_keys=ON');
 for(const path of [
   'serverless/d1-phase3-session-registry.sql',
   'serverless/d1-phase3-session-audit.sql',
+  'serverless/d1-phase3-session-mirror-outbox.sql',
 ]) sqlite.exec(readFileSync(path,'utf8'));
 const execute=(sql,args=[])=>sqlite.query(sql).run(...args);
 const read=(sql,args=[])=>sqlite.query(sql).get(...args);
@@ -92,6 +93,7 @@ const result=await blockStudentServerAccess(db,{firebaseUid:uid},actor);
 assert.equal(result.status,200);
 assert.deepEqual(await result.json(),{
   blocked:true,alreadyBlocked:false,mode:'server-access-only',
+  mirrorStatus:'pending',firestoreAccessConfirmedBlocked:false,
 });
 const current=read(
   'SELECT active,auth_version,tokens_valid_after,last_block_event_id ' +
@@ -115,6 +117,18 @@ assert.equal(audit.actor_uid,actor);
 assert.equal(audit.action,'server-access-blocked');
 assert.equal(audit.prior_auth_version,2);
 assert.equal(audit.new_auth_version,3);
+const mirror=read(
+  'SELECT event_id,firebase_uid,auth_version,revoke_after_seconds,state,attempts ' +
+  'FROM student_auth_mirror_outbox',
+);
+assert.equal(mirror.event_id,audit.event_id);
+assert.equal(mirror.firebase_uid,uid);
+assert.equal(mirror.auth_version,3);
+assert.ok(mirror.revoke_after_seconds>=now);
+assert.equal(mirror.state,'pending');
+assert.equal(mirror.attempts,0);
+assert.equal(read('SELECT COUNT(*) AS n FROM student_auth_mirror_outbox').n,1);
+
 
 const again=await blockStudentServerAccess(db,{firebaseUid:uid},actor);
 assert.equal(again.status,200);
@@ -122,6 +136,7 @@ assert.deepEqual(await again.json(),{
   blocked:true,alreadyBlocked:true,mode:'server-access-only',
 });
 assert.equal(count(),1);
+assert.equal(read('SELECT COUNT(*) AS n FROM student_auth_mirror_outbox').n,1);
 
 const missing=await blockStudentServerAccess(db,{
   firebaseUid:'student_'+'b'.repeat(32),
@@ -153,6 +168,7 @@ const race=await blockStudentServerAccess(raceDb,{
 },actor);
 assert.equal(race.status,409);
 assert.equal(count(),1);
+assert.equal(read('SELECT COUNT(*) AS n FROM student_auth_mirror_outbox').n,1);
 assert.equal(read(
   'SELECT active FROM student_auth_identities WHERE firebase_uid=?',
   [raceUid],

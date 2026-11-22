@@ -25,6 +25,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Cache Firebase emulator and npm downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/firebase/emulators
+          key: phase3-firebase-${{ runner.os }}-cli15.37.0-rules6
       - name: Install emulator test packages (CI only)
         run: |
           npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps firebase-tools@15.37.0 @firebase/rules-unit-testing@6.0.0

@@ -35,17 +35,18 @@ export async function blockStudentServerAccess(db,data,actorUid) {
     db.prepare(
       'UPDATE student_auth_identities SET active=0,' +
       'auth_version=auth_version+1,' +
-      'tokens_valid_after=MAX(tokens_valid_after,?),updated_at=? ' +
+      'tokens_valid_after=MAX(tokens_valid_after,?),updated_at=?,' +
+      'last_block_event_id=? ' +
       'WHERE firebase_uid=? AND active=1 AND auth_version=?'
-    ).bind(now,now,uid,old.auth_version),
+    ).bind(now,now,eventId,uid,old.auth_version),
     db.prepare(
       'INSERT INTO student_auth_block_audit ' +
       '(event_id,firebase_uid,actor_uid,action,prior_auth_version,' +
       'new_auth_version,created_at) ' +
       "SELECT ?,firebase_uid,?,'server-access-blocked',?,?,? " +
       'FROM student_auth_identities WHERE firebase_uid=? ' +
-      'AND active=0 AND auth_version=?'
-    ).bind(eventId,actorUid,old.auth_version,newVersion,now,uid,newVersion),
+      'AND active=0 AND auth_version=? AND last_block_event_id=?'
+    ).bind(eventId,actorUid,old.auth_version,newVersion,now,uid,newVersion,eventId),
   ];
   const results=await db.batch(statements);
   if(!Array.isArray(results) || results.length!==2 ||

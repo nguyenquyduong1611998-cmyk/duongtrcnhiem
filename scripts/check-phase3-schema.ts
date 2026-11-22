@@ -1,5 +1,6 @@
 // Local-only migration validation. Never connects to Cloudflare or Firebase.
 // Run with: bun run scripts/check-phase3-schema.ts
+// @ts-ignore -- Bun supplies bun:sqlite at runtime; this Vite project does not install Bun type declarations.
 import { Database } from 'bun:sqlite';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';

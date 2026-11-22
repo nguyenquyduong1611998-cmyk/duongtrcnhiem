@@ -37,6 +37,7 @@ jobs:
           node --check functions/api/auth/admin/unit-accounts.js
           node --check functions/api/auth/student/unit-verify.js
           node --check functions/api/auth/student/unit-change-password.js
+          node --check functions/api/auth/admin/pilot-enrollments.js
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -52,6 +53,9 @@ jobs:
 
       - name: Phase 3 isolation guardrails (real login still disabled)
         run: node --test tests/phase3-auth-isolation.test.mjs
+
+      - name: Phase 3 pilot enrollment API security tests
+        run: node --test tests/phase3-pilot-enrollments.test.mjs
 
       - name: Build website
         run: bun run build

@@ -169,10 +169,12 @@ test('D1 event is durable; trusted Firestore emulator writer closes the direct-r
     await assertSucceeds(getDoc(otherDoc));
     await assertFails(getDoc(doc(other,'pilot_session_probes',uid)));
 
-    const mirrored=await env.withSecurityRulesDisabled(async ctx=>{
+    let mirrored=null;
+    await env.withSecurityRulesDisabled(async ctx=>{
       const snapshot=await getDoc(doc(ctx.firestore(),'pilot_session_states',uid));
-      return snapshot.data();
+      mirrored=snapshot.exists()?snapshot.data():null;
     });
+    assert.ok(mirrored,'Committed server state must be readable before claiming success');
     assert.equal(mirrored.active,false);
     assert.equal(mirrored.authVersion,5);
     assert.ok(mirrored.revokeAfterSeconds>=now);

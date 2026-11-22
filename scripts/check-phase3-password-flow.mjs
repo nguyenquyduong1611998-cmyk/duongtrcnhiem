@@ -191,5 +191,48 @@ assert.throws(()=>perform(
 assert.equal(count('student_pilot_enrollments'),1);
 assert.equal(count('student_pilot_credentials'),1);
 
+// Brute-force protection for a second synthetic account: 5 failures lock
+// further attempts; admin reissue clears the test-only failure counter.
+const enrollment2='pilot_'+'c'.repeat(32);
+const username2='pilot_hv_'+'d'.repeat(12);
+perform(
+  "INSERT INTO student_pilot_enrollments (enrollment_id,username,status,auth_version,created_at,updated_at) " +
+  "VALUES (?,?,'pending',1,100,100)",
+  [enrollment2,username2]
+);
+const secondAccount=await issuePilotTemporaryPassword(d1,{username:username2},ADMIN_UID);
+assert.equal(secondAccount.status,200);
+const secondPassword=(await secondAccount.json()).temporaryPassword;
+for(let attempt=0;attempt<5;attempt++) {
+  assert.equal((await rotatePilotTemporaryPassword(d1,{
+    username:username2,temporaryPassword:'Wrong!Password2026',
+    newPassword:'Safe!Replacement2026',
+  })).status,401);
+}
+assert.equal(read(
+  'SELECT failures FROM student_pilot_password_attempts WHERE enrollment_id=?',
+  [enrollment2]
+).failures,5);
+assert.equal((await rotatePilotTemporaryPassword(d1,{
+  username:username2,temporaryPassword:secondPassword,
+  newPassword:'Safe!Replacement2026',
+})).status,429);
+const reissued=await issuePilotTemporaryPassword(d1,{username:username2},ADMIN_UID);
+assert.equal(reissued.status,200);
+assert.equal(read(
+  'SELECT COUNT(*) AS n FROM student_pilot_password_attempts WHERE enrollment_id=?',
+  [enrollment2]
+).n,0);
+assert.equal((await rotatePilotTemporaryPassword(d1,{
+  username:username2,temporaryPassword:(await reissued.json()).temporaryPassword,
+  newPassword:'Safe!Replacement2026',
+})).status,200);
+
+assert.equal((await rotatePilotTemporaryPassword(d1,{
+  username:'pilot_hv_'+'e'.repeat(12),
+  temporaryPassword:'Wrong!Password2026',
+  newPassword:'Safe!Replacement2026',
+})).status,401);
+
 sqlite.close();
 console.log('Phase 3 synthetic first-password-change: SQLite integration passed (no cloud writes).');

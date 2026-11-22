@@ -118,25 +118,29 @@ test('D1 event is durable; trusted Firestore emulator writer closes the direct-r
         // Production needs a real Admin SDK/REST service with this same
         // transaction + nondecreasing version/revocation semantics.
         try {
-          return await env.withSecurityRulesDisabled(async ctx=>{
-          const serverDb=ctx.firestore();
-          const ref=doc(serverDb,'pilot_session_states',desired.firebaseUid);
-          return runTransaction(serverDb,async tx=>{
-            const snapshot=await tx.get(ref);
-            const existing=snapshot.exists()?snapshot.data():null;
-            if(existing && (
-              existing.authVersion>desired.authVersion ||
-              (existing.authVersion===desired.authVersion &&
-                existing.revokeAfterSeconds>desired.revokeAfterSeconds)
-            )) return existing;
-            const next={
-              active:false,authVersion:desired.authVersion,
-              revokeAfterSeconds:desired.revokeAfterSeconds,
-            };
-            tx.set(ref,next);
-            return next;
+          let committed=null;
+          await env.withSecurityRulesDisabled(async ctx=>{
+            const serverDb=ctx.firestore();
+            const ref=doc(serverDb,'pilot_session_states',desired.firebaseUid);
+            await runTransaction(serverDb,async tx=>{
+              const snapshot=await tx.get(ref);
+              const existing=snapshot.exists()?snapshot.data():null;
+              if(existing && (
+                existing.authVersion>desired.authVersion ||
+                (existing.authVersion===desired.authVersion &&
+                  existing.revokeAfterSeconds>desired.revokeAfterSeconds)
+              )) return;
+              tx.set(ref,{
+                active:false,authVersion:desired.authVersion,
+                revokeAfterSeconds:desired.revokeAfterSeconds,
+              });
+            });
+            // Emulator bypass wrapper does not return the callback's value.
+            // Read the server-committed state explicitly for acknowledgment.
+            const verifiedSnapshot=await getDoc(ref);
+            committed=verifiedSnapshot.exists()?verifiedSnapshot.data():null;
           });
-          });
+          return committed;
         } catch(error) {
           // Emulated data only. Never log credentials from a real publisher.
           console.error('EMULATOR_WRITER_DIAGNOSTIC',error?.name,error?.code,error?.message);

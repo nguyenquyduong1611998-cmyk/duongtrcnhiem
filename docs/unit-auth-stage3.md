@@ -66,6 +66,21 @@ Tài khoản thật vẫn chưa đăng nhập được: thiếu backend cấp da
 
 Tài liệu Firebase: <https://firebase.google.com/docs/auth/admin/manage-sessions>, <https://firebase.google.com/docs/rules/unit-tests>.
 
+## Chặng 3E — hàng đợi khóa phiên D1 → Firestore (đã có mã thử, không chạy thật)
+
+- Đề xuất schema mới \`serverless/d1-phase3-session-mirror-outbox.sql\`. Khi Admin khóa một tài khoản trong backend đã được bảo vệ, ba lệnh D1 thực hiện trong cùng **một batch nguyên tử**: khóa trạng thái D1, ghi audit, ghi event outbox trạng thái \`pending\`. Những thay đổi này mới chỉ ở nhánh phát triển, **chưa chạy migration**.
+- \`functions/_shared/session-mirror-outbox.mjs\` là bộ tiêu thụ hàng đợi **chưa nối HTTP, cron hoặc Firebase thực tế**. Nó cấp lease, có thể lấy lại việc sau khi worker chết, retry theo backoff, yêu cầu bằng chứng \`active=false\` và version/timestamp không thấp hơn mức cần khóa, rồi mới ghi \`delivered\`.
+- Module chỉ chấp nhận một adapter \`writer.applyRevokedState\` do **dịch vụ máy chủ tin cậy** cung cấp. Adapter thực phải dùng transaction/điều kiện cập nhật đơn điệu (không giảm phiên bản, không giảm mốc thu hồi và không vô tình mở khóa). Chưa có adapter Firebase production, **không được bật bất kỳ scheduler nào** để tiêu thụ queue ngoài môi trường giả lập.
+- \`scripts/check-phase3-mirror-outbox.mjs\` kiểm tra tại chỗ bằng SQLite trong bộ nhớ: khi writer lỗi thì queue được giữ và thử lại, không trả kết quả giả rằng Firestore đã khóa; xử lý lặp, cạnh tranh lease, mất worker, sự kiện đến muộn, và version không bị lùi.
+- \`tests/phase3-firestore-outbox-bridge.test.mjs\` nối D1 SQLite giả lập với Firestore Emulator. Nó cố ý chứng minh lỗ hổng thời gian: **sau khi D1 bị khóa nhưng trước khi queue được giao, người dùng vẫn có thể đọc Firestore trực tiếp**. Sau khi adapter thử ghi trạng thái khóa, Firebase Rules từ chối token cũ, và học viên B không bị ảnh hưởng.
+- Không có token thật, mật khẩu thật hoặc dữ liệu học viên thật trong bất kỳ bài thử nào. Không đưa queue schema vào cơ sở dữ liệu Cloudflare đang dùng.
+
+**Điểm chặn an toàn trước khi đưa vào vận hành:**
+1. Hoàn thiện adapter Firebase tin cậy, kiểm tra quyền/phiên của tài khoản thật, cơ chế tái lập từ log và quan trắc queue trễ/chết; kiểm thử bằng emulator và staging tách biệt.
+2. **Khoảng trễ đồng bộ có thể làm Firestore vẫn truy cập được dù D1 đã khóa**. Không dùng mô hình Firestore trực tiếp cho dữ liệu nhạy cảm khi chưa có giải pháp chặn đồng bộ tức thì, hoặc chuyển mọi truy cập dữ liệu nhạy cảm qua backend kiểm tra D1 trên mỗi yêu cầu.
+3. Cần thêm quy trình Firebase Admin revoke refresh tokens/disabled user, chính sách mở khóa, đồng bộ hai chiều hoặc một nguồn thẩm quyền, xử lý re-enable sau khóa, và Firestore Rules cuối cùng.
+4. Chỉ cho phép dữ liệu thật sau khi có phê duyệt vận hành và rà soát an ninh đầy đủ.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

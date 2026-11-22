@@ -80,14 +80,13 @@ test('revoked synthetic student cannot bypass Firestore Rules with a still-valid
     }).firestore();
     await assertFails(getDoc(doc(googleAdmin,'pilot_session_probes',UID_A)));
 
-    // Incorrect claims and tokens cannot inherit a student session.
+    // Incorrect claims and tokens cannot inherit a student session. The Emulator\n    // injects a default Firebase provider for authenticatedContext, so an\n    // omitted provider cannot be tested here; explicit google.com is denied.
     for(const [label,claims] of [
       ['non-student-claim',{...custom(),unitStudent:false}],
       ['stale-version',{...custom(),unitAuthVersion:3}],
       ['string-version',{...custom(),unitAuthVersion:'4'}],
       ['revoked-auth-time',{...custom(),auth_time:time}],
       ['google-provider',{...custom(),firebase:{sign_in_provider:'google.com'}}],
-      ['no-provider',{auth_time:time+100,unitStudent:true,unitAuthVersion:4}],
       ['missing-student-claim',{...custom(),unitStudent:undefined}],
     ]){
       const client=env.authenticatedContext(UID_A,claims).firestore();

@@ -38,6 +38,9 @@ jobs:
           node --check functions/api/auth/student/unit-verify.js
           node --check functions/api/auth/student/unit-change-password.js
           node --check functions/api/auth/admin/pilot-enrollments.js
+          node --check functions/_shared/pilot-password.mjs
+          node --check functions/api/auth/admin/pilot-password-reset.js
+          node --check functions/api/auth/student/pilot-password-change.js
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -59,6 +62,9 @@ jobs:
 
       - name: Validate phase 3 SQL schema in memory (no remote D1)
         run: bun run scripts/check-phase3-schema.ts
+
+      - name: Phase 3 password rotation proof in local SQLite (synthetic only)
+        run: bun run scripts/check-phase3-password-flow.mjs
 
       - name: Build website
         run: bun run build

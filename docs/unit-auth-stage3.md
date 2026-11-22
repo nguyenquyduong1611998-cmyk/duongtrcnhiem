@@ -54,6 +54,18 @@
 
 Tài khoản thật vẫn chưa đăng nhập được: thiếu backend cấp danh tính thực, KDF chuẩn/nhà cung cấp xác thực phù hợp, liên kết `firebase_uid` bền vững, phát custom token có claim phiên bản, và giao diện quản trị/học viên được kiểm thử đầy đủ. Không cấp quyền truy cập thật bằng cách bật flag.
 
+## Chặng 3D — Firestore Rules thử nghiệm, kiểm thử thật bằng Emulator (đã có mã, chưa phát hành)
+
+- Tạo **bộ Rules riêng** `firestore.phase3.pilot.rules` và cấu hình `firebase.phase3-emulator.json` cho project giả lập `demo-phase3-session-guard`. KHÔNG sửa `firestore.staging.rules` hoặc `firestore.rules` đang phục vụ app.
+- Hai collection **chỉ để kiểm thử**: `pilot_session_states/{studentUid}` (client không được đọc/ghi) và `pilot_session_probes/{ownerUid}` (kết quả giả 7/10; không phải điểm thi thật). Tất cả đường dẫn khác mặc định từ chối.
+- Mỗi yêu cầu vào probe phải có UID khớp owner, provider `custom`, claim `unitStudent=true`, phiên bản `unitAuthVersion` khớp với metadata Firestore, `active=true`, và `auth_time > revokeAfterSeconds`. Metadata thiếu / bị khóa / phiên bản không khớp / thời điểm cũ / truy cập chéo UID đều bị từ chối.
+- `tests/phase3-firestore-rules.test.mjs` kiểm tra bằng **Firebase Firestore Emulator**, gồm student A/B, người ẩn danh, Google Admin, token phiên bản cũ, thao tác sai dữ liệu, cấm list/update, và sau khi server giả lập khóa phiên thì ID token cũ không thể đọc/xóa probe.
+- Workflow `.github/workflows/phase3-firestore-emulator.yml` dùng Firebase CLI + Rules Unit Testing, Java 21, dự án `demo-...`. Không có bất kỳ lệnh `firebase deploy` nào. Kiểm thử Emulator đã đạt trên nhánh phát triển.
+- Hạn chế cần xử lý **trước khi bật học viên thật**: endpoint `session-block` hiện ghi D1, chưa có cơ chế tin cậy đồng bộ trạng thái khóa sang tài liệu `pilot_session_states` trên Firestore; hai hệ thống không có giao dịch chéo; phải thiết kế đồng bộ fail-closed, idempotent, quan trắc lỗi và kiểm tra chính thức. Cần thu hồi Firebase refresh token bằng API Admin được hỗ trợ, kiểm thử emulator cả Rules cuối cùng (không chỉ bộ proof độc lập), và bảo vệ các collection dữ liệu học tập thật.
+- **Không dùng quy tắc pilot thay nguyên tệp Rules staging**: nó mặc định đóng mọi collection của ứng dụng, sẽ khiến hệ thống đang chạy không truy cập dữ liệu. Nó chỉ là chứng minh kỹ thuật được giới hạn.
+
+Tài liệu Firebase: <https://firebase.google.com/docs/auth/admin/manage-sessions>, <https://firebase.google.com/docs/rules/unit-tests>.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

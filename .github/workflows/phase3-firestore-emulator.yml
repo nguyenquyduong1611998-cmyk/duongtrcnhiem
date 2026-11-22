@@ -37,4 +37,4 @@ jobs:
           npm install --no-save --package-lock=false --ignore-scripts --legacy-peer-deps firebase-tools@15.37.0 @firebase/rules-unit-testing@6.0.0
       - name: Emulate isolated synthetic Firestore Rules
         run: |
-          ./node_modules/.bin/firebase emulators:exec --only firestore --project demo-phase3-session-guard --config firebase.phase3-emulator.json "node --test tests/phase3-firestore-rules.test.mjs"
+          ./node_modules/.bin/firebase emulators:exec --only firestore --project demo-phase3-session-guard --config firebase.phase3-emulator.json "node --test --test-concurrency=1 tests/phase3-firestore-rules.test.mjs tests/phase3-firestore-outbox-bridge.test.mjs"

@@ -225,5 +225,5 @@ test('both HTTP routes stay 404 without opt-in and never use public user fields'
 
 test.after(()=>{
   globalThis.fetch=fetchOriginal;
-  assert.ok(outboundCalls>0,'Verifier should fetch Google's public JWKS');
+  assert.ok(outboundCalls>0,"Verifier should fetch Google's public JWKS");
 });

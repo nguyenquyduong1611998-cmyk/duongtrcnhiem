@@ -50,6 +50,8 @@ jobs:
         run: bun test tests/phase4-browser-submit-recovery.test.ts
       - name: Credential-free staging HTTP inspection simulations (NO network)
         run: node --test tests/phase4-public-staging-probe.test.mjs
+      - name: All test Pages previews must use Firebase staging regardless of build variables
+        run: bun test tests/phase4-firebase-preview-host.test.ts
       - name: Pinned test Pages hostname, production-domain denial and flag gates
         run: node --test tests/phase4-pinned-host.test.mjs
       - name: Cross-device HTTP A/B and Admin simulation

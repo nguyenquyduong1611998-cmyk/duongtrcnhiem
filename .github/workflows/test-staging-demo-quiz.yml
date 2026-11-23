@@ -45,6 +45,8 @@ jobs:
         run: node --test tests/phase4-staging-migration-dry-run.test.mjs
       - name: Admin read-only D1 preflight tests
         run: node --test tests/phase4-staging-preflight.test.mjs
+      - name: Verify a local SQLite backup safely, without network or writes
+        run: node --test tests/phase4-local-backup-verify.test.mjs
       - name: Phase 4 isolation and flags OFF by default
         run: node --test tests/phase4-pilot-isolation.test.mjs
       - name: Build website

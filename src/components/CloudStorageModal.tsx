@@ -658,6 +658,9 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
           )}
           {(onGetSyntheticQuizQuestion || onListSyntheticQuizResults || onReadStagingD1Preflight) && (
             <StagingDemoQuizPanel
+              // Reset local question/answer/score when the verified Firebase
+              // student UID changes while this modal remains mounted.
+              key={demoStudentUid ?? (onListSyntheticQuizResults || onReadStagingD1Preflight ? 'staging-admin' : 'unauthenticated')}
               onGetQuestion={onGetSyntheticQuizQuestion}
               onSubmit={onSubmitSyntheticQuiz}
               onReadOwn={onReadOwnSyntheticQuiz}

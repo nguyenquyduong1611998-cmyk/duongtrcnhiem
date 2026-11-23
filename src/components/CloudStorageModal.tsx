@@ -15,6 +15,8 @@ import { CloudStorageState } from '../types';
 import { formatDateTime } from '../utils/grading';
 import { testBackendReady, type DemoStudentCredentials, type SyntheticD1Account, type SyntheticTemporaryCredential } from '../utils/serverlessAuth';
 import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
+import { StagingDemoQuizPanel } from './StagingDemoQuizPanel';
+import type {SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt} from '../utils/syntheticGradedQuiz';
 
 interface CloudStorageModalProps {
   cloud: CloudStorageState;
@@ -37,6 +39,10 @@ interface CloudStorageModalProps {
   disableBulkSync?: boolean;
   onProvisionDemoStudent?: () => Promise<DemoStudentCredentials>;
   onDeleteDemoStudent?: (username: string) => Promise<void>;
+  onGetSyntheticQuizQuestion?: () => Promise<SyntheticQuizQuestion>;
+  onSubmitSyntheticQuiz?: (answerIndex:number) => Promise<SyntheticQuizAttempt>;
+  onReadOwnSyntheticQuiz?: () => Promise<SyntheticQuizAttempt|null>;
+  onListSyntheticQuizResults?: () => Promise<SyntheticQuizAdminAttempt[]>;
   onCreateDemoResultProbe?: () => Promise<void>;
   onReadDemoResultProbe?: () => Promise<void>;
   onDeleteDemoResultProbe?: () => Promise<void>;
@@ -69,6 +75,10 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   disableBulkSync = false,
   onProvisionDemoStudent,
   onDeleteDemoStudent,
+  onGetSyntheticQuizQuestion,
+  onSubmitSyntheticQuiz,
+  onReadOwnSyntheticQuiz,
+  onListSyntheticQuizResults,
   onCreateDemoResultProbe,
   onReadDemoResultProbe,
   onDeleteDemoResultProbe,
@@ -641,6 +651,14 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                 </div>
               )}
             </div>
+          )}
+          {(onGetSyntheticQuizQuestion || onListSyntheticQuizResults) && (
+            <StagingDemoQuizPanel
+              onGetQuestion={onGetSyntheticQuizQuestion}
+              onSubmit={onSubmitSyntheticQuiz}
+              onReadOwn={onReadOwnSyntheticQuiz}
+              onAdminList={onListSyntheticQuizResults}
+            />
           )}
           {onListSyntheticD1Accounts && onCreateSyntheticD1Account &&
             onSetSyntheticD1AccountStatus && onDeleteSyntheticD1Account && onResetSyntheticD1AccountPassword && (

@@ -92,6 +92,33 @@ Nguồn tài liệu Cloudflare:
 https://developers.cloudflare.com/pages/configuration/preview-deployments/
 và https://developers.cloudflare.com/pages/configuration/branch-build-controls/
 
+## Giai đoạn 4M — bảo vệ Firebase trong bản Preview
+
+Đã xác minh Cloudflare Pages **deploy successful** commit
+`0cc4159f2eaef05e84548b27480b0f29697e00c9`, với URL Preview
+`https://70871492.duongtrcnhiem-test.pages.dev` và branch alias
+`https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`.
+Cloudflare rút gọn alias; không dùng URL tên nhánh dài dự đoán trước.
+
+Frontend mới chọn **Firebase staging** cho URL chính của test Pages
+`duongtrcnhiem-test.pages.dev` và tất cả URL Preview dạng
+`*.duongtrcnhiem-test.pages.dev`, ngay cả khi thiếu
+`VITE_FIREBASE_ENV=staging`. Điều này **chỉ chọn Firebase staging cho
+frontend**, không tự cấp quyền API. Ba endpoint Phase 4 vẫn dùng
+**hostname allowlist chính xác**, flags OFF mặc định và kiểm tra JWT,
+D1/active-account ở máy chủ.
+
+Trong GitHub Actions, `tests/phase4-firebase-preview-host.test.ts`
+kiểm tra rằng Pages test không vô tình dùng Firebase production, còn
+hostname trang chính, tên miền gần giống hoặc localhost không bị
+đổi môi trường ngoài ý muốn.
+
+**Chưa xác minh thực tế** Firebase Authorized Domains, quyền
+Cloudflare Access cho Preview, D1 binding Preview và secrets tại
+Dashboard. Thành công build không chứng minh đăng nhập Google/DEMOs
+đã hoạt động trên trình duyệt. Không thêm Preview vào Firebase
+Authorized Domains hoặc mở Cloudflare Access khi chưa phê duyệt.
+
 ## Giai đoạn 4J — kiểm tra bề mặt HTTP staging không cần tài khoản (mới chuẩn bị)
 
 Dự án đã có `scripts/phase4-public-staging-probe.mjs` để **khi người

@@ -2,7 +2,7 @@ import {ADMIN_UID} from './auth.mjs';
 import {assessPilotUnlockPreflight} from './pilot-unlock-preflight.mjs';
 
 // Phase 3K: review workflow only. No HTTP endpoint, no schedule and no
-// account activation; in particular it NEVER sets active=1, enables Firebase
+// account activation; in particular it NEVER activates an account, enables Firebase
 // Auth, alters Firestore session metadata or issues a token.
 // The second-reviewer verifier is a trusted backend dependency, NOT a
 // callback supplied by a browser.

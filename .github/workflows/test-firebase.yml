@@ -48,6 +48,9 @@ jobs:
           node --check functions/_shared/firestore-session-writer.mjs
           node --check functions/_shared/firebase-auth-revoker.mjs
           node --check functions/_shared/pilot-revocation-coordinator.mjs
+          node --check functions/_shared/pilot-outbox-health.mjs
+          node --check functions/api/auth/admin/pilot-queue-health.js
+          node --check functions/_shared/pilot-unlock-preflight.mjs
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -93,6 +96,12 @@ jobs:
 
       - name: Phase 3 coordinated D1 Firestore Auth failure recovery in SQLite
         run: bun run scripts/check-phase3-coordinated-outbox.mjs
+
+      - name: Phase 3 queue health monitoring fail-closed tests
+        run: node --test tests/phase3-queue-health.test.mjs
+
+      - name: Phase 3 read-only unlock preflight safety tests
+        run: node --test tests/phase3-unlock-preflight.test.mjs
 
       - name: Build website
         run: bun run build

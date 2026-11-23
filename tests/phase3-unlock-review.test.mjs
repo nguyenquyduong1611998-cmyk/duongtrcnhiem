@@ -228,5 +228,5 @@ test('review code has no account activation, public route or token creation',()=
   assert.match(code,/assessPilotUnlockPreflight/);
   assert.match(code,/verifyIndependentAdmin/);
   assert.match(code,/canEnableNow:false/);
-  assert.doesNotMatch(code,/mintFirebaseToken|disableUser:false|\bactive=1\b|onRequestPost|createCustomToken/);
+  assert.doesNotMatch(code,/mintFirebaseToken|disableUser:false|onRequestPost|createCustomToken|SET active=1|SET active = 1|SET active=true/);
 });

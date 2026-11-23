@@ -13,7 +13,7 @@ import {onRequestPost as adminEndpoint}
   from '../functions/api/demo-quiz/admin.js';
 
 if(!globalThis.crypto) globalThis.crypto=webcrypto;
-const BASE='https://unit-stage.example.test';
+const BASE='https://duongtrcnhiem-test.pages.dev';
 const A='student_'+'a'.repeat(32);
 const B='student_'+'b'.repeat(32);
 const C='student_'+'c'.repeat(32);
@@ -97,6 +97,7 @@ function fixture(){
       'test-signer@'+PROJECT_ID+'.iam.gserviceaccount.com',
     FIREBASE_PRIVATE_KEY:'NOT_AN_ACTUAL_PRIVATE_KEY',
     AUTH_DB:db,PHASE4_SYNTHETIC_QUIZ_ENABLED:'true',
+    PHASE4_STAGING_HOSTNAME:'duongtrcnhiem-test.pages.dev',
   };
   const call=(type,token,body)=>{
     const path=type==='admin'?'/api/demo-quiz/admin':'/api/demo-quiz/student';

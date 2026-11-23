@@ -25,7 +25,13 @@ test('staging uses a separate admin UID without changing production UID', () => 
   assert.match(stagingRules, /request\.auth\.uid == 'aV2S9WYo4tg8XZQSE9snzjeBU203'/);
   assert.match(productionRules, /request\.auth\.uid == '3zPu6ZrPGLfDNsms17mxHrEwfUF2'/);
   assert.doesNotMatch(productionRules, /aV2S9WYo4tg8XZQSE9snzjeBU203/);
-  assert.match(firebase, /export const IS_FIREBASE_STAGING = import\.meta\.env\.VITE_FIREBASE_ENV === 'staging'/);
+  assert.match(firebase, /export const IS_FIREBASE_STAGING = shouldUseStagingFirebase\(/);
+  assert.match(firebase, /import\.meta\.env\.VITE_FIREBASE_ENV/);
+  assert.match(firebase, /window\.location\.hostname/);
+  const resolver = read('src/utils/firebaseStagingHost.ts');
+  assert.match(resolver, /FIREBASE_TEST_PAGES_HOST='duongtrcnhiem-test\.pages\.dev'/);
+  assert.match(resolver, /actualHostname\.endsWith\('\.'\+FIREBASE_TEST_PAGES_HOST\)/);
+  assert.match(resolver, /viteFlag==='staging'/);
 });
 
 test('staging managed accounts require password hashes, not plaintext', () => {

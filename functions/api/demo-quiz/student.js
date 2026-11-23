@@ -1,3 +1,4 @@
+import {bindStagingDatabaseForRequest} from '../../_shared/staging-db-binding.mjs';
 import {
   requireStaging,json,checkRequest,smallJson,noSecrets,failSafe,
 } from '../../_shared/auth.mjs';
@@ -10,6 +11,7 @@ import {isApprovedPhase4StagingHost}
 // Synthetic cross-device graded-quiz proof ONLY, flag OFF by default.
 // Current live DEMO student login remains unchanged.
 export async function onRequestPost({request,env}) {
+  env=bindStagingDatabaseForRequest(env,request);
   const bad=checkRequest(request);
   if(bad)return bad;
   if(env?.PHASE4_SYNTHETIC_QUIZ_ENABLED!=='true')

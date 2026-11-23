@@ -50,6 +50,51 @@ website chính, tên miền con, cổng bất thường, HTTP và giả mạo
 `X-Forwarded-Host`. Những kiểm thử này chỉ dùng Request giả, chưa
 chứng minh cấu hình dashboard Cloudflare thực tế đã khớp.
 
+## Giai đoạn 4J — kiểm tra bề mặt HTTP staging không cần tài khoản (mới chuẩn bị)
+
+Dự án đã có `scripts/phase4-public-staging-probe.mjs` để **khi người
+vận hành cho phép** thử các API từ máy riêng. Công cụ **không tự chạy**:
+không có cờ `--allow-network` thì chỉ hiện hướng dẫn và dừng; các bài
+test CI thay toàn bộ HTTP bằng `fetch` giả, không kết nối Cloudflare thật.
+
+Khi đã được phép **kiểm tra HTTP không mang dữ liệu học viên**:
+
+```powershell
+node .\scripts\phase4-public-staging-probe.mjs --allow-network
+```
+
+Công cụ chỉ liên hệ đúng `https://duongtrcnhiem-test.pages.dev` và
+chỉ thực hiện `GET /api/auth/status` cùng ba `POST` không có token:
+`/api/demo-quiz/student`, `/api/demo-quiz/admin`,
+`/api/demo-quiz/preflight`. Ba lệnh POST chỉ mang JSON cố định
+`{"action":"result"}`; **không** đăng nhập, không gửi đáp án, tên,
+mật khẩu, Firebase UID hay thông tin người dùng. Các route Phase 4
+chưa xác thực phải từ chối trước khi ghi D1. Mọi yêu cầu đều không
+gửi cookie, không theo chuyển hướng Cloudflare Access, không retry.
+
+Kết quả chỉ trả về mã trạng thái HTTP và nhãn kiểm tra an toàn:
+
+- `NEW_APIS_OFF_OR_NOT_DEPLOYED`: cả ba route mới đều 404; có thể vì
+  **chưa được triển khai**, hoặc đã triển khai nhưng cờ đang tắt.
+  Không khẳng định nhánh PR #3 đang được phục vụ trên Pages.
+- `ACCESS_GATE_INCONCLUSIVE`: có chuyển hướng/401/403; có thể là
+  Cloudflare Access hoặc xác thực API, không cố vượt qua.
+- `MANUAL_SECURITY_REVIEW`: một route trả 2xx hoặc 400 khi không
+  gửi token; phải kiểm tra vì có thể đã bật API ngoài dự kiến.
+- `UNVERIFIED`: có lỗi mạng, hạn mức 429, 5xx hoặc phản hồi khác;
+  **không** suy diễn dịch vụ đã sẵn sàng.
+
+Công cụ không in `Location` chuyển hướng, body chứa token, cookie
+hoặc nội dung máy chủ không đúng mẫu. Dù `/api/auth/status` thông
+báo `ready:true`, đây chỉ là lời khai báo trạng thái; **chưa chứng
+minh** D1 binding, schema, file backup, nhánh triển khai hiện tại hay
+quyền Cloudflare Access. Đầu ra luôn `approvedForActivation:false`
+và `deploymentVerified:false`.
+
+**Hiện chưa chạy công cụ với cờ truy cập mạng, chưa xác minh được
+staging thật và chưa có quyền triển khai.** Không bật flag Phase 4
+hoặc mở Cloudflare Access để công cụ báo xanh.
+
 ## Công cụ kiểm tra schema chỉ đọc (mới chuẩn bị, chưa triển khai)
 
 Mã nguồn `functions/_shared/phase4-staging-preflight.mjs` và route

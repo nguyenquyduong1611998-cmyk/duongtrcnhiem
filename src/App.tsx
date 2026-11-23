@@ -9,6 +9,7 @@ import { HonorBoardView } from './components/HonorBoardView';
 import { LoginScreen } from './components/LoginScreen';
 import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, listSyntheticD1Accounts, createSyntheticD1Account, changeSyntheticD1AccountStatus, deleteSyntheticD1Account, resetSyntheticD1AccountPassword, verifySyntheticD1TemporaryPassword, changeSyntheticD1Password, SYNTHETIC_RESET_REQUIRED } from './utils/serverlessAuth';
 import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, assertOtherDemoStudentDenied } from './utils/stagingResultProbe';
+import {getSyntheticQuizQuestion,submitSyntheticQuiz,readOwnSyntheticQuiz,listSyntheticQuizAttempts} from './utils/syntheticGradedQuiz';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
 import { TopicsView } from './components/TopicsView';
@@ -719,6 +720,15 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     return firebaseUser;
   }, [firebaseUser, cloudState.connected, currentUser?.role, currentUser?.id]);
 
+  const handleGetSyntheticQuizQuestion = useCallback(() => {
+    return getSyntheticQuizQuestion(requireCurrentDemoStudent());
+  }, [requireCurrentDemoStudent]);
+  const handleSubmitSyntheticQuiz = useCallback((answerIndex: number) => {
+    return submitSyntheticQuiz(requireCurrentDemoStudent(),answerIndex);
+  }, [requireCurrentDemoStudent]);
+  const handleReadOwnSyntheticQuiz = useCallback(() => {
+    return readOwnSyntheticQuiz(requireCurrentDemoStudent());
+  }, [requireCurrentDemoStudent]);
   const handleCreateDemoResultProbe = useCallback(async () => {
     await createDemoResultProbe(requireCurrentDemoStudent());
   }, [requireCurrentDemoStudent]);
@@ -740,6 +750,14 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     }
     return firebaseUser.getIdToken();
   }, [adminAccessAllowed, firebaseUser]);
+
+  const handleListSyntheticQuizResults = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || !adminAccessAllowed || !firebaseUser ||
+      firebaseUser.uid !== BOOTSTRAPPED_ADMIN_UID) {
+      throw new Error('Chỉ Google Admin staging đã xác minh được xem kết quả DEMO.');
+    }
+    return listSyntheticQuizAttempts(firebaseUser);
+  }, [adminAccessAllowed,firebaseUser]);
 
   const handleListSyntheticD1Accounts = useCallback(async () => {
     return listSyntheticD1Accounts(await getVerifiedStagingAdminIdToken());
@@ -1220,6 +1238,10 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onDeleteDemoResultProbe={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleDeleteDemoResultProbe : undefined}
                   demoStudentUid={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? firebaseUser.uid : undefined}
                   onCheckOtherDemoStudentIsolation={IS_FIREBASE_STAGING && currentUser?.role === 'student' && currentUser.id === firebaseUser?.uid && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) ? handleCheckOtherDemoStudentIsolation : undefined}
+                  onGetSyntheticQuizQuestion={IS_FIREBASE_STAGING && currentUser?.role === 'student' && !!firebaseUser && currentUser.id === firebaseUser.uid && cloudState.connected ? handleGetSyntheticQuizQuestion : undefined}
+                  onSubmitSyntheticQuiz={IS_FIREBASE_STAGING && currentUser?.role === 'student' && !!firebaseUser && currentUser.id === firebaseUser.uid && cloudState.connected ? handleSubmitSyntheticQuiz : undefined}
+                  onReadOwnSyntheticQuiz={IS_FIREBASE_STAGING && currentUser?.role === 'student' && !!firebaseUser && currentUser.id === firebaseUser.uid && cloudState.connected ? handleReadOwnSyntheticQuiz : undefined}
+                  onListSyntheticQuizResults={IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticQuizResults : undefined}
                   onListSyntheticD1Accounts={IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticD1Accounts : undefined}
                   onCreateSyntheticD1Account={IS_FIREBASE_STAGING && adminAccessAllowed ? handleCreateSyntheticD1Account : undefined}
                   onSetSyntheticD1AccountStatus={IS_FIREBASE_STAGING && adminAccessAllowed ? handleSetSyntheticD1AccountStatus : undefined}

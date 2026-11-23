@@ -18,6 +18,9 @@ const validEnv={
   FIREBASE_SERVICE_ACCOUNT_EMAIL:
     'synthetic@'+PROJECT_ID+'.iam.gserviceaccount.com',
   FIREBASE_PRIVATE_KEY:privateKey,
+  PHASE3_FIRESTORE_SERVICE_ACCOUNT_EMAIL:
+    'revocation-writer@'+PROJECT_ID+'.iam.gserviceaccount.com',
+  PHASE3_FIRESTORE_PRIVATE_KEY:privateKey,
   AUTH_DB:{},
   PHASE3_TRUSTED_FIRESTORE_WRITER_ENABLED:'true',
 };
@@ -65,7 +68,7 @@ function backend() {
       assert.equal(verifySignature('RSA-SHA256',Buffer.from(signed),
         publicKey,Buffer.from(parts[2],'base64url')),true);
       const claims=decode(parts[1]);
-      assert.equal(claims.iss,validEnv.FIREBASE_SERVICE_ACCOUNT_EMAIL);
+      assert.equal(claims.iss,validEnv.PHASE3_FIRESTORE_SERVICE_ACCOUNT_EMAIL);
       assert.equal(claims.aud,url);
       assert.equal(claims.iat,now);
       assert.equal(claims.exp,now+3500);
@@ -167,7 +170,11 @@ test('staging-only feature is OFF by default; other project/accounts are refused
   assert.throws(
     ()=>createPilotFirestoreRevocationWriter({
       ...validEnv,
-      FIREBASE_SERVICE_ACCOUNT_EMAIL:'other@not-staging.iam.gserviceaccount.com',
+      PHASE3_FIRESTORE_SERVICE_ACCOUNT_EMAIL:'other@not-staging.iam.gserviceaccount.com',
+    }),/PILOT_FIRESTORE_WRITER_DISABLED/);
+  assert.throws(
+    ()=>createPilotFirestoreRevocationWriter({
+      ...validEnv,PHASE3_FIRESTORE_PRIVATE_KEY:undefined,
     }),/PILOT_FIRESTORE_WRITER_DISABLED/);
 });
 

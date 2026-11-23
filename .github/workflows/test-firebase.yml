@@ -46,6 +46,8 @@ jobs:
           node --check functions/api/auth/admin/session-block.js
           node --check functions/_shared/session-mirror-outbox.mjs
           node --check functions/_shared/firestore-session-writer.mjs
+          node --check functions/_shared/firebase-auth-revoker.mjs
+          node --check functions/_shared/pilot-revocation-coordinator.mjs
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -82,6 +84,12 @@ jobs:
 
       - name: Phase 3 Firestore service-account writer authorization and CAS tests
         run: node --test tests/phase3-firestore-writer.test.mjs
+
+      - name: Phase 3 Firebase Auth administrative disable and token cutoff tests
+        run: node --test tests/phase3-firebase-auth-revoker.test.mjs
+
+      - name: Phase 3 coordinated D1 Firestore and Auth revocation safety tests
+        run: node --test tests/phase3-revocation-coordinator.test.mjs
 
       - name: Build website
         run: bun run build

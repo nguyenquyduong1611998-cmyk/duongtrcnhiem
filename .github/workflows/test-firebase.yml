@@ -57,6 +57,8 @@ jobs:
           node --check functions/_shared/synthetic-quiz.mjs
           node --check functions/api/demo-quiz/student.js
           node --check functions/api/demo-quiz/admin.js
+          node --check functions/_shared/phase4-staging-preflight.mjs
+          node --check functions/api/demo-quiz/preflight.js
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -126,6 +128,9 @@ jobs:
 
       - name: Phase 4 staging D1 migration rehearsal, offline rollback and 100-student test
         run: node --test tests/phase4-staging-migration-dry-run.test.mjs
+
+      - name: Phase 4 Google Admin read-only D1 staging preflight tests
+        run: node --test tests/phase4-staging-preflight.test.mjs
 
       - name: Build website
         run: bun run build

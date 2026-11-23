@@ -92,11 +92,19 @@ export async function approvePilotUnlockReview(
     throw new Error('UNVERIFIED_SECOND_ADMIN');
   const now=options.now??Math.floor(Date.now()/1000);
   safeClock(now);
+  const reviewerAuthTime=options.reviewerAuthTime;
+  if(!Number.isSafeInteger(reviewerAuthTime) ||
+     reviewerAuthTime<=0 || reviewerAuthTime>now ||
+     now-reviewerAuthTime>300)
+    throw new Error('REVIEWER_RECENT_LOGIN_REQUIRED');
 
   const outcome=await db.prepare(
     "UPDATE student_pilot_unlock_reviews SET status='approved',"+
     'approved_by=?,updated_at=MAX(updated_at,?) '+
     "WHERE review_id=? AND status='pending' AND requested_by<>? "+
+    'AND EXISTS (SELECT 1 FROM student_pilot_review_admins reviewer '+
+    "WHERE reviewer.firebase_uid=? AND reviewer.role='unlock_reviewer' "+
+    'AND reviewer.active=1 AND reviewer.tokens_valid_after<?) '+
     'AND EXISTS (SELECT 1 FROM student_auth_identities e '+
     'WHERE e.firebase_uid=student_pilot_unlock_reviews.firebase_uid '+
     'AND e.active=0 AND e.password_reset_required=0 '+
@@ -107,7 +115,8 @@ export async function approvePilotUnlockReview(
     "AND o.state='delivered' AND o.auth_version=e.auth_version) "+
     'AND NOT EXISTS (SELECT 1 FROM student_auth_mirror_outbox o '+
     "WHERE o.firebase_uid=e.firebase_uid AND o.state<>'delivered'))"
-  ).bind(secondReviewerUid,now,reviewId,secondReviewerUid).run();
+  ).bind(secondReviewerUid,now,reviewId,secondReviewerUid,
+    secondReviewerUid,reviewerAuthTime).run();
   if(outcome?.success!==true)throw new Error('UNLOCK_APPROVAL_WRITE_FAILED');
   return {
     approvedForManualReview:outcome.meta?.changes===1,

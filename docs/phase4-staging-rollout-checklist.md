@@ -14,6 +14,42 @@
 - Bảng được tạo là `synthetic_graded_attempts`; không truy cập/sửa bảng điểm
   `attempts` hiện có, không tải đề thi thật hay danh sách học viên thật.
 
+## Giai đoạn 4I — chốt tên miền staging trước khi bật API (chưa triển khai)
+
+Tài liệu của dự án xác nhận website thử là Cloudflare Pages project
+`duongtrcnhiem-test`, tại `https://duongtrcnhiem-test.pages.dev`.
+Project thử này có một deployment **Pages Production riêng** cho nhánh
+`fix-firebase-login` trước đây, **không phải** GitHub Pages chính
+triển khai từ `main/master`.
+
+Ba endpoint Phase 4 mới (`/api/demo-quiz/student`,
+`/api/demo-quiz/admin`, `/api/demo-quiz/preflight`) có thêm lớp
+`functions/_shared/phase4-host-guard.mjs`: ngoài flag tương ứng và
+`requireStaging`, bắt buộc **cả hai** điều kiện sau đúng:
+
+- URL HTTPS thực tế của Request phải có hostname **chính xác**
+  `duongtrcnhiem-test.pages.dev`, không cổng tùy chỉnh, không tên miền
+  con, không host trùng tiền tố, không phải GitHub Pages live.
+- Biến **server-only** `PHASE4_STAGING_HOSTNAME` phải bằng chính xác
+  `duongtrcnhiem-test.pages.dev`. Nếu thiếu, sai ký tự, hoặc trỏ đến
+  host live thì tất cả ba API trả 404, kể cả khi flag tính năng bật.
+
+Không dùng `X-Forwarded-Host`, `Host` client tùy biến hoặc wildcard
+để quyết định quyền. Không ghi cờ và hostname staging vào Vite
+`VITE_*` hay vào file GitHub. Không thêm bất kỳ quyền Cloudflare Access
+nào mới để vượt qua chốt này.
+
+**Đây mới là chốt trong mã nguồn Draft.** Chưa biết nhánh này có được
+triển khai bởi test Pages project hay không; không tự ý đổi nhánh
+production Cloudflare hay bật biến/flag. Nếu muốn thử trên một URL
+preview/custom domain khác phải rà soát lại quyền và cập nhật danh sách
+hostname bằng một PR riêng, thay vì bỏ qua chốt bảo vệ.
+
+CI có `tests/phase4-pinned-host.test.mjs` thử các host giả, host của
+website chính, tên miền con, cổng bất thường, HTTP và giả mạo
+`X-Forwarded-Host`. Những kiểm thử này chỉ dùng Request giả, chưa
+chứng minh cấu hình dashboard Cloudflare thực tế đã khớp.
+
 ## Công cụ kiểm tra schema chỉ đọc (mới chuẩn bị, chưa triển khai)
 
 Mã nguồn `functions/_shared/phase4-staging-preflight.mjs` và route
@@ -137,9 +173,11 @@ SQL dump có nội dung nguy hiểm. **Chưa kiểm tra file backup thật**.
    `demo_students`, `login_attempts`, `unit_accounts` không thay đổi;
    integrity và foreign key check sạch.
 3. Triển khai code tương ứng đúng commit trên staging preview đã xác nhận;
-   bật duy nhất biến server-only
-   `PHASE4_SYNTHETIC_QUIZ_ENABLED=true` trên môi trường staging đó.
-   Không bật ở `main`, production hoặc preview khác.
+   sau khi phê duyệt, xác nhận biến server-only
+   `PHASE4_STAGING_HOSTNAME=duongtrcnhiem-test.pages.dev` **và**
+   bật duy nhất `PHASE4_SYNTHETIC_QUIZ_ENABLED=true` trên Pages test
+   project đã xác nhận. Không bật ở GitHub Pages live hay project/host
+   preview khác. Chưa được phê duyệt thì không đặt biến/cờ nào.
 4. Dùng trình duyệt A đăng nhập tài khoản `test_hv_*` DEMO hiện có, mở
    **Kiểm thử Cloud Storage → Bài kiểm tra DEMO**, chọn đáp án và nộp một
    lần. Quan sát điểm do máy chủ trả về; không gửi điểm từ frontend.

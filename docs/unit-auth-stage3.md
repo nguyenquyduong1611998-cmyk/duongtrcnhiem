@@ -93,6 +93,19 @@ Tài liệu Firebase: <https://firebase.google.com/docs/auth/admin/manage-sessio
 
 Tham khảo tài liệu chính thức: <https://firebase.google.com/docs/firestore/use-rest-api>, <https://docs.cloud.google.com/firestore/docs/reference/rest/v1/projects.databases.documents/patch>.
 
+## Chặng 3G–3H — Firebase Auth disable + điều phối hai dịch vụ (đã lập trình, chưa triển khai)
+
+- `functions/_shared/firebase-auth-revoker.mjs`: adapter thử nghiệm dành cho tài khoản GIẢ `student_...`, sử dụng **tài khoản dịch vụ riêng** và OAuth 2.0, scope `https://www.googleapis.com/auth/identitytoolkit`. Chỉ gửi yêu cầu quản trị tới **đúng Firebase staging** `/v1/projects/duongtrcnhiem-staging/accounts:update` với `localId`, `disableUser=true` và `validSince` không thấp hơn mốc thu hồi. Sau cập nhật phải gọi `accounts:lookup` để xác minh `disabled=true` cùng `validSince`, không tin mỗi HTTP 200. Cần IAM `firebaseauth.users.update` và `firebaseauth.users.get`.
+- Tham số server-only cho adapter: `PHASE3_TRUSTED_FIREBASE_AUTH_REVOKER_ENABLED=true`, `PHASE3_AUTH_SERVICE_ACCOUNT_EMAIL`, `PHASE3_AUTH_PRIVATE_KEY`. **Chưa cấu hình** những biến này trên Cloudflare; không đưa khóa JSON hay token vào kho GitHub/chat.
+- `functions/_shared/pilot-revocation-coordinator.mjs` nối Firestore writer + Firebase Auth revoker làm một tác vụ duy nhất của bộ tiêu thụ outbox D1. Nó kiểm tra D1 vẫn `active=0`, `auth_version` còn khớp và mốc thu hồi không bị hạ; **kiểm tra lại ngay trước khi gọi Firebase Auth** để giảm nguy cơ khóa một tài khoản đã được Admin mở lại. Nếu một bước lỗi, không trả xác nhận hoàn tất và outbox sẽ thử lại.
+- `runTrustedPilotRevocationCycle` là hàm dành riêng cho backend nội bộ, chỉ hoạt động nếu cả ba cờ `PHASE3_TRUSTED_REVOCATION_DRAIN_ENABLED=true`, `PHASE3_TRUSTED_FIRESTORE_WRITER_ENABLED=true`, `PHASE3_TRUSTED_FIREBASE_AUTH_REVOKER_ENABLED=true`. **Không gắn vào HTTP route, lịch cron, frontend hoặc dịch vụ nào đang chạy.**
+- `tests/phase3-firebase-auth-revoker.test.mjs` thử chữ ký OAuth RSA với khóa thử, dự án cố định, tài khoản sai, disable + validSince, lỗi mạng, lỗi xác nhận và không cấp quyền ngoài phạm vi. `tests/phase3-revocation-coordinator.test.mjs` thử trình tự D1 → Firestore → D1 → Firebase Auth, các tình huống mất kết nối, đổi phiên bản và sai xác nhận. Toàn bộ API Google được giả lập và kiểm thử dùng dữ liệu giả.
+- **Chưa giải quyết hoàn toàn tính nguyên tử giữa D1, Firebase Auth và Firestore**: D1 không thể giao dịch nguyên tử với Google. Có khoảng trễ đồng bộ sau khóa và vẫn có khả năng mở khóa đồng thời trong khi tác vụ đang chạy; trước khi vận hành phải thiết kế quy trình mở khóa chỉ khi hàng đợi hết tác vụ, áp dụng hàng rào phiên bản, cảnh báo tác vụ lỗi, diễn tập phục hồi và bảo vệ dữ liệu nhạy cảm thông qua backend.
+- `disableUser=true` ngăn đăng nhập/đổi token mới, nhưng ID token đã phát hành có thể còn hợp lệ tới khi hết hạn; cần Firestore Rules chặn dựa trên trạng thái máy chủ cùng kiểm tra D1 ở API. Không được chỉ dựa vào thao tác cập nhật Firebase Auth.
+- Đối với Cloudflare Pages, nếu sau này cần chạy định kỳ, cân nhắc **Worker riêng** với Cron Trigger và quyền tối thiểu; chưa tạo cron hoặc quyền IAM mới. Không mở một endpoint tiêu thụ hàng đợi có thể gọi từ Internet trước khi có chứng thực nội bộ, kiểm soát tốc độ và audit.
+
+Tham khảo: <https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/projects.accounts/update>, <https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/projects.accounts/lookup>, <https://firebase.google.com/docs/auth/admin/manage-sessions>, <https://developers.cloudflare.com/workers/configuration/cron-triggers/>.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

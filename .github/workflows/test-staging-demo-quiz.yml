@@ -32,6 +32,7 @@ jobs:
           node --check scripts/phase4-inspect-d1-sql-export.mjs
           node --check functions/_shared/synthetic-quiz.mjs
           node --check functions/_shared/phase4-host-guard.mjs
+          node --check functions/_shared/staging-db-binding.mjs
           node --check scripts/phase4-public-staging-probe.mjs
           node --check functions/_shared/phase4-staging-preflight.mjs
           node --check functions/api/demo-quiz/student.js
@@ -52,6 +53,8 @@ jobs:
         run: node --test tests/phase4-public-staging-probe.test.mjs
       - name: All test Pages previews must use Firebase staging regardless of build variables
         run: bun test tests/phase4-firebase-preview-host.test.ts
+      - name: Preview D1 binding isolation, no canonical database fallback
+        run: node --test tests/phase4-preview-d1-binding.test.mjs
       - name: Pinned test Pages hostname, production-domain denial and flag gates
         run: node --test tests/phase4-pinned-host.test.mjs
       - name: Cross-device HTTP A/B and Admin simulation

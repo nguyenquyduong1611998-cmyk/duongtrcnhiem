@@ -40,6 +40,8 @@ jobs:
           node --test tests/d1-unit-password-change.test.mjs
       - name: DEMO quiz token and D1 grading tests
         run: node --test tests/phase4-synthetic-quiz.test.mjs
+      - name: Browser lost-response recovery, prior scores and no duplicate POST
+        run: bun test tests/phase4-browser-submit-recovery.test.ts
       - name: Cross-device HTTP A/B and Admin simulation
         run: node --test tests/phase4-synthetic-quiz-http-e2e.test.mjs
       - name: Migration rollback and 100-student SQLite rehearsal

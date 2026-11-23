@@ -117,6 +117,7 @@ test('after migration: verifies table, columns, FK, index and append-only trigge
     assert.equal(report.synthetic.exists,true);
     assert.equal(report.synthetic.columnsValid,true);
     assert.equal(report.synthetic.foreignKeyValid,true);
+    assert.equal(report.synthetic.constraintsValid,true);
     assert.equal(report.synthetic.immutableTriggerPresent,true);
     assert.equal(report.synthetic.dateIndexPresent,true);
     assert.equal(report.synthetic.rowCount,0);
@@ -140,6 +141,32 @@ test('blocks missing baseline, incomplete score table, and schema name collision
       assert.equal(report.status,'BLOCKED',type);
       assert.equal(report.deploymentAuthorized,false);
       assert.equal(report.canExecuteMigrationAutomatically,false);
+    }finally{f.sqlite.close();}
+  }
+});
+test('spoofed table, index or no-op trigger is BLOCKED even with plausible names',async()=>{
+  const cases=[
+    // A table with the correct columns, but no grading CHECK protection.
+    "CREATE TABLE synthetic_graded_attempts ("+
+      "firebase_uid TEXT PRIMARY KEY REFERENCES demo_students(firebase_uid) ON DELETE CASCADE,"+
+      "quiz_id TEXT,answer_index INTEGER,score INTEGER,submitted_at INTEGER,marker TEXT);"+
+    "CREATE INDEX synthetic_graded_attempts_by_date "+
+      "ON synthetic_graded_attempts(submitted_at DESC);"+
+    "CREATE TRIGGER synthetic_grade_no_update "+
+      "BEFORE UPDATE ON synthetic_graded_attempts BEGIN SELECT 1; END;",
+    // The index name looks correct, but it points to the wrong table.
+    "CREATE INDEX synthetic_graded_attempts_by_date "+
+      "ON demo_students(created_at DESC);",
+  ];
+  for(const sql of cases){
+    const f=fixture();
+    try{
+      f.sqlite.exec(sql);
+      const result=await inspectStagingDemoQuizSchema(f.db);
+      assert.equal(result.status,'BLOCKED');
+      assert.equal(result.deploymentAuthorized,false);
+      if(sql.includes('BEGIN SELECT 1'))
+        assert.equal(result.synthetic.immutableTriggerPresent,false);
     }finally{f.sqlite.close();}
   }
 });

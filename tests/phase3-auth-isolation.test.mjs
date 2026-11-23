@@ -102,3 +102,22 @@ test('phase 3 Firestore session Rules remain an isolated proof, never a deployed
   assert.ok(!existing.includes('match /pilot_session_states/'),
     'Current staging rules must not be silently changed by this stage');
 });
+
+test('trusted Firebase writer remains staging-gated, separate from login keys and unwired',()=>{
+  const writer=source('functions/_shared/firestore-session-writer.mjs');
+  const outbox=source('functions/_shared/session-mirror-outbox.mjs');
+  const admin=source('functions/api/auth/admin/session-block.js');
+  assert.match(writer,/PHASE3_TRUSTED_FIRESTORE_WRITER_ENABLED/);
+  assert.match(writer,/PHASE3_FIRESTORE_SERVICE_ACCOUNT_EMAIL/);
+  assert.match(writer,/PHASE3_FIRESTORE_PRIVATE_KEY/);
+  assert.match(writer,/requireStaging\(env\)/);
+  assert.match(writer,/https:\/\/oauth2\.googleapis\.com\/token/);
+  assert.match(writer,/auth\/datastore/);
+  assert.match(writer,/currentDocument\.exists/);
+  assert.match(writer,/currentDocument\.updateTime/);
+  assert.match(writer,/pilot_session_states/);
+  assert.doesNotMatch(writer,/signJwt\(env,\{/);
+  assert.doesNotMatch(writer,/\/attempts\/|\/account_directory\/|\/managed_accounts\//);
+  assert.doesNotMatch(admin,/createPilotFirestoreRevocationWriter|deliverPilotSessionRevocations/);
+  assert.doesNotMatch(outbox,/createPilotFirestoreRevocationWriter/);
+});

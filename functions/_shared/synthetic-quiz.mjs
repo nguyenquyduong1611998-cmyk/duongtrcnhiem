@@ -101,7 +101,9 @@ function readAttempt(row) {
 async function fetchAttempt(db,uid) {
   return db.prepare(
     'SELECT firebase_uid,quiz_id,answer_index,score,submitted_at,marker '+
-    'FROM synthetic_graded_attempts WHERE firebase_uid=?'
+    'FROM synthetic_graded_attempts a '+
+    'JOIN demo_students s ON s.firebase_uid=a.firebase_uid '+
+    'WHERE a.firebase_uid=? AND s.active=1'
   ).bind(uid).first();
 }
 

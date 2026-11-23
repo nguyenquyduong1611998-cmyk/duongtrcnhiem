@@ -126,6 +126,6 @@ export async function approvePilotReviewWithSignedAdmin(
   };
   return approvePilotUnlockReview(
     db,reviewId,identity.uid,verifier,
-    options.now===undefined?{}:{now:options.now},
+    {reviewerAuthTime:identity.authTime,...(options.now===undefined?{}:{now:options.now})},
   );
 }

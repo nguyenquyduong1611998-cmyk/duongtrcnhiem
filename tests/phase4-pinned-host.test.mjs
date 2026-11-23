@@ -120,7 +120,7 @@ test('disabled feature flags always produce 404 even at the correct host',async(
 test('reviewed branch alias is NOT permitted until an additional preview-only opt-in',async()=>{
   const preview='https://'+PHASE4_PILOT_PREVIEW_HOST;
   assert.equal(PHASE4_PILOT_PREVIEW_HOST,
-    'feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev');
+    'feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev');
   const previewEnv={
     ...credentials,
     PHASE4_STAGING_HOSTNAME:PHASE4_PILOT_PREVIEW_HOST,

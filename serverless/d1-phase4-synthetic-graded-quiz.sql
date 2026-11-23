@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS synthetic_graded_attempts (
     REFERENCES demo_students(firebase_uid) ON DELETE CASCADE
     CHECK (firebase_uid GLOB 'student_*'
       AND length(firebase_uid)=40
-      AND firebase_uid NOT GLOB '*[^a-f0-9_]*'),
+      AND substr(firebase_uid,9) NOT GLOB '*[^a-f0-9]*'),
   quiz_id TEXT NOT NULL DEFAULT 'synthetic_math_v1'
     CHECK (quiz_id='synthetic_math_v1'),
   answer_index INTEGER NOT NULL CHECK (answer_index BETWEEN 0 AND 3),

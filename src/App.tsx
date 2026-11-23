@@ -10,6 +10,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, listSyntheticD1Accounts, createSyntheticD1Account, changeSyntheticD1AccountStatus, deleteSyntheticD1Account, resetSyntheticD1AccountPassword, verifySyntheticD1TemporaryPassword, changeSyntheticD1Password, SYNTHETIC_RESET_REQUIRED } from './utils/serverlessAuth';
 import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, assertOtherDemoStudentDenied } from './utils/stagingResultProbe';
 import {getSyntheticQuizQuestion,submitSyntheticQuiz,readOwnSyntheticQuiz,listSyntheticQuizAttempts} from './utils/syntheticGradedQuiz';
+import {readStagingD1Preflight} from './utils/stagingD1Preflight';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
 import { TopicsView } from './components/TopicsView';
@@ -759,6 +760,14 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
     return listSyntheticQuizAttempts(firebaseUser);
   }, [adminAccessAllowed,firebaseUser]);
 
+  const handleReadStagingD1Preflight = useCallback(async () => {
+    if (!IS_FIREBASE_STAGING || !adminAccessAllowed || !firebaseUser ||
+      firebaseUser.uid !== BOOTSTRAPPED_ADMIN_UID) {
+      throw new Error('Cần xác thực Google Admin staging trước khi xem tình trạng D1.');
+    }
+    return readStagingD1Preflight(firebaseUser);
+  }, [adminAccessAllowed, firebaseUser]);
+
   const handleListSyntheticD1Accounts = useCallback(async () => {
     return listSyntheticD1Accounts(await getVerifiedStagingAdminIdToken());
   }, [getVerifiedStagingAdminIdToken]);
@@ -1242,6 +1251,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onSubmitSyntheticQuiz={IS_FIREBASE_STAGING && currentUser?.role === 'student' && !!firebaseUser && currentUser.id === firebaseUser.uid && cloudState.connected ? handleSubmitSyntheticQuiz : undefined}
                   onReadOwnSyntheticQuiz={IS_FIREBASE_STAGING && currentUser?.role === 'student' && !!firebaseUser && currentUser.id === firebaseUser.uid && cloudState.connected ? handleReadOwnSyntheticQuiz : undefined}
                   onListSyntheticQuizResults={IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticQuizResults : undefined}
+                  onReadStagingD1Preflight={IS_FIREBASE_STAGING && adminAccessAllowed ? handleReadStagingD1Preflight : undefined}
                   onListSyntheticD1Accounts={IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticD1Accounts : undefined}
                   onCreateSyntheticD1Account={IS_FIREBASE_STAGING && adminAccessAllowed ? handleCreateSyntheticD1Account : undefined}
                   onSetSyntheticD1AccountStatus={IS_FIREBASE_STAGING && adminAccessAllowed ? handleSetSyntheticD1AccountStatus : undefined}

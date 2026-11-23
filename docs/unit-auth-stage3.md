@@ -106,6 +106,16 @@ Tham khảo tài liệu chính thức: <https://firebase.google.com/docs/firesto
 
 Tham khảo: <https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/projects.accounts/update>, <https://docs.cloud.google.com/identity-platform/docs/reference/rest/v1/projects.accounts/lookup>, <https://firebase.google.com/docs/auth/admin/manage-sessions>, <https://developers.cloudflare.com/workers/configuration/cron-triggers/>.
 
+## Chặng 3I–3J — giám sát hàng đợi và chốt điều kiện mở khóa (mã thử nghiệm, chưa triển khai)
+
+- `functions/_shared/pilot-outbox-health.mjs`: thống kê **chỉ đọc** D1 về tổng yêu cầu đang chờ, đang xử lý, đã giao, quá hạn 5 phút, xử lý lỗi 5 lần trở lên, lease hết hạn và yêu cầu đến hạn gửi lại. Phân mức `clear` / `attention` / `critical`; kết quả **không chứa Firebase UID, tên, mật khẩu, token hay event ID**. Tình trạng `clear` không có nghĩa rằng toàn bộ quyền truy cập Firebase đã bị thu hồi.
+- `POST /api/auth/admin/pilot-queue-health`: endpoint xem số liệu **mặc định 404**, chỉ hoạt động trong môi trường staging khi cấu hình riêng `PHASE3_PILOT_QUEUE_MONITOR_ENABLED=true` và có Firebase Google Admin ID Token đã xác minh. Đây chưa phải hệ thống cảnh báo, dashboard hay theo dõi định kỳ; **chưa bật** trên Cloudflare.
+- `functions/_shared/pilot-unlock-preflight.mjs`: **kiểm tra an toàn chỉ đọc**, không phải API mở khóa. Phải xác minh D1 vẫn khóa, tất cả sự kiện outbox liên quan đã `delivered`, block gần nhất đúng phiên bản, trạng thái Firestore thật là `active=false` và mốc thu hồi không thấp hơn D1, Firebase Auth thật đang `disabled=true` và `validSince` không cũ hơn mốc D1. Thiếu bất kỳ bằng chứng nào đều phải từ chối.
+- Ngay cả khi preflight trả `eligibleForManualReview=true`, giá trị `canEnableNow=false` **luôn đúng**; không có tài khoản nào được mở tự động, không cấp token, không viết D1/Firebase. Đây chỉ là ảnh chụp trạng thái có thể lỗi thời, **không phải xác nhận an toàn để mở khóa**.
+- Bộ kiểm thử `tests/phase3-queue-health.test.mjs` và `tests/phase3-unlock-preflight.test.mjs` kiểm tra số liệu SQL với SQLite giả lập, không tiết lộ UID/token, chặn người chưa xác thực, từ chối hàng đợi lỗi, trường hợp lệch trạng thái ba hệ thống, và cấm thao tác mở khóa từ preflight. Các bài thử này được nối vào GitHub Actions.
+
+**Điểm chặn vận hành vẫn còn:** trước khi mở khóa tài khoản thật phải thiết kế một quy trình khóa/mở **nguyên tử ở cấp D1 với phiên bản tăng dần**, khóa phát hành token trong lúc trạng thái chuyển đổi, đọc lại có điều kiện sau mỗi bước từ xa, cập nhật Firestore Rules cuối cùng, xử lý mất kết nối và tái cấp mật khẩu/phiên mới. Phải có lịch xử lý hàng đợi, cảnh báo sự cố và phê duyệt IAM riêng, nhưng chưa kích hoạt. Không đưa dữ liệu học viên thật vào môi trường thử nghiệm này.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

@@ -142,7 +142,7 @@ test('stale, revoked and non-approved reviews cannot prepare an unlock',async()=
     f=>f.exec("UPDATE student_pilot_unlock_reviews SET status='pending',approved_by=NULL WHERE review_id=?",reviewId),
     f=>f.exec('UPDATE student_pilot_review_admins SET active=0 WHERE firebase_uid=?',reviewer),
     f=>f.exec('UPDATE student_pilot_review_admins SET tokens_valid_after=? WHERE firebase_uid=?',now-1,reviewer),
-    f=>f.exec('UPDATE student_pilot_unlock_reviews SET updated_at=? WHERE review_id=?',now-1000,reviewId),
+    f=>f.exec('UPDATE student_pilot_unlock_reviews SET requested_at=?,updated_at=? WHERE review_id=?',now-1100,now-1000,reviewId),
     f=>f.exec('UPDATE student_pilot_unlock_reviews SET updated_at=? WHERE review_id=?',now+100,reviewId),
     f=>f.exec('UPDATE student_auth_identities SET auth_version=5 WHERE firebase_uid=?',uid),
     f=>f.exec('UPDATE student_auth_identities SET password_reset_required=1 WHERE firebase_uid=?',uid),

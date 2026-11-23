@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  PHASE4_PINNED_STAGING_HOST,isApprovedPhase4StagingHost,
+  PHASE4_PINNED_STAGING_HOST,PHASE4_PILOT_PREVIEW_HOST,
+  isApprovedPhase4StagingHost,
 } from '../functions/_shared/phase4-host-guard.mjs';
 import {onRequestPost as studentEndpoint}
   from '../functions/api/demo-quiz/student.js';
@@ -42,7 +43,7 @@ const deniedHosts=[
   'https://duongtrcnhiem-test.pages.dev.example.com',
 ];
 
-test('project has exactly one reviewed Pages hostname for Phase 4 pilot',()=>{
+test('canonical staging hostname remains pinned and refuses arbitrary names',()=>{
   assert.equal(PHASE4_PINNED_STAGING_HOST,HOST);
   assert.equal(isApprovedPhase4StagingHost(request(urls[0]),credentials),true);
   assert.equal(
@@ -113,6 +114,89 @@ test('disabled feature flags always produce 404 even at the correct host',async(
     studentEndpoint,adminEndpoint,preflightEndpoint,
   ].entries()){
     assert.equal((await handler({request:request(urls[i]),env})).status,404);
+  }
+});
+
+test('reviewed branch alias is NOT permitted until an additional preview-only opt-in',async()=>{
+  const preview='https://'+PHASE4_PILOT_PREVIEW_HOST;
+  assert.equal(PHASE4_PILOT_PREVIEW_HOST,
+    'feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev');
+  const previewEnv={
+    ...credentials,
+    PHASE4_STAGING_HOSTNAME:PHASE4_PILOT_PREVIEW_HOST,
+  };
+  assert.equal(isApprovedPhase4StagingHost(
+    request(preview+'/api/demo-quiz/student'),previewEnv),false);
+  for(const [i,handler] of [
+    studentEndpoint,adminEndpoint,preflightEndpoint,
+  ].entries()){
+    const reply=await handler({request:request(preview+new URL(urls[i]).pathname),
+      env:{...previewEnv,AUTH_DB:{}}});
+    assert.equal(reply.status,404);
+  }
+});
+
+test('explicit preview opt-in permits only its precise HTTPS alias and still requires auth',async()=>{
+  const preview='https://'+PHASE4_PILOT_PREVIEW_HOST;
+  const env={
+    ...credentials,
+    PHASE4_STAGING_HOSTNAME:PHASE4_PILOT_PREVIEW_HOST,
+    PHASE4_PREVIEW_HOST_OPT_IN:'true',
+    AUTH_DB:{
+      prepare(){throw new Error('UNAUTHENTICATED_MUST_NOT_QUERY_D1');},
+    },
+  };
+  for(const [i,handler] of [
+    studentEndpoint,adminEndpoint,preflightEndpoint,
+  ].entries()){
+    const r=request(preview+new URL(urls[i]).pathname);
+    assert.equal(isApprovedPhase4StagingHost(r,env),true);
+    const response=await handler({request:r,env});
+    assert.equal(response.status,i===0?401:403);
+    assert.equal(response.headers.get('cache-control'),'no-store, max-age=0');
+  }
+  for(const domain of [
+    'https://duongtrcnhiem-test.pages.dev',
+    'https://abc12345.duongtrcnhiem-test.pages.dev',
+    'https://feature-staging-demo-quiz-pilot.duongtrcnhiem.pages.dev',
+    'http://'+PHASE4_PILOT_PREVIEW_HOST,
+    'https://'+PHASE4_PILOT_PREVIEW_HOST+':8443',
+    'https://'+PHASE4_PILOT_PREVIEW_HOST+'.evil.example',
+  ]){
+    assert.equal(isApprovedPhase4StagingHost(
+      request(domain+'/api/demo-quiz/student'),env),false,domain);
+    for(const [i,handler] of [
+      studentEndpoint,adminEndpoint,preflightEndpoint,
+    ].entries()){
+      const response=await handler({
+        request:request(domain+new URL(urls[i]).pathname),env,
+      });
+      assert.equal(response.status,404,domain);
+    }
+  }
+});
+
+test('correct preview hostname never bypasses feature flag or separate opt-in',async()=>{
+  const env={
+    ...credentials,
+    PHASE4_STAGING_HOSTNAME:PHASE4_PILOT_PREVIEW_HOST,
+    PHASE4_PREVIEW_HOST_OPT_IN:'true',
+    PHASE4_SYNTHETIC_QUIZ_ENABLED:'false',
+    PHASE4_STAGING_PREFLIGHT_ENABLED:'false',
+    AUTH_DB:{},
+  };
+  for(const [i,handler] of [
+    studentEndpoint,adminEndpoint,preflightEndpoint,
+  ].entries()){
+    const url='https://'+PHASE4_PILOT_PREVIEW_HOST+new URL(urls[i]).pathname;
+    assert.equal((await handler({request:request(url),env})).status,404);
+    env.PHASE4_SYNTHETIC_QUIZ_ENABLED='true';
+    env.PHASE4_STAGING_PREFLIGHT_ENABLED='true';
+    env.PHASE4_PREVIEW_HOST_OPT_IN='TRUE';
+    assert.equal((await handler({request:request(url),env})).status,404);
+    env.PHASE4_PREVIEW_HOST_OPT_IN='true';
+    env.PHASE4_SYNTHETIC_QUIZ_ENABLED='false';
+    env.PHASE4_STAGING_PREFLIGHT_ENABLED='false';
   }
 });
 

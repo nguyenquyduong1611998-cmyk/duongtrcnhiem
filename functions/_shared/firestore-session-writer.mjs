@@ -6,8 +6,7 @@ import {PROJECT_ID,requireStaging,signJwt} from './auth.mjs';
 // MUST stay server-side, use least-privilege IAM, and never serve callers'
 // arbitrary collection paths or project IDs. Default OFF even on staging.
 //
-// It updates ONLY pilot_session_states/{student_[a-f0-9]{32}} and cannot
-// reactivate an identity. All compare/write operations use Firestore's
+// Requires a DEDICATED server-only service account, separate from the existing\n// Firebase custom-token signing key. Neither key nor access token is logged.\n// It updates ONLY pilot_session_states/{student_[a-f0-9]{32}} and cannot\n// reactivate an identity. All compare/write operations use Firestore's
 // currentDocument preconditions; the committed state is re-read before ack.
 // It DOES NOT revoke Firebase Auth refresh tokens or disable Auth users.
 const UID=/^student_[a-f0-9]{32}$/;
@@ -76,7 +75,9 @@ export function createPilotFirestoreRevocationWriter(env, options={}) {
   // provide its options. Never instantiate when the feature flag is absent.
   requireStaging(env);
   if(env.PHASE3_TRUSTED_FIRESTORE_WRITER_ENABLED!=='true' ||
-     !STAGING_SERVICE_ACCOUNT.test(env.FIREBASE_SERVICE_ACCOUNT_EMAIL)) {
+     !STAGING_SERVICE_ACCOUNT.test(env.PHASE3_FIRESTORE_SERVICE_ACCOUNT_EMAIL || '') ||
+     typeof env.PHASE3_FIRESTORE_PRIVATE_KEY!=='string' ||
+     !env.PHASE3_FIRESTORE_PRIVATE_KEY.includes('BEGIN PRIVATE KEY')) {
     throw new Error('PILOT_FIRESTORE_WRITER_DISABLED');
   }
   const fetchImpl=options.fetchImpl ?? fetch;
@@ -90,8 +91,10 @@ export function createPilotFirestoreRevocationWriter(env, options={}) {
     const now=seconds();
     if(!validSeconds(now)) throw new Error('INVALID_CLOCK');
     if(cachedToken && now+90<tokenValidUntil) return cachedToken;
-    const assertion=await signJwt(env,{
-      iss:env.FIREBASE_SERVICE_ACCOUNT_EMAIL,
+    const assertion=await signJwt({
+      FIREBASE_PRIVATE_KEY:env.PHASE3_FIRESTORE_PRIVATE_KEY,
+    },{
+      iss:env.PHASE3_FIRESTORE_SERVICE_ACCOUNT_EMAIL,
       scope:SCOPE,
       aud:TOKEN_ENDPOINT,
       iat:now,exp:now+3500,

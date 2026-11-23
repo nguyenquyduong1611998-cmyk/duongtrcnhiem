@@ -21,3 +21,11 @@ CREATE TABLE IF NOT EXISTS synthetic_graded_attempts (
 );
 CREATE INDEX IF NOT EXISTS synthetic_graded_attempts_by_date
   ON synthetic_graded_attempts(submitted_at DESC);
+
+-- Server-graded attempts are append-only. Deleting a DEMO student may still
+-- cascade the synthetic row, but changing the grade/answer later is forbidden.
+CREATE TRIGGER IF NOT EXISTS synthetic_grade_no_update
+BEFORE UPDATE ON synthetic_graded_attempts
+BEGIN
+  SELECT RAISE(ABORT,'SYNTHETIC_GRADE_IMMUTABLE');
+END;

@@ -37,6 +37,46 @@ thử cho nó chỉ dùng SQLite giả lập và token Google được ký thử
 Tình trạng `REVIEW_MIGRATION_ONLY` chỉ có nghĩa cấu trúc cơ sở đạt điều kiện
 để con người **xem xét**, không tự cho phép áp dụng migration.
 
+## Kiểm tra bản sao lưu SQLite trên máy (mã Phase 4E, chưa đọc dữ liệu thật)
+
+Có thêm công cụ nội bộ `scripts/phase4-verify-local-backup.mjs` chỉ đọc
+bản sao lưu **định dạng cơ sở dữ liệu SQLite** đang lưu trên máy.
+Nó **không** kết nối Internet, không chạy migration, không đổi nội dung
+tệp và không tải bản sao lưu lên GitHub/Cloudflare/ChatGPT.
+
+Ví dụ với PowerShell trên Windows, từ thư mục mã nguồn đã có Node.js:
+
+```powershell
+node .\scripts\phase4-verify-local-backup.mjs "C:\duong-dan-rieng\staging-backup.sqlite"
+```
+
+Chỉ dùng đường dẫn của **bản sao lưu đã tạo trước**; đừng trỏ vào tệp
+cơ sở dữ liệu đang hoạt động. Không chia sẻ đường dẫn thật, nội dung
+backup, tên tài khoản, mật khẩu hoặc token trong ảnh chụp màn hình.
+Đầu ra chỉ gồm trạng thái schema, số bản ghi tổng hợp và các cờ
+`deployAllowed:false`, `isFreshBackupVerified:false`,
+`matchesLiveStagingVerified:false`.
+
+Khi báo `LOCAL_STRUCTURE_CHECK_PASSED`, điều đó chỉ có nghĩa
+SQLite trong tệp cục bộ đã vượt qua `PRAGMA integrity_check`,
+`PRAGMA foreign_key_check` và kiểm tra schema hiện biết.
+Đây **không** phải xác thực sao lưu mới, so khớp với D1 thật,
+đã cấp quyền triển khai hay đã thử khôi phục thành công.
+
+**Quan trọng:** bản export Cloudflare D1 có thể là **file `.sql`**
+chứ không phải ảnh cơ sở dữ liệu SQLite (`.sqlite`/`.db`).
+Công cụ này cố ý **từ chối file SQL** (`BACKUP_NOT_SQLITE_SNAPSHOT`)
+để không vô tình thực thi các lệnh trong bản dump.
+File SQL bị từ chối **không đồng nghĩa backup bị hỏng**. Chỉ phân tích nó
+sau khi được khôi phục **riêng, offline, có thẩm định** thành tệp
+SQLite; không tự động phục hồi vào D1 đang sử dụng. Bước kiểm tra backup
+`.sql` chưa được tự động hóa trong giai đoạn này.
+
+Bộ kiểm thử `tests/phase4-local-backup-verify.test.mjs` chạy trên
+file SQLite giả được tạo tạm: xác nhận không thay đổi byte nào, không
+lộ tài khoản và mật khẩu, chặn schema thiếu, khóa ngoại lỗi và từ chối
+SQL dump có nội dung nguy hiểm. **Chưa kiểm tra file backup thật**.
+
 ## Cửa kiểm soát trước khi ghi D1
 
 1. GitHub Actions của **commit định triển khai** phải đạt: TypeScript/build,

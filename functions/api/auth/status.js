@@ -1,7 +1,9 @@
+import {bindStagingDatabaseForRequest} from '../../_shared/staging-db-binding.mjs';
 import {PROJECT_ID, json} from '../../_shared/auth.mjs';
 
 // Read-only staging diagnostics. Never expose secrets, account records or passwords.
-export async function onRequestGet({env}) {
+export async function onRequestGet({request,env}) {
+  env=bindStagingDatabaseForRequest(env,request);
   let d1Connected = false;
   let tablesReady = false;
   if (env?.AUTH_DB) {

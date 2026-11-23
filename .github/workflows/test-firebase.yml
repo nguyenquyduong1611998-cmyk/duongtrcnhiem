@@ -52,6 +52,7 @@ jobs:
           node --check functions/api/auth/admin/pilot-queue-health.js
           node --check functions/_shared/pilot-unlock-preflight.mjs
           node --check functions/_shared/pilot-unlock-review.mjs
+          node --check functions/_shared/pilot-review-admin.mjs
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -106,6 +107,9 @@ jobs:
 
       - name: Phase 3 two-person unlock review and no-direct-activation tests
         run: node --test tests/phase3-unlock-review.test.mjs
+
+      - name: Phase 3 independently signed reviewer Admin and D1 role authorization
+        run: node --test tests/phase3-review-admin.test.mjs
 
       - name: Build website
         run: bun run build

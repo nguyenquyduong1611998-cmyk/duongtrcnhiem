@@ -31,9 +31,14 @@ Tài liệu chính thức Cloudflare nêu branch alias được tạo bằng cá
 đổi ký tự không phải chữ/số thành dấu `-`, nên URL Preview **dự kiến**
 cho nhánh trên là:
 
-`https://feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev`
+`https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`
 
-**Chưa xác nhận alias này tồn tại hoặc thực sự trỏ đến commit PR #3.**
+**Alias này đã được xác nhận** trong Cloudflare Pages check của commit
+`0cc4159f2eaef05e84548b27480b0f29697e00c9` (Deploy successful).
+Cloudflare sử dụng alias rút gọn `feature-staging-demo-quiz-pi`,
+không phải alias dài dự đoán từ tên nhánh. Kết quả deployment chỉ chứng
+minh thành công build, **chưa chứng minh** Preview được bảo vệ đúng
+Cloudflare Access hoặc có binding/secrets D1 Preview.
 Trước khi dùng phải vào Cloudflare Dashboard → Workers & Pages →
 `duongtrcnhiem-test` → Deployments → mở deployment của đúng nhánh
 `feature/staging-demo-quiz-pilot` → kiểm tra hostname, commit SHA,
@@ -48,7 +53,7 @@ khớp với chính hostname đang truy cập:
 | Môi trường | `PHASE4_STAGING_HOSTNAME` | Điều kiện bổ sung |
 | --- | --- | --- |
 | Pages test URL chính | `duongtrcnhiem-test.pages.dev` | Các cờ Phase 4, staging auth và Firebase xác thực |
-| Preview nhánh PR #3 | `feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev` | **Thêm** `PHASE4_PREVIEW_HOST_OPT_IN=true` cùng các cờ/xác thực bên trên |
+| Preview nhánh PR #3 | `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` | **Thêm** `PHASE4_PREVIEW_HOST_OPT_IN=true` cùng các cờ/xác thực bên trên |
 
 Chưa có các biến server này, hoặc chưa bật cờ Phase 4 thì các API
 vẫn trả 404. Dù đã bật, học viên vẫn cần token staging hợp lệ,
@@ -107,7 +112,7 @@ node .\scripts\phase4-public-staging-probe.mjs --allow-network --preview
 
 Công cụ chỉ liên hệ đúng một trong **hai hostname cố định**:
 `duongtrcnhiem-test.pages.dev` hoặc
-`feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev`
+`feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`
 theo lựa chọn tường minh. Trước khi chọn `--preview`, phải xem alias
 và commit có thật trong Cloudflare Pages Dashboard; nếu không thấy
 thì dừng, không nhập hostname khác hay tự chuyển hướng. Công cụ

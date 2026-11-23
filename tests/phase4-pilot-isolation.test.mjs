@@ -35,6 +35,16 @@ test('quiz SQL is additive, synthetic-only and does not alter old tables',()=>{
   assert.match(sql,/SYNTHETIC_GRADE_IMMUTABLE/);
   assert.doesNotMatch(sql,/\bDROP TABLE\b|\bALTER TABLE\b|\bDELETE FROM\b/);
 });
+test('DEMO panel state is isolated per verified Firebase student UID',()=>{
+  const modal=text('src/components/CloudStorageModal.tsx');
+  const app=text('src/App.tsx');
+  const panel=text('src/components/StagingDemoQuizPanel.tsx');
+  assert.match(modal,/key=\{demoStudentUid \?\?/);
+  assert.match(app,/demoStudentUid=\{IS_FIREBASE_STAGING/);
+  assert.match(app,/currentUser\.id === firebaseUser\.uid/);
+  assert.doesNotMatch(panel,/localStorage|sessionStorage|indexedDB/);
+});
+
 test('no job deploys, runs wrangler or enables server flags',()=>{
   const workflow=text('.github/workflows/test-staging-demo-quiz.yml');
   assert.match(workflow,/feature\/staging-demo-quiz-pilot/);

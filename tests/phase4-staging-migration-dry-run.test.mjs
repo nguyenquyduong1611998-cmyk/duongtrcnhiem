@@ -71,7 +71,13 @@ test('migration file is additive, named and has no old-table DML or DDL',()=>{
   assert.match(sql,/CREATE INDEX IF NOT EXISTS synthetic_graded_attempts_by_date/);
   assert.doesNotMatch(sql,
     /\b(?:DROP|ALTER|TRUNCATE|VACUUM|ATTACH|DETACH)\b/i);
-  assert.doesNotMatch(sql,
+  // BEFORE UPDATE ON is a trigger declaration, not a table mutation.
+  // Allow only that exact trigger clause; reject actual UPDATE table DML.
+  const withoutEvent=sql.replace(
+    /\bBEFORE\s+UPDATE\s+ON\s+synthetic_graded_attempts\b/gi,
+    'BEFORE_SYNTHETIC_UPDATE_EVENT',
+  );
+  assert.doesNotMatch(withoutEvent,
     /\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM|REPLACE\s+INTO)\b/i);
   assert.doesNotMatch(sql,/\b(?:PRAGMA|CREATE\s+VIRTUAL|CREATE\s+TEMP)\b/i);
 });

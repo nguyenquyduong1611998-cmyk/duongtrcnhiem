@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS student_auth_identities (
   tokens_valid_after INTEGER NOT NULL DEFAULT 0
     CHECK (tokens_valid_after >= 0),
   last_block_event_id TEXT,
+  -- Phase 3M CAS marker; only an approved, offline unlock preparation may set it.
+  -- This schema is a draft, not an ALTER of a deployed D1 table.
+  last_unlock_prepare_id TEXT,
   created_at INTEGER NOT NULL CHECK (created_at > 0),
   updated_at INTEGER NOT NULL CHECK (updated_at >= created_at)
 );

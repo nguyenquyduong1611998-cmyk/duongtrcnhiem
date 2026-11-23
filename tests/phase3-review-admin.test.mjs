@@ -227,6 +227,27 @@ test('reviewer revoked between signature check and SQL write cannot approve',asy
   }finally{f.sqlite.close();}
 });
 
+test('recent-session revocation between verification and approval blocks SQL update',async()=>{
+  const f=fixture();
+  try {
+    f.enable();
+    f.seedLock();
+    const requested=await requestPilotUnlockReview(
+      f.db,f.readers,uid,ADMIN_UID,{now});
+    assert.equal(requested.reviewCreated,true);
+    f.intercept(()=>{
+      f.execute('UPDATE student_pilot_review_admins SET tokens_valid_after=? '+
+        'WHERE firebase_uid=?',now,reviewer);
+    });
+    const result=await approvePilotReviewWithSignedAdmin(
+      f.db,requested.reviewId,req(await signed()),{now,keys:[jwk]});
+    assert.equal(result.approvedForManualReview,false);
+    assert.equal(f.get('SELECT status FROM student_pilot_unlock_reviews').status,
+      'pending');
+    assert.equal(f.get('SELECT active FROM student_auth_identities').active,0);
+  }finally{f.sqlite.close();}
+});
+
 test('the requesting Admin cannot approve own review, even with second role',async()=>{
   const f=fixture();
   try {

@@ -116,6 +116,17 @@ Tham khảo: <https://docs.cloud.google.com/identity-platform/docs/reference/res
 
 **Điểm chặn vận hành vẫn còn:** trước khi mở khóa tài khoản thật phải thiết kế một quy trình khóa/mở **nguyên tử ở cấp D1 với phiên bản tăng dần**, khóa phát hành token trong lúc trạng thái chuyển đổi, đọc lại có điều kiện sau mỗi bước từ xa, cập nhật Firestore Rules cuối cùng, xử lý mất kết nối và tái cấp mật khẩu/phiên mới. Phải có lịch xử lý hàng đợi, cảnh báo sự cố và phê duyệt IAM riêng, nhưng chưa kích hoạt. Không đưa dữ liệu học viên thật vào môi trường thử nghiệm này.
 
+## Chặng 3K — xét duyệt mở khóa hai bước, cấm kích hoạt trực tiếp (đã kiểm thử bằng dữ liệu giả)
+
+- `serverless/d1-phase3-unlock-review.sql` đề xuất **bảng mới** `student_pilot_unlock_reviews` lưu yêu cầu xét duyệt, phiên bản xác thực đã khóa, event khóa cuối, Admin đề xuất, Admin duyệt và trạng thái `pending/approved/cancelled`. Chỉ một hồ sơ chờ hoặc đã duyệt cho mỗi UID. File này **chưa được chạy trên Cloudflare D1**.
+- SQL có hai trigger mẫu `phase3_no_direct_active_insert` và `phase3_no_direct_reactivation`: ngăn thêm tài khoản `active=1` hoặc đổi tài khoản đã khóa sang `active=1` khi bản migration bảo vệ được áp dụng. **Chưa có trigger nào trong cơ sở dữ liệu D1 đang chạy** do chưa triển khai.
+- `functions/_shared/pilot-unlock-review.mjs` bổ sung **thao tác nội bộ, chưa nối API** tạo hồ sơ xét duyệt và ghi nhận duyệt của người quản trị thứ hai. Trước khi ghi phải qua `assessPilotUnlockPreflight` (D1, Firestore, Firebase Auth đều đang khóa và outbox đã giao), sau đó điều kiện SQL nguyên tử xác minh phiên bản D1, event cuối, không còn yêu cầu đang chờ và không có hồ sơ xét duyệt mở trước đó.
+- Người duyệt phải **khác** người đề xuất và được một dịch vụ xác thực Admin độc lập do backend cung cấp xác minh. Hiện tại dịch vụ xác minh Admin thứ hai **chưa được triển khai**; thử nghiệm chỉ dùng xác minh giả trong bộ kiểm thử. Không đưa callback từ trình duyệt vào bộ kiểm tra này.
+- Ngay cả sau khi xét duyệt, tài khoản vẫn `active=0`; kết quả `canEnableNow=false`. **Không có** thao tác mở khóa Firebase Auth, sửa Firestore `active=true`, cấp token hay mở quyền truy cập API. Bản ghi đã duyệt chỉ là một bước chuẩn bị, **không có quyền kích hoạt**.
+- `tests/phase3-unlock-review.test.mjs` dùng SQLite trong bộ nhớ thử: hai quản trị viên khác nhau, từ chối tự duyệt, xét duyệt trùng, hàng đợi chưa xử lý, phiên bản đổi giữa hai bước, và cấm INSERT/UPDATE kích hoạt tài khoản trực tiếp. GitHub Actions chạy kiểm thử này trên nhánh riêng.
+
+**Trước khi có nút Mở khóa thật:** cần định danh/ủy quyền nhiều Admin được đánh giá, giao thức nâng phiên bản và giữ khóa trong D1 khi thao tác hai dịch vụ Firebase, biện pháp fail-closed nếu remote lỗi/gián đoạn, Rules staging cuối cùng, kiểm thử đồng thời và kiểm toán. Không bật tính năng mới hoặc chạy migration trên cơ sở dữ liệu hiện hành khi chưa có các bước này.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

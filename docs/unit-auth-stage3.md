@@ -138,6 +138,17 @@ Tham khảo: <https://docs.cloud.google.com/identity-platform/docs/reference/res
 
 **Điểm chặn trước khi vận hành:** cần xác thực và phê duyệt danh tính người quản trị thứ hai thật; thiết lập IAM/phân quyền vận hành, chống mất tài khoản Admin, và hoàn thiện quy trình kích hoạt lại học viên không làm sống lại phiên cũ. Không gộp PR hoặc chạy migration trong giai đoạn kiểm thử.
 
+## Chặng 3M — chuẩn bị mở khóa có phiên bản (bản thử, vẫn khóa hoàn toàn)
+
+- Bổ sung bản thảo `serverless/d1-phase3-unlock-preparation.sql` để ghi lịch sử từng yêu cầu **chuẩn bị mở khóa** riêng biệt. Schema `student_auth_identities` dạng bản thảo thêm dấu mốc CAS `last_unlock_prepare_id`; cả hai **chưa chạy trên D1 Cloudflare** và không phải hướng dẫn ALTER dữ liệu đang hoạt động.
+- `functions/_shared/pilot-unlock-preparation.mjs` chỉ có hàm nội bộ `preparePilotUnlockBlockedState`, **không gắn API, cron hoặc giao diện**. Hàm yêu cầu hồ sơ đã được hai Admin khác nhau duyệt, bản ghi reviewer còn quyền, quyết định duyệt không quá 15 phút, tài khoản vẫn khóa, đúng event/version và hàng đợi thu hồi không còn yêu cầu đang xử lý.
+- Một **D1 batch nguyên tử** kiểm tra các điều kiện và cập nhật tài khoản: `auth_version += 1`, `password_reset_required=1`, `tokens_valid_after` không giảm, `active=0`, gắn ID chuẩn bị ngẫu nhiên. Lệnh ghi journal kế tiếp chỉ thành công nếu đọc được dấu mốc CAS đúng từ lệnh cập nhật trước. Nếu có thay đổi đồng thời hoặc bị lặp, không được tạo hồ sơ chuẩn bị mới.
+- Trigger `phase3_no_direct_reactivation` và `phase3_no_direct_active_insert` của chặng 3K vẫn được giữ. **Mọi thao tác mở khóa thực sự đều bị cấm**, bao gồm ghi `active=1`, bật lại Firebase Auth, mở quyền Firestore hoặc phát token. Duyệt hoặc chuẩn bị thành công **không cho phép học viên đăng nhập**.
+- `tests/phase3-unlock-preparation.test.mjs` thử SQLite trong bộ nhớ: trạng thái vẫn bị khóa và token cũ không hợp lệ, chuẩn bị lặp, reviewer bị vô hiệu hóa, quyền phiên reviewer bị thu hồi, hồ sơ duyệt quá hạn, hàng đợi chưa hoàn tất, thay đổi phiên bản giữa bước kiểm tra, rollback khi nhật ký không ghi được và SQL vẫn chặn kích hoạt trực tiếp.
+- Trước khi thực hiện **mở khóa thật** cần một giao thức hai pha/khôi phục hoàn chỉnh bảo đảm Firestore Rules, Firebase Auth, D1 và phiên đăng nhập mới cùng nhất quán; đặc biệt phải xử lý mất kết nối và race với yêu cầu khóa mới. Cần rà soát IAM thực tế, kiểm toán độc lập và kiểm thử tình huống khôi phục trước khi kết nối backend.
+
+**Kết luận:** Chặng này mới giải quyết bước "chuẩn bị khi vẫn khóa". Không cấp quyền cho người dùng thật; không chạy migration hoặc bật flag trên môi trường hiện hành.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

@@ -3,6 +3,8 @@ import {
   noSecrets,failSafe,
 } from '../../_shared/auth.mjs';
 import {handleDemoQuizAdmin} from '../../_shared/synthetic-quiz.mjs';
+import {isApprovedPhase4StagingHost}
+  from '../../_shared/phase4-host-guard.mjs';
 
 // Read-only Admin dashboard of synthetic D1 graded attempts.
 // A browser-local Admin role never grants access to this endpoint.
@@ -12,6 +14,8 @@ export async function onRequestPost({request,env}) {
   if(env?.PHASE4_SYNTHETIC_QUIZ_ENABLED!=='true')
     return json({error:'NOT_FOUND'},404);
   try{requireStaging(env);}catch{return noSecrets();}
+  if(!isApprovedPhase4StagingHost(request,env))
+    return json({error:'NOT_FOUND'},404);
   if(!await verifiedGoogleAdmin(request))
     return json({error:'ADMIN_AUTH_REQUIRED'},403);
   let data;

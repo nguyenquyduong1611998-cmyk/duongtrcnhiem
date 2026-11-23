@@ -212,6 +212,86 @@ test('server grades only from fixed answer key; immutable one attempt per UID',a
   }finally{f.sqlite.close();}
 });
 
+test('only duplicate UID is ignored: unexpected D1 CHECK failures must throw',async()=>{
+  const f=fixture();
+  try{
+    // Simulates a schema mismatch or added staging integrity constraint.
+    // Legacy INSERT OR IGNORE would silently skip this CHECK violation.
+    f.sqlite.exec(
+      'ALTER TABLE synthetic_graded_attempts ADD COLUMN '+
+      'synthetic_integrity_guard INTEGER NOT NULL DEFAULT 0 '+
+      'CHECK (synthetic_integrity_guard=1)',
+    );
+    await assert.rejects(
+      handleDemoQuizStudent(f.db,UID_A,{action:'submit',answerIndex:1}),
+      /CHECK constraint failed/,
+    );
+    assert.equal(f.count(),0);
+  }finally{f.sqlite.close();}
+});
+
+test('20 concurrent submissions are write-once even with differing answers',async()=>{
+  const f=fixture();
+  try{
+    const results=await Promise.all(Array.from({length:20},(_,i)=>
+      handleDemoQuizStudent(f.db,UID_A,{action:'submit',answerIndex:i%4}),
+    ));
+    assert.equal(f.count(),1);
+    const saved=f.get(
+      'SELECT score,answer_index FROM synthetic_graded_attempts WHERE firebase_uid=?',
+      UID_A,
+    );
+    assert.ok([0,1,2,3].includes(saved.answer_index));
+    assert.equal(saved.score,saved.answer_index===1?10:0);
+    const responses=await Promise.all(results.map(r=>r.json().then(data=>({
+      status:r.status,...data,
+    }))));
+    assert.equal(responses.filter(r=>r.created===true).length,1);
+    for(const r of responses){
+      assert.ok([200,409].includes(r.status));
+      assert.equal(r.attempt?.score,saved.score);
+    }
+  }finally{f.sqlite.close();}
+});
+
+test('account deactivation before INSERT does not store a grade',async()=>{
+  const f=fixture();
+  try{
+    const realPrepare=f.db.prepare;
+    f.db.prepare=(sql)=>{
+      if(sql.startsWith('INSERT INTO synthetic_graded_attempts '))
+        f.run('UPDATE demo_students SET active=0 WHERE firebase_uid=?',UID_A);
+      return realPrepare(sql);
+    };
+    const r=await handleDemoQuizStudent(f.db,UID_A,{action:'submit',answerIndex:1});
+    assert.equal(r.status,403);
+    assert.equal(f.count(),0);
+  }finally{f.sqlite.close();}
+});
+
+test('deactivation just AFTER INSERT suppresses student score response',async()=>{
+  const f=fixture();
+  try{
+    const realPrepare=f.db.prepare;
+    f.db.prepare=(sql)=>{
+      if(sql.startsWith('SELECT a.firebase_uid,a.quiz_id,a.answer_index,'))
+        f.run('UPDATE demo_students SET active=0 WHERE firebase_uid=?',UID_A);
+      return realPrepare(sql);
+    };
+    const r=await handleDemoQuizStudent(f.db,UID_A,{action:'submit',answerIndex:1});
+    assert.equal(r.status,403);
+    assert.equal(f.count(),1);
+    assert.equal(f.get('SELECT score FROM synthetic_graded_attempts').score,10);
+    assert.equal((await r.json()).attempt,undefined);
+  }finally{f.sqlite.close();}
+});
+
+test('grade insert uses targeted upsert, never blanket INSERT OR IGNORE',()=>{
+  const text=readFileSync('functions/_shared/synthetic-quiz.mjs','utf8');
+  assert.match(text,/ON CONFLICT\(firebase_uid\) DO NOTHING/);
+  assert.doesNotMatch(text,/INSERT OR IGNORE INTO synthetic_graded_attempts/);
+});
+
 test('malicious client data, arbitrary student UID, forged score are rejected',async()=>{
   const f=fixture();
   try {

@@ -94,13 +94,23 @@ vận hành cho phép** thử các API từ máy riêng. Công cụ **không t�
 không có cờ `--allow-network` thì chỉ hiện hướng dẫn và dừng; các bài
 test CI thay toàn bộ HTTP bằng `fetch` giả, không kết nối Cloudflare thật.
 
-Khi đã được phép **kiểm tra HTTP không mang dữ liệu học viên**:
+Khi đã được phép **kiểm tra HTTP không mang dữ liệu học viên**,
+có thể chọn URL chính của Pages test hoặc Preview của PR #3:
 
 ```powershell
+# URL chính của Pages test
 node .\scripts\phase4-public-staging-probe.mjs --allow-network
+
+# URL Preview alias của feature/staging-demo-quiz-pilot (chỉ sau khi xác nhận ở Dashboard)
+node .\scripts\phase4-public-staging-probe.mjs --allow-network --preview
 ```
 
-Công cụ chỉ liên hệ đúng `https://duongtrcnhiem-test.pages.dev` và
+Công cụ chỉ liên hệ đúng một trong **hai hostname cố định**:
+`duongtrcnhiem-test.pages.dev` hoặc
+`feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev`
+theo lựa chọn tường minh. Trước khi chọn `--preview`, phải xem alias
+và commit có thật trong Cloudflare Pages Dashboard; nếu không thấy
+thì dừng, không nhập hostname khác hay tự chuyển hướng. Công cụ
 chỉ thực hiện `GET /api/auth/status` cùng ba `POST` không có token:
 `/api/demo-quiz/student`, `/api/demo-quiz/admin`,
 `/api/demo-quiz/preflight`. Ba lệnh POST chỉ mang JSON cố định

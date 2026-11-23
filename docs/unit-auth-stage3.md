@@ -164,6 +164,16 @@ Tham khảo: <https://docs.cloud.google.com/identity-platform/docs/reference/res
 
 **Chưa thể dùng làm hệ thống kiểm tra chính thức:** bộ đề thật phải do máy chủ quản lý/phiên bản hóa, chống lộ đáp án và chấm điểm ở backend; giới hạn lượt/time, kiểm tra session bị thu hồi, mô hình kết quả có phân quyền, thống kê Admin, quản lý tài khoản thật, sao lưu và kiểm thử bảo mật 30–100 người đều chưa hoàn thiện. Dữ liệu DEMO này không được gộp với `attempts`/lịch sử thi hiện có.
 
+## Giai đoạn 4B — Kiểm thử A/B/Admin qua HTTP API và D1 mô phỏng (chưa triển khai)
+
+- `tests/phase4-synthetic-quiz-http-e2e.test.mjs` thử xuyên suốt **hai phiên học viên DEMO độc lập và một phiên Google Admin**, gửi `Request` thật vào chính `onRequestPost` của Cloudflare Functions nhưng dữ liệu D1 chạy trong SQLite trong bộ nhớ. Chữ ký Firebase RS256 được tạo bằng khóa RSA thử, bộ khóa công khai Google JWKS cũng được **mô phỏng**; không có HTTP tới Google hay Cloudflare thật.
+- Phiên học viên A tải câu hỏi, nộp đáp án; phiên thứ hai cùng UID A đọc lại điểm; học viên B chỉ thấy điểm của chính mình, không thể yêu cầu UID người khác; Admin (JWT Google provider có chữ ký hợp lệ và UID cố định staging) xem cả hai kết quả qua endpoint quản trị. Các hành vi đang được thử **trên API**, không chứng minh đã chạy trên hai thiết bị thật.
+- Bộ thử kiểm tra token sai chữ ký/dự án/provider, UID chưa đăng ký, tài khoản đã khóa, nộp lại cùng/khác đáp án, không cho gửi `score`/UID/role giả và ngăn UPDATE điểm qua trigger SQL. Kết quả không nằm trong bảng `attempts` của web hiện tại.
+- Truy vấn điểm của học viên trong `functions/_shared/synthetic-quiz.mjs` nay kiểm tra lại `demo_students.active=1` ở bước đọc bằng JOIN; tránh trả dữ liệu khi Admin vừa khóa học viên giữa hai thao tác. Tuy vậy, việc thu hồi Firebase token sau khóa DEMO vẫn là bài toán riêng chưa được giải quyết; không được dùng bộ thử này cho học viên thật.
+- Khi chưa bật `PHASE4_SYNTHETIC_QUIZ_ENABLED`, API vẫn trả 404. Không chạy migration D1, không đặt flag, không triển khai Firebase Rules, không tự động gửi điểm thực và không Merge PR.
+
+**Kiểm thử tiếp theo cần sự phê duyệt triển khai staging riêng:** sau khi rà soát bản sao lưu D1, chỉ chạy SQL cho bảng thử và bật flag DEMO rồi kiểm tra từ hai trình duyệt và một phiên Admin. Trước khi áp dụng cho người dùng thật cần quản lý đề thi chuẩn, chấm tin cậy, phiên đăng nhập thật có thể thu hồi, phân quyền, quản lý danh sách và kiểm thử độ tải.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

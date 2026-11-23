@@ -154,6 +154,29 @@ SQL dump có nội dung nguy hiểm. **Chưa kiểm tra file backup thật**.
 7. Đánh giá lại backup và quyền truy cập trước khi cân nhắc mở rộng.
    **Không dùng kết quả DEMO như điểm chính thức.**
 
+## Phase 4G — nộp bài mất kết nối và kết quả đã có từ phiên khác (chưa thử trên mạng thật)
+
+Frontend staging xử lý ba trạng thái kết quả riêng: `new` là lượt nộp mới
+được máy chủ xác nhận; `existing` là bài đã nộp từ trước (có thể ở một
+trình duyệt khác), không ghi đè điểm; `recovered` là trình duyệt không
+nhận được phản hồi của lệnh nộp nhưng sau đó **đọc được một điểm đã lưu**
+từ D1. Trạng thái `recovered` **không chứng minh chính yêu cầu vừa gửi
+đã tạo ra điểm**, vì trình duyệt khác có thể đã nộp bài trước đó.
+
+Khi yêu cầu nộp bài bị lỗi mạng hoặc trả phản hồi thành công không đọc
+được nội dung, frontend chỉ gọi `result` thêm **một lần** để đối chiếu
+D1. **Tuyệt đối không tự động nộp lại đáp án**. Nếu không thể đọc D1
+hoặc chưa có điểm, giao diện hiện lỗi và hướng dẫn dùng nút đọc kết quả;
+không tự nhận đã nộp thành công. Lỗi rõ ràng như 401, 403, 404, 5xx
+không được đổi thành thông báo thành công.
+
+Nếu máy chủ trả 409 `ALREADY_SUBMITTED` cùng điểm đã lưu, giao diện
+hiển thị rõ đây là **kết quả cũ**, không phải kết quả nộp mới. Phải
+kiểm tra trên hai trình duyệt thật rằng điểm không bị ghi đè và trạng
+thái hiển thị chính xác khi mất mạng. Bộ kiểm thử
+`tests/phase4-browser-submit-recovery.test.ts` dùng dữ liệu giả để
+chứng minh không có POST tự động thứ hai; chưa kiểm chứng qua Internet.
+
 ## Tiêu chí dừng và cách quay về trạng thái an toàn
 
 - Bất cứ lỗi schema, quyền truy cập, tài khoản khác xem được điểm, sai D1

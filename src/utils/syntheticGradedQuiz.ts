@@ -2,6 +2,8 @@
 // The server computes a fixed demo score; the browser never submits a score.
 import type {User} from 'firebase/auth';
 import {BOOTSTRAPPED_ADMIN_UID,IS_FIREBASE_STAGING} from '../firebase';
+import {SyntheticQuizDeliveryUncertainError,reconcileSyntheticQuizSubmission} from './syntheticQuizSubmissionRecovery';
+import type {SyntheticQuizReceipt} from './syntheticQuizSubmissionRecovery';
 
 const DEMO_UID=/^student_[a-f0-9]{32}$/;
 const USERNAME=/^test_hv_[a-f0-9]{12}$/;
@@ -35,22 +37,30 @@ function requireDemoAdmin(user:User|null):User {
     throw new Error('Cần đăng nhập Google Admin staging để xem kết quả DEMO.');
   return user;
 }
-async function post(path:string,data:Record<string,unknown>,user:User):Promise<Record<string,unknown>> {
-  const response=await fetch(path,{
+async function post(path:string,data:Record<string,unknown>,user:User,allowExisting=false):Promise<Record<string,unknown>> {
+  // Request identity first: failures while refreshing a Firebase token must
+  // not be mistaken for a submitted or saved DEMO answer.
+  const token=await user.getIdToken();
+  let response:Response;
+  try{response=await fetch(path,{
     method:'POST',
     headers:{
       'content-type':'application/json',
-      authorization:`Bearer ${await user.getIdToken()}`,
+      authorization:`Bearer ${token}`, 
     },
     body:JSON.stringify(data),
     credentials:'same-origin',
     cache:'no-store',
-  });
+  });}
+  catch{throw new SyntheticQuizDeliveryUncertainError();}
   const result=await response.json().catch(()=>null) as Record<string,unknown>|null;
+  if(response.ok&&!result)throw new SyntheticQuizDeliveryUncertainError();
   if(response.status===404)
     throw new Error('Chức năng chấm bài DEMO đang tắt trên máy chủ staging.');
-  if(response.status===409 && result?.error==='ALREADY_SUBMITTED')
+  if(response.status===409 && result?.error==='ALREADY_SUBMITTED'){
+    if(allowExisting && result.attempt) return {...result,__alreadySubmitted:true};
     throw new Error('Học viên đã nộp bài DEMO từ thiết bị khác. Hãy dùng nút đọc kết quả.');
+  }
   if(response.status===401||response.status===403)
     throw new Error('Phiên Firebase chưa được xác minh hoặc học viên DEMO đã bị khóa.');
   if(!response.ok||!result)
@@ -84,12 +94,21 @@ export async function getSyntheticQuizQuestion(user:User|null):Promise<Synthetic
     oneSubmission:true,text:data.text,options:data.options,
   };
 }
-export async function submitSyntheticQuiz(user:User|null,answerIndex:number):Promise<SyntheticQuizAttempt> {
+export async function submitSyntheticQuiz(user:User|null,answerIndex:number):Promise<SyntheticQuizReceipt<SyntheticQuizAttempt>> {
   if(!Number.isInteger(answerIndex)||answerIndex<0||answerIndex>3)
     throw new Error('Chọn một đáp án hợp lệ trước khi nộp.');
-  const data=await post('/api/demo-quiz/student',
-    {action:'submit',answerIndex},requireDemoUser(user));
-  return attempt(data.attempt);
+  const validUser=requireDemoUser(user);
+  return reconcileSyntheticQuizSubmission(
+    async()=>{
+      const data=await post('/api/demo-quiz/student',
+        {action:'submit',answerIndex},validUser,true);
+      return {
+        attempt:attempt(data.attempt),
+        disposition:data.__alreadySubmitted===true||data.created===false?'existing':'new',
+      };
+    },
+    ()=>readOwnSyntheticQuiz(validUser),
+  );
 }
 export async function readOwnSyntheticQuiz(user:User|null):Promise<SyntheticQuizAttempt|null> {
   const data=await post('/api/demo-quiz/student',

@@ -41,7 +41,11 @@ function safeCount(row){
   return n;
 }
 
-export async function inspectStagingDemoQuizSchema(db) {
+export async function inspectStagingDemoQuizSchema(db,{profile='canonical'}={}) {
+  // The isolated branch Preview uses only the two DEMO auth tables.
+  // Canonical staging retains the stricter unit_accounts requirement.
+  if(profile!=='canonical'&&profile!=='preview-demo')
+    throw new Error('INVALID_PREFLIGHT_PROFILE');
   if(!db?.prepare)throw new Error('MISSING_STAGING_D1');
   const objects=await all(db,
     "SELECT name,type,tbl_name,sql FROM sqlite_master "+
@@ -72,8 +76,9 @@ export async function inspectStagingDemoQuizSchema(db) {
         counts[name]=safeCount(values[0]);
       }
     }
-    tables[name]={exists,requiredColumnsPresent:fieldsValid};
-    if(!exists||!fieldsValid)baselineReady=false;
+    const required=name!=='unit_accounts'||profile==='canonical';
+    tables[name]={exists,requiredColumnsPresent:fieldsValid,required};
+    if(required&&(!exists||!fieldsValid))baselineReady=false;
   }
   const tableMeta=objectsByName.get('synthetic_graded_attempts');
   const indexMeta=objectsByName.get('synthetic_graded_attempts_by_date');
@@ -129,6 +134,7 @@ export async function inspectStagingDemoQuizSchema(db) {
     'BLOCKED' : newTable?'SYNTHETIC_SCHEMA_PRESENT':'REVIEW_MIGRATION_ONLY';
   return {
     mode:'read-only-staging-preflight',
+    profile,
     status,
     canExecuteMigrationAutomatically:false,
     requiresFreshBackup:true,

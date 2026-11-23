@@ -91,6 +91,9 @@ jobs:
       - name: Phase 3 coordinated D1 Firestore and Auth revocation safety tests
         run: node --test tests/phase3-revocation-coordinator.test.mjs
 
+      - name: Phase 3 coordinated D1 Firestore Auth failure recovery in SQLite
+        run: bun run scripts/check-phase3-coordinated-outbox.mjs
+
       - name: Build website
         run: bun run build
         

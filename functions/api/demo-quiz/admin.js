@@ -1,0 +1,26 @@
+import {
+  requireStaging,json,checkRequest,smallJson,verifiedGoogleAdmin,
+  noSecrets,failSafe,
+} from '../../_shared/auth.mjs';
+import {handleDemoQuizAdmin} from '../../_shared/synthetic-quiz.mjs';
+
+// Read-only Admin dashboard of synthetic D1 graded attempts.
+// A browser-local Admin role never grants access to this endpoint.
+export async function onRequestPost({request,env}) {
+  const bad=checkRequest(request);
+  if(bad)return bad;
+  if(env?.PHASE4_SYNTHETIC_QUIZ_ENABLED!=='true')
+    return json({error:'NOT_FOUND'},404);
+  try{requireStaging(env);}catch{return noSecrets();}
+  if(!await verifiedGoogleAdmin(request))
+    return json({error:'ADMIN_AUTH_REQUIRED'},403);
+  let data;
+  try{data=await smallJson(request);}
+  catch{return json({error:'INVALID_REQUEST'},400);}
+  try{return await handleDemoQuizAdmin(env.AUTH_DB,data);}
+  catch(error){
+    console.error('Synthetic demo quiz admin failure type:',
+      error?.name||'unknown');
+    return failSafe();
+  }
+}

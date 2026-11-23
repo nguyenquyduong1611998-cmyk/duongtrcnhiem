@@ -65,13 +65,16 @@ function fixture() {
   const run=(sql,...args)=>sqlite.prepare(sql).run(...args);
   const get=(sql,...args)=>sqlite.prepare(sql).get(...args);
   const db={
-    prepare(sql){return {bind(...args) {
-      return {
-        async first(){return get(sql,...args)??null;},
-        async all(){return {results:sqlite.prepare(sql).all(...args)};},
-        async run(){return {success:true,meta:{changes:run(sql,...args).changes}};},
-      };
-    }};},
+    prepare(sql){return {
+      async all(){return {results:sqlite.prepare(sql).all()};},
+      bind(...args) {
+        return {
+          async first(){return get(sql,...args)??null;},
+          async all(){return {results:sqlite.prepare(sql).all(...args)};},
+          async run(){return {success:true,meta:{changes:run(sql,...args).changes}};},
+        };
+      },
+    };},
   };
   const create=(username,uid,active=1)=>run(
     'INSERT INTO demo_students '+

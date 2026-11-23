@@ -124,6 +124,9 @@ jobs:
       - name: Phase 4 HTTP A/B and Admin cross-device authorization E2E simulation
         run: node --test tests/phase4-synthetic-quiz-http-e2e.test.mjs
 
+      - name: Phase 4 staging D1 migration rehearsal, offline rollback and 100-student test
+        run: node --test tests/phase4-staging-migration-dry-run.test.mjs
+
       - name: Build website
         run: bun run build
         

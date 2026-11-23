@@ -61,7 +61,7 @@ function sqlStatements(text){
   flush();
   return {statements,unclosed};
 }
-function unquote(m){return m.slice(2,6).find(x=>x!==undefined)||null;}
+function unquote(m){return m.slice(1,5).find(x=>x!==undefined)||null;}
 function declaredColumns(statement,from){
   const parts=[];
   let depth=1,quote='',part='';

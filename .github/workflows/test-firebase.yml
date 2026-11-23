@@ -54,6 +54,9 @@ jobs:
           node --check functions/_shared/pilot-unlock-review.mjs
           node --check functions/_shared/pilot-review-admin.mjs
           node --check functions/_shared/pilot-unlock-preparation.mjs
+          node --check functions/_shared/synthetic-quiz.mjs
+          node --check functions/api/demo-quiz/student.js
+          node --check functions/api/demo-quiz/admin.js
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -114,6 +117,9 @@ jobs:
 
       - name: Phase 3 atomic blocked-state unlock preparation tests
         run: node --test tests/phase3-unlock-preparation.test.mjs
+
+      - name: Phase 4 server-graded synthetic quiz and D1 cross-device test
+        run: node --test tests/phase4-synthetic-quiz.test.mjs
 
       - name: Build website
         run: bun run build

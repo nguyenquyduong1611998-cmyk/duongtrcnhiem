@@ -127,6 +127,17 @@ Tham khảo: <https://docs.cloud.google.com/identity-platform/docs/reference/res
 
 **Trước khi có nút Mở khóa thật:** cần định danh/ủy quyền nhiều Admin được đánh giá, giao thức nâng phiên bản và giữ khóa trong D1 khi thao tác hai dịch vụ Firebase, biện pháp fail-closed nếu remote lỗi/gián đoạn, Rules staging cuối cùng, kiểm thử đồng thời và kiểm toán. Không bật tính năng mới hoặc chạy migration trên cơ sở dữ liệu hiện hành khi chưa có các bước này.
 
+## Chặng 3L — xác thực Admin thứ hai bằng Firebase và phân quyền D1 (đã kiểm thử, chưa kích hoạt)
+
+- Bổ sung schema `serverless/d1-phase3-review-admins.sql` tạo bảng `student_pilot_review_admins`. **Không có Admin được thêm sẵn**, và mọi reviewer mới có `active=0` theo mặc định; schema chưa chạy trên Cloudflare D1. Không có tài khoản hoặc email học viên nào được đăng ký trong bảng này.
+- `functions/_shared/pilot-review-admin.mjs` kiểm tra chữ ký RSA của **Firebase ID Token do Google phát hành**, bằng khóa công khai Google, issuer/audience phải thuộc `duongtrcnhiem-staging`, provider `google.com`, email đã xác minh, thời hạn token hợp lệ và đăng nhập Google không quá **5 phút**. Firebase Custom Token, UID tự khai báo, token dự án khác hoặc chữ ký không hợp lệ đều không đủ quyền.
+- Sau khi xác minh chữ ký, phải đối chiếu **UID từ token** với bản ghi D1 có vai trò `unlock_reviewer`, `active=1` và `auth_time` mới hơn `tokens_valid_after`. Mỗi lần duyệt đều đối chiếu lại dữ liệu; chính câu lệnh `UPDATE` duyệt cũng xác minh reviewer còn active và chưa bị thu hồi phiên, để chống trạng thái thay đổi giữa kiểm tra và ghi.
+- Admin duyệt phải **khác** người đề xuất. Ngay cả khi được duyệt, hồ sơ vẫn là `review-only`, tài khoản học viên vẫn `active=0`, không có API kích hoạt, không phát token hoặc thay đổi Firestore/Firebase Auth.
+- `tests/phase3-review-admin.test.mjs` kiểm thử token RSA được ký trong bộ nhớ, token/issuer/provider giả mạo, đăng nhập quá hạn, reviewer bị thu hồi quyền hoặc thu hồi phiên ngay lúc cập nhật, tự duyệt, và việc duyệt không tự bật tài khoản. Các kiểm thử hiện chạy trong CI, **không gọi Firebase thật hoặc ghi D1 thật**.
+- Chưa có chức năng tạo/cấp quyền reviewer Admin thật, chưa có giao diện xét duyệt và chưa có API công khai; việc cấp quyền phải được quản trị qua quy trình ngoài băng được xác minh, có kiểm toán và nguyên tắc quyền tối thiểu. Cờ bật tính năng mới **không được cấu hình** trên Cloudflare.
+
+**Điểm chặn trước khi vận hành:** cần xác thực và phê duyệt danh tính người quản trị thứ hai thật; thiết lập IAM/phân quyền vận hành, chống mất tài khoản Admin, và hoàn thiện quy trình kích hoạt lại học viên không làm sống lại phiên cũ. Không gộp PR hoặc chạy migration trong giai đoạn kiểm thử.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

@@ -100,7 +100,8 @@ function readAttempt(row) {
 
 async function fetchAttempt(db,uid) {
   return db.prepare(
-    'SELECT firebase_uid,quiz_id,answer_index,score,submitted_at,marker '+
+    'SELECT a.firebase_uid,a.quiz_id,a.answer_index,a.score,'+
+    'a.submitted_at,a.marker '+
     'FROM synthetic_graded_attempts a '+
     'JOIN demo_students s ON s.firebase_uid=a.firebase_uid '+
     'WHERE a.firebase_uid=? AND s.active=1'

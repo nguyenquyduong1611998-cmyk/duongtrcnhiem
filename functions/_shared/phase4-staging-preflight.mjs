@@ -44,7 +44,7 @@ function safeCount(row){
 export async function inspectStagingDemoQuizSchema(db) {
   if(!db?.prepare)throw new Error('MISSING_STAGING_D1');
   const objects=await all(db,
-    "SELECT name,type FROM sqlite_master "+
+    "SELECT name,type,tbl_name,sql FROM sqlite_master "+
     "WHERE name IN ('demo_students','login_attempts','unit_accounts',"+
     "'synthetic_graded_attempts','synthetic_graded_attempts_by_date',"+
     "'synthetic_grade_no_update')"
@@ -53,13 +53,13 @@ export async function inspectStagingDemoQuizSchema(db) {
   for(const row of objects){
     if(!NAMES.includes(row?.name)||objectsByName.has(row.name))
       throw new Error('INVALID_SCHEMA_OBJECT');
-    objectsByName.set(row.name,row.type);
+    objectsByName.set(row.name,row);
   }
   const tables={};
   const counts={};
   let baselineReady=true;
   for(const name of Object.keys(REQUIRED)){
-    const exists=objectsByName.get(name)==='table';
+    const exists=objectsByName.get(name)?.type==='table';
     let fieldsValid=false;
     if(exists){
       fieldsValid=hasAll(columns(
@@ -75,18 +75,39 @@ export async function inspectStagingDemoQuizSchema(db) {
     tables[name]={exists,requiredColumnsPresent:fieldsValid};
     if(!exists||!fieldsValid)baselineReady=false;
   }
-  const newTable=objectsByName.get('synthetic_graded_attempts')==='table';
+  const tableMeta=objectsByName.get('synthetic_graded_attempts');
+  const indexMeta=objectsByName.get('synthetic_graded_attempts_by_date');
+  const triggerMeta=objectsByName.get('synthetic_grade_no_update');
+  const newTable=tableMeta?.type==='table' &&
+    tableMeta.tbl_name==='synthetic_graded_attempts';
   const newNameOccupied=objectsByName.has('synthetic_graded_attempts')&&!newTable;
-  const index=objectsByName.get('synthetic_graded_attempts_by_date')==='index';
-  const trigger=objectsByName.get('synthetic_grade_no_update')==='trigger';
+  // Names alone are insufficient: a misleading index or empty trigger must
+  // not cause the inspector to report that the grade is protected.
+  const index=indexMeta?.type==='index' &&
+    indexMeta.tbl_name==='synthetic_graded_attempts' &&
+    /\bON\s+synthetic_graded_attempts\s*\(\s*submitted_at\s+DESC\s*\)/i.test(
+      indexMeta.sql||'');
+  const trigger=triggerMeta?.type==='trigger' &&
+    triggerMeta.tbl_name==='synthetic_graded_attempts' &&
+    /\bBEFORE\s+UPDATE\s+ON\s+synthetic_graded_attempts\b/i.test(
+      triggerMeta.sql||'') &&
+    /RAISE\s*\(\s*ABORT\s*,\s*'SYNTHETIC_GRADE_IMMUTABLE'\s*\)/i.test(
+      triggerMeta.sql||'');
   const indexCollision=objectsByName.has('synthetic_graded_attempts_by_date')&&!index;
   const triggerCollision=objectsByName.has('synthetic_grade_no_update')&&!trigger;
-  let scoreFieldsValid=false,foreignKeyValid=false,scoreRows=null;
+  let scoreFieldsValid=false,foreignKeyValid=false,constraintsValid=false,scoreRows=null;
   if(newTable){
     scoreFieldsValid=hasAll(
       columns(await all(db,"PRAGMA table_info('synthetic_graded_attempts')")),
       SCORE_COLUMNS,
     );
+    const schema=tableMeta.sql||'';
+    constraintsValid=
+      /CHECK\s*\(\s*quiz_id\s*=\s*'synthetic_math_v1'\s*\)/i.test(schema)&&
+      /CHECK\s*\(\s*answer_index\s+BETWEEN\s+0\s+AND\s+3\s*\)/i.test(schema)&&
+      /CHECK\s*\(\s*marker\s*=\s*'SYNTHETIC_ONLY'\s*\)/i.test(schema)&&
+      /answer_index\s*=\s*1\s+AND\s+score\s*=\s*10/i.test(schema)&&
+      /answer_index\s*<>\s*1\s+AND\s+score\s*=\s*0/i.test(schema);
     const fk=await all(db,
       "PRAGMA foreign_key_list('synthetic_graded_attempts')");
     foreignKeyValid=fk.some(row=>row?.table==='demo_students'&&
@@ -102,7 +123,7 @@ export async function inspectStagingDemoQuizSchema(db) {
   const collision=indexCollision||triggerCollision||newNameOccupied ||
     (!newTable&&(index||trigger));
   const syntheticSchemaComplete=newTable&&scoreFieldsValid&&foreignKeyValid&&
-    index&&trigger;
+    constraintsValid&&index&&trigger;
   const status= !baselineReady||collision||
       (newTable&&!syntheticSchemaComplete) ?
     'BLOCKED' : newTable?'SYNTHETIC_SCHEMA_PRESENT':'REVIEW_MIGRATION_ONLY';
@@ -118,6 +139,7 @@ export async function inspectStagingDemoQuizSchema(db) {
       exists:newTable,
       columnsValid:scoreFieldsValid,
       foreignKeyValid,
+      constraintsValid,
       immutableTriggerPresent:trigger,
       dateIndexPresent:index,
       rowCount:scoreRows,

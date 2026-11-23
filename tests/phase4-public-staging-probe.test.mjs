@@ -74,7 +74,7 @@ test('enabled unauthenticated route and validation response must be reviewed',as
   for(const httpStatus of [200,201,204,400]){
     const {transport}=mockSequence([
       json({stage:'staging-only',ready:false,mode:'demo-students-only'}),
-      new Response('',{status:httpStatus}),
+      new Response(httpStatus===204?null:'',{status:httpStatus}),
       json({error:'NOT_FOUND'},404),
       json({error:'NOT_FOUND'},404),
     ]);

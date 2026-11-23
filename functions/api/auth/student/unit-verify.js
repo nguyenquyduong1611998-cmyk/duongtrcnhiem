@@ -1,3 +1,4 @@
+import {bindStagingDatabaseForRequest} from '../../../_shared/staging-db-binding.mjs';
 import {
   requireStaging, json, checkRequest, smallJson, pbkdf2, equalSecret,
   GENERIC_LOGIN_ERROR, noSecrets, failSafe,
@@ -61,6 +62,7 @@ export async function verifySyntheticUnitCredential(db, data) {
 }
 
 export async function onRequestPost({request,env}) {
+  env=bindStagingDatabaseForRequest(env,request);
   const invalid=checkRequest(request);
   if (invalid)return invalid;
   try{requireStaging(env);}catch{return noSecrets();}

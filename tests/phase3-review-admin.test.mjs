@@ -248,7 +248,8 @@ test('empty D1 registry is deny-by-default and cannot insert student UID reviewe
   const f=fixture();
   try {
     const entry=f.get('SELECT active,role FROM student_pilot_review_admins');
-    assert.deepEqual(entry,{active:0,role:'unlock_reviewer'});
+    assert.equal(entry.active,0);
+    assert.equal(entry.role,'unlock_reviewer');
     assert.throws(()=>f.execute(
       "INSERT INTO student_pilot_review_admins "+
       "(firebase_uid,created_at,updated_at) VALUES (?,?,?)",

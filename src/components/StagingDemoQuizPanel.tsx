@@ -2,24 +2,27 @@ import React from 'react';
 import type {
   SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt,
 } from '../utils/syntheticGradedQuiz';
+import type {StagingD1PreflightReport} from '../utils/stagingD1Preflight';
 
 interface Props {
   onGetQuestion?:()=>Promise<SyntheticQuizQuestion>;
   onSubmit?:(answerIndex:number)=>Promise<SyntheticQuizAttempt>;
   onReadOwn?:()=>Promise<SyntheticQuizAttempt|null>;
   onAdminList?:()=>Promise<SyntheticQuizAdminAttempt[]>;
+  onAdminPreflight?:()=>Promise<StagingD1PreflightReport>;
 }
 
 // A visibly labelled, staging-only UI proving the server owns the grade and
 // D1 stores it across browsers. Does not interact with the real quiz flow.
 export const StagingDemoQuizPanel:React.FC<Props>=({
-  onGetQuestion,onSubmit,onReadOwn,onAdminList,
+  onGetQuestion,onSubmit,onReadOwn,onAdminList,onAdminPreflight,
 })=>{
   const [busy,setBusy]=React.useState(false);
   const [question,setQuestion]=React.useState<SyntheticQuizQuestion|null>(null);
   const [selected,setSelected]=React.useState<number|null>(null);
   const [own,setOwn]=React.useState<SyntheticQuizAttempt|null>(null);
   const [rows,setRows]=React.useState<SyntheticQuizAdminAttempt[]|null>(null);
+  const [preflight,setPreflight]=React.useState<StagingD1PreflightReport|null>(null);
   const [notice,setNotice]=React.useState('');
   const [isError,setIsError]=React.useState(false);
   const execute=async(fn:()=>Promise<void>)=>{
@@ -95,16 +98,30 @@ export const StagingDemoQuizPanel:React.FC<Props>=({
           </p>}
         </div>
       )}
-      {onAdminList && (
+      {(onAdminList||onAdminPreflight) && (
         <div className="space-y-2 rounded-lg border border-[#DDE3DC] bg-white p-3">
           <p className="text-xs font-semibold">Dành cho Google Admin staging</p>
-          <button type="button" disabled={busy} onClick={()=>void execute(async()=>{
+          {onAdminList && <button type="button" disabled={busy} onClick={()=>void execute(async()=>{
             const result=await onAdminList();setRows(result);
             setNotice(`Đã lấy ${result.length} kết quả giả từ D1 máy chủ.`);
           })}
             className="rounded-md border border-[#1F4D36] px-3 py-2 text-xs font-semibold text-[#1F4D36] disabled:opacity-50">
             Xem kết quả học viên DEMO từ D1
-          </button>
+          </button>}
+          {onAdminPreflight && <button type="button" disabled={busy}
+            onClick={()=>void execute(async()=>{
+              const result=await onAdminPreflight();setPreflight(result);
+              setNotice('Đã đọc tình trạng cấu trúc D1. Không có thay đổi nào được thực hiện.');
+            })}
+            className="rounded-md border border-[#1F4D36] px-3 py-2 text-xs font-semibold text-[#1F4D36] disabled:opacity-50">
+            Kiểm tra cấu trúc D1 (chỉ đọc)
+          </button>}
+          {preflight && <div className="rounded-lg border border-[#DDE3DC] bg-[#F5F7F5] p-2 text-xs space-y-1">
+            <p className="font-semibold">Trạng thái: {preflight.status==='BLOCKED'?'Cần xử lý lỗi cấu trúc':preflight.status==='SYNTHETIC_SCHEMA_PRESENT'?'Đã có bảng điểm DEMO':'Chưa tạo bảng điểm DEMO'}</p>
+            <p>Bảng kết quả giả: {preflight.synthetic.exists?'Đã tồn tại':'Chưa tồn tại'}; số lượt: {preflight.synthetic.rowCount??'Chưa xác định'}</p>
+            <p>Học viên DEMO: {preflight.existingRowCounts.demo_students??'Không có bảng'}; bản ghi đăng nhập thử: {preflight.existingRowCounts.login_attempts??'Không có bảng'}; tài khoản đơn vị thử: {preflight.existingRowCounts.unit_accounts??'Không có bảng'}</p>
+            <p className="font-semibold text-[#9A3412]">Chưa được phép triển khai: phải có bản sao lưu mới và phê duyệt riêng.</p>
+          </div>}
           {rows && <div className="space-y-1">
             {rows.length===0 && <p className="text-xs">Chưa có kết quả DEMO.</p>}
             {rows.map(r=>(

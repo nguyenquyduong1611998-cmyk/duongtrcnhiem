@@ -133,10 +133,13 @@ export async function handleDemoQuizStudent(db,uid,data) {
   const now=Math.floor(Date.now()/1000);
   const score=data.answerIndex===CORRECT_INDEX?10:0;
   const inserted=await db.prepare(
-    'INSERT OR IGNORE INTO synthetic_graded_attempts '+
+    'INSERT INTO synthetic_graded_attempts '+
     '(firebase_uid,quiz_id,answer_index,score,submitted_at,marker) '+
     'SELECT ?,?,?,?,?,? WHERE EXISTS '+
-    '(SELECT 1 FROM demo_students WHERE firebase_uid=? AND active=1)'
+    '(SELECT 1 FROM demo_students WHERE firebase_uid=? AND active=1) '+
+    // Only an existing submission is idempotent. Every other database
+    // constraint failure must surface instead of being silently ignored.
+    'ON CONFLICT(firebase_uid) DO NOTHING'
   ).bind(uid,QUIZ_ID,data.answerIndex,score,now,MARKER,uid).run();
   if(inserted?.success!==true)
     throw new Error('SYNTHETIC_ATTEMPT_WRITE_FAILED');

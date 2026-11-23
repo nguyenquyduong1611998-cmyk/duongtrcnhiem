@@ -173,23 +173,24 @@ test('rejects arbitrary identities, roles, auth versions and fields before netwo
 });
 
 test('fails closed for missing account and unsuccessful OAuth/lookup/update',async()=>{
-  const f=fakeAuth();
-  await assert.rejects(f.revoker.disableAndRevoke(desired(anotherUid)),
+  const missing=fakeAuth();
+  await assert.rejects(missing.revoker.disableAndRevoke(desired(anotherUid)),
     /AUTH_USER_NOT_CONFIRMED/);
-  f.counters.failOAuth=true;
-  await assert.rejects(f.revoker.disableAndRevoke(desired()),
+  const badOauth=fakeAuth();
+  badOauth.counters.failOAuth=true;
+  await assert.rejects(badOauth.revoker.disableAndRevoke(desired()),
     /AUTH_OAUTH_UNAVAILABLE/);
-  f.counters.failOAuth=false;
-  f.counters.failLookup=true;
-  await assert.rejects(f.revoker.disableAndRevoke(desired()),
+  const badLookup=fakeAuth();
+  badLookup.counters.failLookup=true;
+  await assert.rejects(badLookup.revoker.disableAndRevoke(desired()),
     /AUTH_LOOKUP_UNAVAILABLE/);
-  f.counters.failLookup=false;
-  f.counters.badLookupReceipt=true;
-  await assert.rejects(f.revoker.disableAndRevoke(desired()),
+  const badReceipt=fakeAuth();
+  badReceipt.counters.badLookupReceipt=true;
+  await assert.rejects(badReceipt.revoker.disableAndRevoke(desired()),
     /AUTH_USER_NOT_CONFIRMED/);
-  f.counters.badLookupReceipt=false;
-  f.counters.failUpdate=true;
-  await assert.rejects(f.revoker.disableAndRevoke(desired()),
+  const badUpdate=fakeAuth();
+  badUpdate.counters.failUpdate=true;
+  await assert.rejects(badUpdate.revoker.disableAndRevoke(desired()),
     /AUTH_DISABLE_UNAVAILABLE/);
 });
 

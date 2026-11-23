@@ -18,6 +18,7 @@ import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
 import { StagingDemoQuizPanel } from './StagingDemoQuizPanel';
 import type {SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt} from '../utils/syntheticGradedQuiz';
 import type {StagingD1PreflightReport} from '../utils/stagingD1Preflight';
+import type {SyntheticQuizReceipt} from '../utils/syntheticQuizSubmissionRecovery';
 
 interface CloudStorageModalProps {
   cloud: CloudStorageState;
@@ -41,7 +42,7 @@ interface CloudStorageModalProps {
   onProvisionDemoStudent?: () => Promise<DemoStudentCredentials>;
   onDeleteDemoStudent?: (username: string) => Promise<void>;
   onGetSyntheticQuizQuestion?: () => Promise<SyntheticQuizQuestion>;
-  onSubmitSyntheticQuiz?: (answerIndex:number) => Promise<SyntheticQuizAttempt>;
+  onSubmitSyntheticQuiz?: (answerIndex:number) => Promise<SyntheticQuizReceipt<SyntheticQuizAttempt>>;
   onReadOwnSyntheticQuiz?: () => Promise<SyntheticQuizAttempt|null>;
   onListSyntheticQuizResults?: () => Promise<SyntheticQuizAdminAttempt[]>;
   onReadStagingD1Preflight?: () => Promise<StagingD1PreflightReport>;

@@ -439,3 +439,20 @@ thử nghiệm này làm xác thực học viên thật.
 - Khi cần bàn giao thật, người vận hành phải chấp thuận chính xác môi trường,
   phạm vi migration và cửa sổ triển khai; **không merge PR #2** chỉ để thử một
   endpoint nhỏ.
+
+## Giai đoạn 4P — Preflight cho D1 Preview hai bảng (đề xuất)
+
+Ngày 23/11/2026, D1 `duongtrcnhiem-auth-preview` được kiểm tra thực tế
+với `demo_students` và `login_attempts`, 2 tài khoản DEMO, 0 lần
+đăng nhập sai. SQL export được thử khôi phục riêng vào SQLite bộ nhớ:
+2 tài khoản, integrity ok, 0 lỗi khóa ngoại; chưa chứng minh khả năng
+khôi phục trực tiếp Cloudflare.
+
+Preflight chỉ-đọc có 2 profile: `canonical` (mặc định, cần 3 bảng
+bao gồm `unit_accounts`) và `preview-demo` (chỉ đúng hostname Preview
+đã qua host guard/opt-in; chỉ cần hai bảng demo_students, login_attempts).
+Các kiểm tra bảo vệ bảng điểm/index/trigger, Admin JWT và tắt API
+theo feature flag giữ nguyên. Thiếu bất kỳ bảng bắt buộc nào vẫn BLOCKED.
+Không tạo `unit_accounts` trên Preview chỉ để làm preflight báo xanh.
+
+Chưa merge PR hoặc bật cờ Phase 4, chưa chạy migration Cloudflare.

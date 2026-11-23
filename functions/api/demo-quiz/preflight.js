@@ -5,7 +5,7 @@ import {
 } from '../../_shared/auth.mjs';
 import {inspectStagingDemoQuizSchema}
   from '../../_shared/phase4-staging-preflight.mjs';
-import {isApprovedPhase4StagingHost}
+import {isApprovedPhase4StagingHost,PHASE4_PILOT_PREVIEW_HOST}
   from '../../_shared/phase4-host-guard.mjs';
 
 // Read-only, Admin-only and OFF until independently approved in staging.
@@ -26,7 +26,11 @@ export async function onRequestPost({request,env}){
   catch{return json({error:'INVALID_REQUEST'},400);}
   if(Object.keys(input).length!==1||input.action!=='inspect')
     return json({error:'INVALID_REQUEST'},400);
-  try{return json(await inspectStagingDemoQuizSchema(env.AUTH_DB));}
+  // Only the approved, opted-in branch alias may use the two-table
+  // Preview profile; canonical staging retains its stricter check.
+  const profile=new URL(request.url).hostname===PHASE4_PILOT_PREVIEW_HOST
+    ? 'preview-demo':'canonical';
+  try{return json(await inspectStagingDemoQuizSchema(env.AUTH_DB,{profile}));}
   catch(error){
     console.error('Phase4 preflight error type:',error?.name||'unknown');
     return failSafe();

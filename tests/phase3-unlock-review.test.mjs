@@ -18,6 +18,7 @@ const schemas=[
   'serverless/d1-phase3-session-audit.sql',
   'serverless/d1-phase3-session-mirror-outbox.sql',
   'serverless/d1-phase3-unlock-review.sql',
+  'serverless/d1-phase3-review-admins.sql',
 ];
 function fixture() {
   const sqlite=new DatabaseSync(':memory:');
@@ -60,6 +61,12 @@ function fixture() {
     "VALUES (?,?,3,?,'delivered',1,0,?,?,?)",
     event,uid,now-50,now-60,now-100,now-60,
   );
+  // Independently provisioned synthetic reviewer (never seeded by schema).
+  run('INSERT INTO student_pilot_review_admins '+
+    '(firebase_uid,role,active,tokens_valid_after,created_at,updated_at) '+
+    "VALUES (?,'unlock_reviewer',1,0,?,?)",
+    independent,now-1000,now-1000,
+  );
   const readers={
     async readFirestoreState(value) {
       assert.equal(value,uid);
@@ -90,7 +97,7 @@ const request=(f)=>requestPilotUnlockReview(
   f.db,f.readers,uid,ADMIN_UID,{now},
 );
 const approve=(f,id,actor=independent,verify=f.verifier)=>approvePilotUnlockReview(
-  f.db,id,actor,verify,{now:now+20},
+  f.db,id,actor,verify,{now:now+20,reviewerAuthTime:now},
 );
 
 test('an audited delivered lock can start a review; approval keeps account disabled',async()=>{

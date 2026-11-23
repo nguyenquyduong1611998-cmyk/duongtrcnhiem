@@ -21,7 +21,7 @@ const UID_C='student_'+'c'.repeat(32);
 const USER_A='test_hv_'+'a'.repeat(12);
 const USER_B='test_hv_'+'b'.repeat(12);
 const PLAIN='NoPlaintextPasswordsInThisDemoTest';
-const DOMAIN='https://example.pages.dev';
+const DOMAIN='https://duongtrcnhiem-test.pages.dev';
 const header={alg:'RS256',kid:'synthetic-rsa-key',typ:'JWT'};
 const payload={
   iss:'https://securetoken.google.com/'+PROJECT_ID,
@@ -344,6 +344,7 @@ test('both public endpoints default OFF; Admin endpoint requires real signed Adm
     const configured={
       AUTH_DB:f.db,
       PHASE4_SYNTHETIC_QUIZ_ENABLED:'true',
+      PHASE4_STAGING_HOSTNAME:'duongtrcnhiem-test.pages.dev',
       STAGING_AUTH_ENABLED:'true',
       FIREBASE_PROJECT_ID:PROJECT_ID,
       FIREBASE_SERVICE_ACCOUNT_EMAIL:'synthetic@'+PROJECT_ID+'.iam.gserviceaccount.com',

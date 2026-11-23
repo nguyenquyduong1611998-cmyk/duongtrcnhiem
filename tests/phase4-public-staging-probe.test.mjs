@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
-import {probePublicStaging,STAGING_HOST}
+import {probePublicStaging,STAGING_HOST,PREVIEW_HOST}
   from '../scripts/phase4-public-staging-probe.mjs';
 
 const urls=[
@@ -15,12 +15,12 @@ const urls=[
 const json=(value,status=200)=>new Response(JSON.stringify(value),{
   status,headers:{'content-type':'application/json'},
 });
-function mockSequence(responses){
+function mockSequence(responses,host=STAGING_HOST){
   const seen=[];
   const transport=async (url,opts)=>{
     const i=seen.length;
     seen.push({url,opts});
-    assert.equal(url,'https://'+STAGING_HOST+urls[i]);
+    assert.equal(url,'https://'+host+urls[i]);
     return typeof responses[i]==='function'
       ?responses[i](url,opts):responses[i];
   };
@@ -53,6 +53,30 @@ test('safe OFF-or-undeployed result makes NO claim of deployment/DB readiness',a
     assert.equal(opts.method,i===0?'GET':'POST');
     if(i===0)assert.equal(opts.body,undefined);
     else assert.deepEqual(JSON.parse(opts.body),{action:'result'});
+  }
+});
+
+test('explicit preview inspection uses ONLY reviewed branch alias and no credentials',async()=>{
+  assert.equal(PREVIEW_HOST,
+    'feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev');
+  const {seen,transport}=mockSequence([
+    json({stage:'staging-only',ready:false,mode:'demo-students-only'}),
+    json({error:'NOT_FOUND'},404),
+    json({error:'NOT_FOUND'},404),
+    json({error:'NOT_FOUND'},404),
+  ],PREVIEW_HOST);
+  const r=await probePublicStaging(transport,{preview:true});
+  assert.equal(r.host,PREVIEW_HOST);
+  assert.equal(r.status,'NEW_APIS_OFF_OR_NOT_DEPLOYED');
+  assert.equal(r.deploymentVerified,false);
+  assert.equal(r.approvedForActivation,false);
+  assert.equal(seen.length,4);
+  for(const {url,opts} of seen){
+    assert.equal(new URL(url).hostname,PREVIEW_HOST);
+    assert.equal(opts.credentials,'omit');
+    assert.equal(opts.redirect,'manual');
+    assert.equal(opts.headers.authorization,undefined);
+    assert.equal(opts.headers.cookie,undefined);
   }
 });
 
@@ -114,7 +138,7 @@ test('unexpected auth/status content is ignored, not leaked or trusted',async()=
 });
 
 test('CLI without --allow-network refuses before attempting any HTTP',()=>{
-  for(const args of [[],['--wrong'],['--allow-network','--other']]){
+  for(const args of [[],['--wrong'],['--preview'],['--allow-network','--other'],['--preview','--allow-network']]){
     const x=spawnSync(process.execPath,
       ['scripts/phase4-public-staging-probe.mjs',...args],
       {encoding:'utf8',timeout:8000});
@@ -126,7 +150,9 @@ test('CLI without --allow-network refuses before attempting any HTTP',()=>{
 
 test('source cannot be parameterized to reach production or take credentials',()=>{
   const src=readFileSync('scripts/phase4-public-staging-probe.mjs','utf8');
-  assert.match(src,/STAGING_HOST='duongtrcnhiem-test\.pages\.dev'/);
+  assert.match(src,/PHASE4_PINNED_STAGING_HOST/);
+  assert.match(src,/PHASE4_PILOT_PREVIEW_HOST/);
+  assert.match(src,/--preview/);
   assert.match(src,/--allow-network/);
   assert.match(src,/credentials:'omit'/);
   assert.match(src,/redirect:'manual'/);

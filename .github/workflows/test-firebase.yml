@@ -45,6 +45,7 @@ jobs:
           node --check functions/api/auth/student/session-check.js
           node --check functions/api/auth/admin/session-block.js
           node --check functions/_shared/session-mirror-outbox.mjs
+          node --check functions/_shared/firestore-session-writer.mjs
 
       - name: Test Cloudflare D1 demo authentication security
         run: node --test tests/serverless-auth.test.mjs
@@ -78,6 +79,9 @@ jobs:
 
       - name: Phase 3 retryable Firestore revocation outbox in local SQLite
         run: bun run scripts/check-phase3-mirror-outbox.mjs
+
+      - name: Phase 3 Firestore service-account writer authorization and CAS tests
+        run: node --test tests/phase3-firestore-writer.test.mjs
 
       - name: Build website
         run: bun run build

@@ -2,12 +2,12 @@
 // A git branch preview cannot use the canonical test Pages hostname.
 // This is an ALLOWLIST of TWO exact hosts, not a *.pages.dev wildcard.
 // Preview branch aliases are lowercased with "/" replaced by "-"; the
-// anticipated alias MUST be confirmed in the Pages deployment dashboard.
+// ACTUAL alias confirmed in Cloudflare Pages check for commit 0cc4159.
 // Both environments still require requireStaging(), Firebase auth and
 // the default-OFF Phase 4 feature flags. No automatic deployment occurs.
 export const PHASE4_PINNED_STAGING_HOST='duongtrcnhiem-test.pages.dev';
 export const PHASE4_PILOT_PREVIEW_HOST=
-  'feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev';
+  'feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev';
 
 export function isApprovedPhase4StagingHost(request,env){
   const desired=env?.PHASE4_STAGING_HOSTNAME;

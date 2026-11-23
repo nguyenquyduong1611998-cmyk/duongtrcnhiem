@@ -81,6 +81,18 @@ Tài liệu Firebase: <https://firebase.google.com/docs/auth/admin/manage-sessio
 3. Cần thêm quy trình Firebase Admin revoke refresh tokens/disabled user, chính sách mở khóa, đồng bộ hai chiều hoặc một nguồn thẩm quyền, xử lý re-enable sau khóa, và Firestore Rules cuối cùng.
 4. Chỉ cho phép dữ liệu thật sau khi có phê duyệt vận hành và rà soát an ninh đầy đủ.
 
+## Chặng 3F — adapter Firebase OAuth có kiểm tra phiên bản (đã viết và kiểm thử giả lập, chưa nối vận hành)
+
+- `functions/_shared/firestore-session-writer.mjs` là adapter **chỉ phía máy chủ**, dùng JWT ký bởi **tài khoản dịch vụ riêng** để đổi lấy Google OAuth token có scope `https://www.googleapis.com/auth/datastore`. Không dùng lại khóa đăng nhập học viên; không chứa SDK Admin trong frontend.
+- Chỉ ghi `pilot_session_states/student_...` thuộc `duongtrcnhiem-staging`, không nhận tên project, collection hoặc đường dẫn từ client. Trước khi ghi đọc phiên bản Firestore và dùng precondition `currentDocument.updateTime` / `currentDocument.exists=false` để tránh ghi đè khi có cập nhật cạnh tranh. Giá trị `active=false` không bao giờ bị đổi thành true bởi adapter.
+- Sau khi ghi, adapter đọc lại tài liệu và chỉ xác nhận thành công nếu trạng thái thực sự đã khóa, version và thời điểm thu hồi **không thấp hơn** yêu cầu. Nếu phiên bản mới hơn đang mở (`active=true`), yêu cầu cũ bị từ chối và cần người vận hành kiểm tra thay vì vô tình khóa phiên mới.
+- Cần ba cấu hình **server-side** trên staging mới có thể khởi tạo: `PHASE3_TRUSTED_FIRESTORE_WRITER_ENABLED=true`, `PHASE3_FIRESTORE_SERVICE_ACCOUNT_EMAIL`, `PHASE3_FIRESTORE_PRIVATE_KEY`. Mặc định không được cấu hình, nên adapter **không hoạt động**; các secret phải được bảo vệ trong Cloudflare Secrets, không đưa vào GitHub, chat hay frontend. Tài khoản dịch vụ này cần IAM riêng tối thiểu có thể dùng được; OAuth từ tài khoản dịch vụ **bỏ qua Firestore Security Rules**, nên không thể thay cho kiểm soát IAM.
+- `tests/phase3-firestore-writer.test.mjs` kiểm tra ký OAuth RS256 bằng khóa thử tạo trong bộ nhớ, mục tiêu project cố định, ghi mới, cập nhật có điều kiện, giao dịch cạnh tranh, sự kiện cũ, và lỗi OAuth/Firestore. Toàn bộ HTTP được mô phỏng, **không gửi yêu cầu tới Google thật**.
+- Adapter **chưa được nối** vào trình tiêu thụ outbox, HTTP route hoặc lịch chạy; chưa có truy cập đến Firebase Auth, chưa thu hồi refresh token, chưa tắt user Auth, và chưa có quy trình bù trừ khi đồng bộ thất bại. Không bật flag hoặc triển khai migration lúc này.
+- Kết quả của phần kiểm thử chỉ khẳng định logic trong môi trường mô phỏng; trước khi hoạt động thực tế phải kiểm thử IAM, API REST thực, account disable/revoke, Firestore Rules và trường hợp mở khóa, kèm cảnh báo hàng đợi trễ.
+
+Tham khảo tài liệu chính thức: <https://firebase.google.com/docs/firestore/use-rest-api>, <https://docs.cloud.google.com/firestore/docs/reference/rest/v1/projects.databases.documents/patch>.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

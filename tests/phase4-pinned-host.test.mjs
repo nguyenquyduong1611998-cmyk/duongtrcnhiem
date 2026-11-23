@@ -142,7 +142,7 @@ test('explicit preview opt-in permits only its precise HTTPS alias and still req
     ...credentials,
     PHASE4_STAGING_HOSTNAME:PHASE4_PILOT_PREVIEW_HOST,
     PHASE4_PREVIEW_HOST_OPT_IN:'true',
-    AUTH_DB:{
+    AUTH_DB_PREVIEW:{
       prepare(){throw new Error('UNAUTHENTICATED_MUST_NOT_QUERY_D1');},
     },
   };

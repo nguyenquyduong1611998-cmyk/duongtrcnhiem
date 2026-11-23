@@ -3,10 +3,11 @@ import type {
   SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt,
 } from '../utils/syntheticGradedQuiz';
 import type {StagingD1PreflightReport} from '../utils/stagingD1Preflight';
+import type {SyntheticQuizReceipt} from '../utils/syntheticQuizSubmissionRecovery';
 
 interface Props {
   onGetQuestion?:()=>Promise<SyntheticQuizQuestion>;
-  onSubmit?:(answerIndex:number)=>Promise<SyntheticQuizAttempt>;
+  onSubmit?:(answerIndex:number)=>Promise<SyntheticQuizReceipt<SyntheticQuizAttempt>>;
   onReadOwn?:()=>Promise<SyntheticQuizAttempt|null>;
   onAdminList?:()=>Promise<SyntheticQuizAdminAttempt[]>;
   onAdminPreflight?:()=>Promise<StagingD1PreflightReport>;
@@ -85,8 +86,13 @@ export const StagingDemoQuizPanel:React.FC<Props>=({
               <button type="button" disabled={busy||selected===null||!!own}
                 onClick={()=>void execute(async()=>{
                   if(selected===null)return;
-                  const result=await onSubmit(selected);setOwn(result);
-                  setNotice(resultText(result));
+                  const receipt=await onSubmit(selected);setOwn(receipt.attempt);
+                  if(receipt.disposition==='new')
+                    setNotice('Đã nộp bài DEMO mới. '+resultText(receipt.attempt));
+                  else if(receipt.disposition==='existing')
+                    setNotice('Đã có bài DEMO được lưu từ trước; điểm cũ được giữ nguyên. '+resultText(receipt.attempt));
+                  else
+                    setNotice('Không nhận được phản hồi nộp bài, nhưng đã tìm thấy kết quả trong D1; có thể từ phiên khác. '+resultText(receipt.attempt));
                 })}
                 className="rounded-md bg-[#1F4D36] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
                 Nộp bài — máy chủ tự chấm

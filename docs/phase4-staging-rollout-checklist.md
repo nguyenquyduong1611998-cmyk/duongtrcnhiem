@@ -14,41 +14,78 @@
 - Bảng được tạo là `synthetic_graded_attempts`; không truy cập/sửa bảng điểm
   `attempts` hiện có, không tải đề thi thật hay danh sách học viên thật.
 
-## Giai đoạn 4I — chốt tên miền staging trước khi bật API (chưa triển khai)
+## Giai đoạn 4I/4K — URL chính và nhánh Preview riêng biệt (chưa triển khai)
 
-Tài liệu của dự án xác nhận website thử là Cloudflare Pages project
-`duongtrcnhiem-test`, tại `https://duongtrcnhiem-test.pages.dev`.
-Project thử này có một deployment **Pages Production riêng** cho nhánh
-`fix-firebase-login` trước đây, **không phải** GitHub Pages chính
-triển khai từ `main/master`.
+Theo `docs/cloudflare-functions-firebase-staging.md`, dự án Pages thử
+`duongtrcnhiem-test` đã dùng URL chính
+`https://duongtrcnhiem-test.pages.dev` và nhánh triển khai
+`fix-firebase-login`. **Chỉ mới đối chiếu tài liệu trong repository**,
+chưa xác minh trạng thái hiện tại của Cloudflare Dashboard.
 
-Ba endpoint Phase 4 mới (`/api/demo-quiz/student`,
-`/api/demo-quiz/admin`, `/api/demo-quiz/preflight`) có thêm lớp
-`functions/_shared/phase4-host-guard.mjs`: ngoài flag tương ứng và
-`requireStaging`, bắt buộc **cả hai** điều kiện sau đúng:
+PR #3 đang nằm trên nhánh `feature/staging-demo-quiz-pilot`; mã trên
+nhánh này **không tự xuất hiện** ở URL Pages chính. Cloudflare Pages
+có thể tự build Preview cho các nhánh khác, nhưng điều đó phụ thuộc
+cấu hình **Preview branch control** của từng Pages project.
 
-- URL HTTPS thực tế của Request phải có hostname **chính xác**
-  `duongtrcnhiem-test.pages.dev`, không cổng tùy chỉnh, không tên miền
-  con, không host trùng tiền tố, không phải GitHub Pages live.
-- Biến **server-only** `PHASE4_STAGING_HOSTNAME` phải bằng chính xác
-  `duongtrcnhiem-test.pages.dev`. Nếu thiếu, sai ký tự, hoặc trỏ đến
-  host live thì tất cả ba API trả 404, kể cả khi flag tính năng bật.
+Tài liệu chính thức Cloudflare nêu branch alias được tạo bằng cách
+đổi ký tự không phải chữ/số thành dấu `-`, nên URL Preview **dự kiến**
+cho nhánh trên là:
 
-Không dùng `X-Forwarded-Host`, `Host` client tùy biến hoặc wildcard
-để quyết định quyền. Không ghi cờ và hostname staging vào Vite
-`VITE_*` hay vào file GitHub. Không thêm bất kỳ quyền Cloudflare Access
-nào mới để vượt qua chốt này.
+`https://feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev`
 
-**Đây mới là chốt trong mã nguồn Draft.** Chưa biết nhánh này có được
-triển khai bởi test Pages project hay không; không tự ý đổi nhánh
-production Cloudflare hay bật biến/flag. Nếu muốn thử trên một URL
-preview/custom domain khác phải rà soát lại quyền và cập nhật danh sách
-hostname bằng một PR riêng, thay vì bỏ qua chốt bảo vệ.
+**Chưa xác nhận alias này tồn tại hoặc thực sự trỏ đến commit PR #3.**
+Trước khi dùng phải vào Cloudflare Dashboard → Workers & Pages →
+`duongtrcnhiem-test` → Deployments → mở deployment của đúng nhánh
+`feature/staging-demo-quiz-pilot` → kiểm tra hostname, commit SHA,
+Build command, `VITE_FIREBASE_ENV=staging`, binding, các lớp
+Cloudflare Access và Preview branch control. **Không thay đổi production
+branch hoặc cấu hình môi trường** khi chưa được phê duyệt.
 
-CI có `tests/phase4-pinned-host.test.mjs` thử các host giả, host của
-website chính, tên miền con, cổng bất thường, HTTP và giả mạo
-`X-Forwarded-Host`. Những kiểm thử này chỉ dùng Request giả, chưa
-chứng minh cấu hình dashboard Cloudflare thực tế đã khớp.
+Hàm `functions/_shared/phase4-host-guard.mjs` chỉ cho phép hai
+hostname **chính xác**, không có wildcard và chỉ khi cấu hình server
+khớp với chính hostname đang truy cập:
+
+| Môi trường | `PHASE4_STAGING_HOSTNAME` | Điều kiện bổ sung |
+| --- | --- | --- |
+| Pages test URL chính | `duongtrcnhiem-test.pages.dev` | Các cờ Phase 4, staging auth và Firebase xác thực |
+| Preview nhánh PR #3 | `feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev` | **Thêm** `PHASE4_PREVIEW_HOST_OPT_IN=true` cùng các cờ/xác thực bên trên |
+
+Chưa có các biến server này, hoặc chưa bật cờ Phase 4 thì các API
+vẫn trả 404. Dù đã bật, học viên vẫn cần token staging hợp lệ,
+UID DEMO đang active trong D1; Admin phải qua Google staging JWT.
+Không dùng Host/`X-Forwarded-Host` tùy ý, URL hash-based khác,
+`http://`, cổng phụ hoặc tên miền khác để bỏ qua giới hạn.
+
+**Đường đi thử nghiệm ưu tiên sau khi có phê duyệt cụ thể:**
+
+1. Đọc Cloudflare Dashboard để xác nhận Preview đã tạo, hostname
+   đúng, quyền truy cập Preview bị giới hạn và không bị công khai
+   ngoài dự kiến. Kiểm tra **Preview D1 binding** khác với Production
+   của Pages test, và không trỏ đến D1 có tài khoản/học viên thật.
+2. Xác nhận tệp backup mới, project Firebase staging, phiên bản mã
+   build, Access policy và quyền Cloudflare. Nếu Preview bị mọi người
+   truy cập được thì **dừng, không bật flags**.
+3. Chỉ khi được cho phép: tạo bảng điểm DEMO trên **D1 Preview đã
+   xác nhận riêng**, đặt `PHASE4_STAGING_HOSTNAME` đúng alias, bật
+   `PHASE4_PREVIEW_HOST_OPT_IN=true` rồi mới bật lần lượt các cờ
+   thử nghiệm. Xác nhận phạm vi biến Preview có thể ảnh hưởng nhiều
+   nhánh; nếu không phân tách được thì **dừng**.
+4. Thử một học viên DEMO ở hai trình duyệt, một Google Admin, kiểm
+   tra 401/403, kết quả một lần, tắt flag để rollback. **Không Merge
+   PR #3** chỉ để xem Preview; không chạy migration vào D1 đang dùng
+   và không mở Access cho toàn Internet.
+5. Nếu Preview không tồn tại hoặc alias không đúng, chỉ ghi nhận
+   là **chưa sẵn sàng**. Không đổi branch Production Pages test và
+   không thêm wildcard để cố truy cập.
+
+Các bài thử `tests/phase4-pinned-host.test.mjs` xác nhận Preview
+chỉ qua khi **host khớp và có flag opt-in riêng**, đồng thời từ
+chối tên miền chính của website, các hostname hash-based, subdomain
+khác, HTTP, giả mạo forwarded-host và thiếu xác thực.
+
+Nguồn tài liệu Cloudflare:
+https://developers.cloudflare.com/pages/configuration/preview-deployments/
+và https://developers.cloudflare.com/pages/configuration/branch-build-controls/
 
 ## Giai đoạn 4J — kiểm tra bề mặt HTTP staging không cần tài khoản (mới chuẩn bị)
 

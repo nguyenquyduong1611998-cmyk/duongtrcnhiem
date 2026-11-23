@@ -5,6 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {webcrypto} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {PROJECT_ID,ADMIN_UID} from '../functions/_shared/auth.mjs';
+import {PHASE4_PILOT_PREVIEW_HOST} from '../functions/_shared/phase4-host-guard.mjs';
 import {inspectStagingDemoQuizSchema}
   from '../functions/_shared/phase4-staging-preflight.mjs';
 import {onRequestPost}
@@ -108,6 +109,50 @@ test('before migration: read-only report identifies valid baseline and no score 
     assert.equal(f.sqlite.prepare(
       "SELECT COUNT(*) AS n FROM sqlite_master WHERE name='synthetic_graded_attempts'"
     ).get().n,0);
+  }finally{f.sqlite.close();}
+});
+test('two-table Preview is valid only under explicit preview-demo profile',async()=>{
+  for(const withQuiz of [false,true]){
+    const f=fixture({withUnit:false,withQuiz});
+    try{
+      const canonical=await inspectStagingDemoQuizSchema(f.db);
+      assert.equal(canonical.status,'BLOCKED');
+      assert.equal(canonical.profile,'canonical');
+      const preview=await inspectStagingDemoQuizSchema(f.db,{profile:'preview-demo'});
+      assert.equal(preview.status,withQuiz?'SYNTHETIC_SCHEMA_PRESENT':'REVIEW_MIGRATION_ONLY');
+      assert.equal(preview.baseline.demo_students.required,true);
+      assert.equal(preview.baseline.login_attempts.required,true);
+      assert.equal(preview.baseline.unit_accounts.required,false);
+      assert.equal(preview.baseline.unit_accounts.exists,false);
+      assert.equal(preview.deploymentAuthorized,false);
+      assert.equal(preview.canExecuteMigrationAutomatically,false);
+    }finally{f.sqlite.close();}
+  }
+});
+test('preflight requires an opted-in exact Preview alias before two-table inspection',async()=>{
+  const f=fixture({withUnit:false});
+  try{
+    const previewOrigin='https://'+PHASE4_PILOT_PREVIEW_HOST;
+    f.env.AUTH_DB_PREVIEW=f.db;
+    f.env.PHASE4_STAGING_HOSTNAME=PHASE4_PILOT_PREVIEW_HOST;
+    const makeRequest=token=>new Request(previewOrigin+'/api/demo-quiz/preflight',{
+      method:'POST',headers:{origin:previewOrigin,'content-type':'application/json',
+        authorization:'Bearer '+token},
+      body:JSON.stringify({action:'inspect'}),
+    });
+    const token=await adminToken();
+    assert.equal((await onRequestPost({request:makeRequest(token),env:f.env})).status,404);
+    f.env.PHASE4_PREVIEW_HOST_OPT_IN='true';
+    assert.equal((await onRequestPost({request:makeRequest('invalid'),env:f.env})).status,403);
+    const response=await onRequestPost({request:makeRequest(token),env:f.env});
+    assert.equal(response.status,200);
+    const report=await response.json();
+    assert.equal(report.profile,'preview-demo');
+    assert.equal(report.status,'REVIEW_MIGRATION_ONLY');
+    assert.equal(report.baseline.unit_accounts.required,false);
+    assert.equal(report.existingRowCounts.demo_students,0);
+    assert.equal(report.existingRowCounts.login_attempts,0);
+    assert.equal(report.deploymentAuthorized,false);
   }finally{f.sqlite.close();}
 });
 test('after migration: verifies table, columns, FK, index and append-only trigger',async()=>{

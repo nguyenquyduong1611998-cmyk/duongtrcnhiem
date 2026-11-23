@@ -149,6 +149,21 @@ Tham khảo: <https://docs.cloud.google.com/identity-platform/docs/reference/res
 
 **Kết luận:** Chặng này mới giải quyết bước "chuẩn bị khi vẫn khóa". Không cấp quyền cho người dùng thật; không chạy migration hoặc bật flag trên môi trường hiện hành.
 
+## Giai đoạn 4A — bài kiểm tra giả được chấm ở máy chủ, chuẩn bị kiểm thử liên thiết bị (chưa triển khai)
+
+**Mục tiêu thay vì tiếp tục phát triển tài khoản mô phỏng:** minh chứng luồng thực tế **học viên DEMO đăng nhập → chọn đáp án → Cloudflare Functions tự chấm → kết quả được lưu D1 → Admin đọc từ thiết bị khác**, không cần VPS, không chuyển bất kỳ câu hỏi hay kết quả thi thật lên đám mây.
+
+- `serverless/d1-phase4-synthetic-graded-quiz.sql` tạo bảng **mới** `synthetic_graded_attempts`, khóa chính là Firebase UID của tài khoản `demo_students` hiện có, `quiz_id='synthetic_math_v1'`, `marker='SYNTHETIC_ONLY'`. Giới hạn đúng **một lần nộp**/UID. Bảng có CHECK score và đáp án khớp với khóa giả; không chứa tên thật, đơn vị, bài thi hoặc kết quả thật. Có FK `ON DELETE CASCADE` để xóa học viên DEMO thì kết quả DEMO riêng của người đó cũng được xóa. **CHƯA CHẠY SQL NÀY TRÊN CLOUDFLARE D1**.
+- `functions/_shared/synthetic-quiz.mjs` chứa khóa đáp án giả **chỉ ở backend Cloudflare Functions**. API đưa ra câu hỏi một câu cố định “2+2 bằng bao nhiêu?” với các lựa chọn 3, 4, 5, 6; không trả `correctIndex`. Học viên chỉ nộp `answerIndex`, máy chủ quyết định điểm `10` hoặc `0`, và lưu một lần trong D1. Lượt nộp khác đáp án bị từ chối 409; lượt nộp lại cùng đáp án được xử lý idempotent. Không có thao tác sửa điểm hoặc cho trình duyệt gửi `score`.
+- `POST /api/demo-quiz/student`: hành động `question`, `submit`, `result`. Xác minh **chữ ký Firebase ID Token do Google phát hành**, đúng dự án staging và provider `custom`, sau đó đối chiếu UID từ token với `demo_students.active=1` trong D1. UID tự khai báo/điểm tự gửi từ trình duyệt không có quyền.
+- `POST /api/demo-quiz/admin`: hành động `list`. Chỉ Google Admin được máy chủ xác minh `verifiedGoogleAdmin`; truy vấn danh sách tối đa 100 lượt, tên tài khoản chỉ theo mẫu `test_hv_...`; không đưa mật khẩu hay mã băm ra API.
+- Hai endpoint trả **404 mặc định** và chỉ bật bằng biến máy chủ `PHASE4_SYNTHETIC_QUIZ_ENABLED=true` trên staging; **biến chưa được cấu hình**. Mọi route cũng qua `requireStaging`. Tuyệt đối không bật ở production hoặc dùng dữ liệu thật.
+- Frontend có `src/components/StagingDemoQuizPanel.tsx` trong cửa sổ kiểm thử Cloud Storage: học viên DEMO tải câu hỏi, nộp đáp án và đọc lại điểm của UID trên máy khác; Google Admin xem danh sách kết quả DEMO của các tài khoản. Frontend không chấm điểm và không tự đồng bộ cache điểm thi thật.
+- `tests/phase4-synthetic-quiz.test.mjs` dùng **SQLite trong bộ nhớ** và RSA chữ ký token thử: đáp án/điểm không được tin từ client, chống UID giả, tài khoản đã khóa, token sai dự án/sai provider/giả mạo, khóa chính chống nộp trùng, Admin bị từ chối khi chưa xác thực và API tắt mặc định. Pipeline còn kiểm tra TypeScript/build website.
+- **Đây mới là mã và kiểm thử tự động; chưa thử trên nhiều thiết bị thật.** Bước tiếp theo sau khi review và phê duyệt staging là sao lưu D1, áp dụng đúng migration mới, bật duy nhất flag Phase 4A tại staging, thử học viên A gửi bài ở trình duyệt ẩn danh và Google Admin đọc kết quả ở trình duyệt khác. Không làm các bước đó khi người dùng chưa cho phép.
+
+**Chưa thể dùng làm hệ thống kiểm tra chính thức:** bộ đề thật phải do máy chủ quản lý/phiên bản hóa, chống lộ đáp án và chấm điểm ở backend; giới hạn lượt/time, kiểm tra session bị thu hồi, mô hình kết quả có phân quyền, thống kê Admin, quản lý tài khoản thật, sao lưu và kiểm thử bảo mật 30–100 người đều chưa hoàn thiện. Dữ liệu DEMO này không được gộp với `attempts`/lịch sử thi hiện có.
+
 ## Phạm vi tối thiểu
 
 1. Admin được máy chủ xác thực có quyền tạo học viên, cấp mật khẩu tạm một lần, khóa/mở và reset mật khẩu; mọi thao tác được ghi audit không chứa mật khẩu.

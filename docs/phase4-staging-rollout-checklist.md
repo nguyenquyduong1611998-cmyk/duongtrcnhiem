@@ -177,6 +177,32 @@ thái hiển thị chính xác khi mất mạng. Bộ kiểm thử
 `tests/phase4-browser-submit-recovery.test.ts` dùng dữ liệu giả để
 chứng minh không có POST tự động thứ hai; chưa kiểm chứng qua Internet.
 
+## Phase 4H — chống bỏ qua lỗi D1, khóa tài khoản và tách điểm theo phiên (kiểm thử offline)
+
+- Lệnh lưu bài trong `functions/_shared/synthetic-quiz.mjs` dùng
+  `INSERT ... ON CONFLICT(firebase_uid) DO NOTHING` thay cho
+  `INSERT OR IGNORE`. Chỉ cho phép gửi lại khi cùng UID đã có điểm;
+  lỗi `CHECK`, cấu trúc D1 không khớp và lỗi ràng buộc khác phải nổi lên
+  dưới dạng lỗi máy chủ thay vì bị bỏ qua như một lần nộp hợp lệ.
+- Kiểm thử SQLite trong bộ nhớ gửi **20 yêu cầu nộp đồng thời** với đáp
+  án khác nhau: chỉ một bản ghi được tạo, điểm đã lưu không bị ghi đè.
+  Đây là kiểm thử logic, không phải phép đo tải đồng thời 100 người
+  trên Cloudflare thật.
+- Kiểm thử khóa tài khoản DEMO ngay **trước khi ghi**: lệnh nộp
+  không được lưu bài; khóa ngay **sau khi ghi nhưng trước khi đọc**:
+  endpoint không được trả điểm cho học viên đã bị vô hiệu hóa.
+  Kết quả có thể đã được ghi trước khi khóa, vẫn cần đối chiếu audit nếu
+  đây là ứng dụng thật.
+- `StagingDemoQuizPanel` được gắn React `key` theo UID học viên
+  Firebase đã đối chiếu ở `App.tsx`. Khi đổi tài khoản trong lúc cửa sổ
+  Cloud Storage còn mở, câu trả lời/điểm đã đọc cũ được reset thay vì
+  hiển thị cho tài khoản mới. Bộ kiểm thử CI có kiểm tra tĩnh liên kết này;
+  **chưa thực hiện kiểm thử chuyển tài khoản thực tế trên trình duyệt**.
+
+Việc khóa và mở lại tài khoản DEMO **chưa phải** cơ chế thu hồi
+Firebase refresh token/ID token hoàn chỉnh. Không dùng các hàng rào
+thử nghiệm này làm xác thực học viên thật.
+
 ## Tiêu chí dừng và cách quay về trạng thái an toàn
 
 - Bất cứ lỗi schema, quyền truy cập, tài khoản khác xem được điểm, sai D1

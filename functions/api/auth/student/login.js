@@ -1,3 +1,4 @@
+import {bindStagingDatabaseForRequest} from '../../../_shared/staging-db-binding.mjs';
 import {
   requireStaging,json,checkRequest,smallJson,usernameKey,pbkdf2,equalSecret,
   mintFirebaseToken,GENERIC_LOGIN_ERROR, noSecrets,failSafe
@@ -18,6 +19,7 @@ async function updateFailures(db,username,old,now){
   ).bind(username,count,first,locked).run();
 }
 export async function onRequestPost({request,env}){
+  env=bindStagingDatabaseForRequest(env,request);
   const invalid=checkRequest(request);
   if(invalid)return invalid;
   try {requireStaging(env);}catch{return noSecrets();}

@@ -15,6 +15,7 @@ export interface StagingD1PreflightReport {
     exists:boolean;
     columnsValid:boolean;
     foreignKeyValid:boolean;
+    constraintsValid:boolean;
     immutableTriggerPresent:boolean;
     dateIndexPresent:boolean;
     rowCount:number|null;
@@ -58,6 +59,7 @@ export async function readStagingD1Preflight(
     typeof synthetic.exists!=='boolean'||
     typeof synthetic.columnsValid!=='boolean'||
     typeof synthetic.foreignKeyValid!=='boolean'||
+    typeof synthetic.constraintsValid!=='boolean'||
     typeof synthetic.immutableTriggerPresent!=='boolean'||
     typeof synthetic.dateIndexPresent!=='boolean'||
     !(synthetic.rowCount===null||

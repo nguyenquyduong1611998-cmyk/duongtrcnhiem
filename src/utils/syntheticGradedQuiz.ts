@@ -46,15 +46,21 @@ async function post(path:string,data:Record<string,unknown>,user:User,allowExist
     method:'POST',
     headers:{
       'content-type':'application/json',
-      authorization:`Bearer ${token}`, 
+      authorization:`Bearer ${token}`,
     },
     body:JSON.stringify(data),
     credentials:'same-origin',
     cache:'no-store',
   });}
-  catch{throw new SyntheticQuizDeliveryUncertainError();}
+  catch{
+    if(data.action==='submit')throw new SyntheticQuizDeliveryUncertainError();
+    throw new Error('Không thể kết nối Cloudflare để đọc dữ liệu DEMO. Hãy kiểm tra mạng.');
+  }
   const result=await response.json().catch(()=>null) as Record<string,unknown>|null;
-  if(response.ok&&!result)throw new SyntheticQuizDeliveryUncertainError();
+  if(response.ok&&!result){
+    if(data.action==='submit')throw new SyntheticQuizDeliveryUncertainError();
+    throw new Error('Máy chủ trả về dữ liệu DEMO không hợp lệ.');
+  }
   if(response.status===404)
     throw new Error('Chức năng chấm bài DEMO đang tắt trên máy chủ staging.');
   if(response.status===409 && result?.error==='ALREADY_SUBMITTED'){

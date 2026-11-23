@@ -4,9 +4,11 @@
 // A 404 can mean either flag OFF OR route not deployed; do not infer readiness.
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {PHASE4_PINNED_STAGING_HOST,PHASE4_PILOT_PREVIEW_HOST}
+  from '../functions/_shared/phase4-host-guard.mjs';
 
-export const STAGING_HOST='duongtrcnhiem-test.pages.dev';
-const ROOT='https://'+STAGING_HOST;
+export const STAGING_HOST=PHASE4_PINNED_STAGING_HOST;
+export const PREVIEW_HOST=PHASE4_PILOT_PREVIEW_HOST;
 const probes=Object.freeze([
   {name:'existing_auth_status',path:'/api/auth/status',method:'GET'},
   {name:'demo_student_route',path:'/api/demo-quiz/student',method:'POST'},
@@ -52,8 +54,8 @@ function categorize(route,httpStatus){
   return 'UNEXPECTED_RESPONSE';
 }
 
-async function one({name,path,method},transport){
-  const url=ROOT+path;
+async function one({name,path,method},transport,host){
+  const url='https://'+host+path;
   const opts={
     method,
     redirect:'manual',      // never follow a Cloudflare Access login redirect
@@ -89,16 +91,17 @@ async function one({name,path,method},transport){
   }
   return outcome;
 }
-export async function probePublicStaging(transport=fetch){
+export async function probePublicStaging(transport=fetch,{preview=false}={}){
+  const host=preview?PREVIEW_HOST:STAGING_HOST;
   const results=[];
-  for(const spec of probes)results.push(await one(spec,transport));
+  for(const spec of probes)results.push(await one(spec,transport,host));
   const unsafe=results.some(r=>r.result==='UNEXPECTED_UNAUTHENTICATED_SUCCESS'
     ||r.result==='ROUTE_MAY_BE_ENABLED_REVIEW_REQUIRED');
   const allOff=results.slice(1).every(r=>r.result==='OFF_OR_NOT_DEPLOYED');
   const access=results.some(r=>r.result==='ACCESS_OR_AUTH_GATE_UNKNOWN');
   return {
     mode:'unauthenticated-public-surface-check',
-    host:STAGING_HOST,
+    host,
     status:unsafe?'MANUAL_SECURITY_REVIEW':
       access?'ACCESS_GATE_INCONCLUSIVE':
       allOff?'NEW_APIS_OFF_OR_NOT_DEPLOYED':'UNVERIFIED',
@@ -115,17 +118,21 @@ export async function probePublicStaging(transport=fetch){
 }
 
 async function main(){
-  if(process.argv.length!==3||process.argv[2]!=='--allow-network'){
+  const args=process.argv.slice(2);
+  const canonical=args.length===1&&args[0]==='--allow-network';
+  const preview=args.length===2&&args[0]==='--allow-network'&&args[1]==='--preview';
+  if(!canonical&&!preview){
     process.stdout.write(
       'Not executed. After explicit approval, run:\n'+
       'node scripts/phase4-public-staging-probe.mjs --allow-network\n'+
-      'Only contacts the exact hard-coded staging hostname; no credentials.\n',
+      'node scripts/phase4-public-staging-probe.mjs --allow-network --preview\n'+
+      'Only contacts exact allowlisted Pages test hosts; no credentials.\n',
     );
     process.exitCode=process.argv.includes('--help')?0:2;
     return;
   }
   try{
-    const report=await probePublicStaging();
+    const report=await probePublicStaging(fetch,{preview});
     process.stdout.write(JSON.stringify(report,null,2)+'\n');
     if(report.status!=='NEW_APIS_OFF_OR_NOT_DEPLOYED')
       process.exitCode=1;

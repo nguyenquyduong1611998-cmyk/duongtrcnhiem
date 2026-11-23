@@ -98,6 +98,11 @@ test('duplicate CREATE TABLE and active ATTACH/DROP statements are flagged',()=>
     dump()+base,
     dump()+"\nATTACH DATABASE '/private/file.sqlite' AS unsafe;",
     dump()+"\nDROP TABLE demo_students;",
+    dump()+"\nDELETE FROM demo_students;",
+    dump()+"\nUPDATE demo_students SET active=0;",
+    dump()+"\nREPLACE INTO demo_students VALUES ('synthetic');",
+    dump()+"\nCREATE VIRTUAL TABLE q USING fts5(body);",
+    dump()+"\nINSERT INTO sqlite_master VALUES ('unsafe');",
   ]){
     const report=inspectD1SqlExportText(value);
     assert.equal(report.status,'BLOCKED');

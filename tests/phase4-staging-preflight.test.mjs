@@ -12,7 +12,7 @@ import {onRequestPost}
 
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 const now=Math.floor(Date.now()/1000);
-const origin='https://staging.example.test';
+const origin='https://duongtrcnhiem-test.pages.dev';
 const base=readFileSync('serverless/d1-staging-schema.sql','utf8');
 const unit=readFileSync('serverless/d1-phase2-staging-accounts.sql','utf8');
 const quiz=readFileSync('serverless/d1-phase4-synthetic-graded-quiz.sql','utf8');
@@ -72,6 +72,7 @@ function fixture({withUnit=true,withQuiz=false,withBaseline=true}={}){
       'synthetic@'+PROJECT_ID+'.iam.gserviceaccount.com',
     FIREBASE_PRIVATE_KEY:'UNUSED_PLACEHOLDER_NO_REAL_SECRET',
     PHASE4_STAGING_PREFLIGHT_ENABLED:'true',
+    PHASE4_STAGING_HOSTNAME:'duongtrcnhiem-test.pages.dev',
   };
   const request=(token='',body={action:'inspect'})=>new Request(
     origin+'/api/demo-quiz/preflight',{

@@ -197,6 +197,12 @@ test('server grades only from fixed answer key; immutable one attempt per UID',a
     assert.equal(list.attempts[0].password,undefined);
     assert.equal(list.attempts[0].firebaseUid,undefined);
 
+    // D1 itself must refuse score changes, even outside the application.
+    assert.throws(()=>f.run(
+      'UPDATE synthetic_graded_attempts SET score=? WHERE firebase_uid=?',
+      0,UID_A,
+    ),/SYNTHETIC_GRADE_IMMUTABLE/);
+
     // Deleting a DEMO enrollment cascades only to its synthetic quiz row.
     f.run('DELETE FROM demo_students WHERE firebase_uid=?',UID_A);
     assert.equal(f.count(),1);

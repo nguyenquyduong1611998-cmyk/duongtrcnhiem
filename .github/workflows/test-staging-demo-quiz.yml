@@ -1,0 +1,55 @@
+name: Staging DEMO Quiz Pilot (isolated)
+
+on:
+  push:
+    branches:
+      - feature/staging-demo-quiz-pilot
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  demo-quiz-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout clean feature branch
+        uses: actions/checkout@v4
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install
+      - name: TypeScript validation
+        run: bun run lint
+      - name: Check Cloudflare Functions syntax
+        run: |
+          node --check functions/_shared/auth.mjs
+          node --check functions/_shared/demo-quiz-token.mjs
+          node --check functions/_shared/synthetic-quiz.mjs
+          node --check functions/_shared/phase4-staging-preflight.mjs
+          node --check functions/api/demo-quiz/student.js
+          node --check functions/api/demo-quiz/admin.js
+          node --check functions/api/demo-quiz/preflight.js
+      - name: Existing DEMO authentication and D1 regressions
+        run: |
+          node --test tests/staging-security.test.mjs
+          node --test tests/serverless-auth.test.mjs
+          node --test tests/d1-unit-accounts.test.mjs
+          node --test tests/d1-unit-verify.test.mjs
+          node --test tests/d1-unit-password-change.test.mjs
+      - name: DEMO quiz token and D1 grading tests
+        run: node --test tests/phase4-synthetic-quiz.test.mjs
+      - name: Cross-device HTTP A/B and Admin simulation
+        run: node --test tests/phase4-synthetic-quiz-http-e2e.test.mjs
+      - name: Migration rollback and 100-student SQLite rehearsal
+        run: node --test tests/phase4-staging-migration-dry-run.test.mjs
+      - name: Admin read-only D1 preflight tests
+        run: node --test tests/phase4-staging-preflight.test.mjs
+      - name: Phase 4 isolation and flags OFF by default
+        run: node --test tests/phase4-pilot-isolation.test.mjs
+      - name: Build website
+        run: bun run build
+      - name: Build staging website
+        env:
+          VITE_FIREBASE_ENV: staging
+        run: bun run build

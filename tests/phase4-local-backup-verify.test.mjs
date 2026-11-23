@@ -4,6 +4,7 @@ import {readFileSync,writeFileSync,mkdtempSync,rmSync,statSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {DatabaseSync} from 'node:sqlite';
 import {verifyOfflineStagingBackup}
   from '../scripts/phase4-verify-local-backup.mjs';
@@ -144,6 +145,41 @@ test('rejects non-file, missing, and incomplete binary database snapshots',async
     await assert.rejects(verifyOfflineStagingBackup(dir),
       /LOCAL_BACKUP_SIZE_OR_TYPE_INVALID/);
     await assert.rejects(verifyOfflineStagingBackup(''));
+  }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test('CLI returns safe aggregate report and never prints the private filename or rows',()=>{
+  const f=fixture();
+  try {
+    const run=spawnSync(process.execPath,
+      ['scripts/phase4-verify-local-backup.mjs',f.path],
+      {encoding:'utf8',timeout:20000});
+    assert.equal(run.status,0,run.stderr);
+    const obj=JSON.parse(run.stdout);
+    assert.equal(obj.status,'LOCAL_STRUCTURE_CHECK_PASSED');
+    assert.equal(obj.deployAllowed,false);
+    assert.equal(run.stdout.includes('secret-hash'),false);
+    assert.equal(run.stdout.includes('test_hv_aaaaaaaaaaaa'),false);
+    assert.equal(run.stdout.includes(f.path),false);
+  }finally{f.clean();}
+});
+test('CLI fails closed on text dump without echoing path or unsafe SQL',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'phase4-text-export-'));
+  const file=join(dir,'sensitive-export.sql');
+  try {
+    writeFileSync(file,"ATTACH DATABASE '/tmp/unsafe-private.db' AS x;");
+    const run=spawnSync(process.execPath,
+      ['scripts/phase4-verify-local-backup.mjs',file],
+      {encoding:'utf8',timeout:20000});
+    assert.equal(run.status,1);
+    const obj=JSON.parse(run.stdout);
+    assert.deepEqual(obj,{
+      status:'BLOCKED',reason:'BACKUP_NOT_SQLITE_SNAPSHOT',
+      deployAllowed:false,
+    });
+    assert.equal(run.stdout.includes(file),false);
+    assert.equal(run.stderr.includes(file),false);
+    assert.equal(run.stdout.includes('ATTACH'),false);
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
 

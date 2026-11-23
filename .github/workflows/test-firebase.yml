@@ -121,6 +121,9 @@ jobs:
       - name: Phase 4 server-graded synthetic quiz and D1 cross-device test
         run: node --test tests/phase4-synthetic-quiz.test.mjs
 
+      - name: Phase 4 HTTP A/B and Admin cross-device authorization E2E simulation
+        run: node --test tests/phase4-synthetic-quiz-http-e2e.test.mjs
+
       - name: Build website
         run: bun run build
         

@@ -40,7 +40,7 @@ const decode=segment=>JSON.parse(Buffer.from(segment,'base64url').toString());
 function backend() {
   const docs=new Map();
   const network={
-    reads:0,writes:0,oauth:0,failRead:false,failWrite:false,failOAuth:false,
+    reads:0,writes:0,committedWrites:0,oauth:0,failRead:false,failWrite:false,failOAuth:false,
     failAck:false,injectConflict:false,oauthScopes:[],
   };
   let updateNumber=0;
@@ -91,7 +91,7 @@ function backend() {
       network.reads++;
       assert.equal(parsed.search,'');
       if(network.failRead)return response({error:'unavailable'},503);
-      if(network.failAck && network.writes>0) return response({
+      if(network.failAck && network.committedWrites>0) return response({
         fields:{
           active:{booleanValue:true},
           authVersion:{integerValue:'1'},
@@ -146,6 +146,7 @@ function backend() {
         return response({error:'already-exists'},409);
       }
       stored(account,{active,authVersion,revokeAfterSeconds});
+      network.committedWrites++;
       return response({name:projectDoc+account},200);
     }
     throw new Error('Unexpected HTTP method');

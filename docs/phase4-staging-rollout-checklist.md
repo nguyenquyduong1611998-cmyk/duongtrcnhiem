@@ -92,6 +92,56 @@ Nguồn tài liệu Cloudflare:
 https://developers.cloudflare.com/pages/configuration/preview-deployments/
 và https://developers.cloudflare.com/pages/configuration/branch-build-controls/
 
+## Giai đoạn 4N — D1 binding riêng cho bản Preview (chuẩn bị cấu hình)
+
+Ngày 23/11/2026, khi mở `/api/auth/status` trên branch Preview,
+kết quả thực tế là `ready:false`, `d1Connected:false`,
+`tablesReady:false`. Ảnh Cloudflare cho thấy ở **Preview**
+phần `Bindings` trống; Production test Pages đã có
+`AUTH_DB → duongtrcnhiem-auth-staging`.
+
+Người quản trị đã tạo **D1 mới rỗng** tên
+`duongtrcnhiem-auth-preview` (Number of Tables: 0, Rows written: 0).
+Cloudflare UI không cho dùng trùng tên `AUTH_DB` trong màn hình thêm
+binding Preview, nhưng chấp nhận tên riêng `AUTH_DB_PREVIEW`.
+
+Các hàm `functions/api/auth/*`, `functions/api/demo-quiz/*` và
+`/api/auth/status` được bổ sung
+`functions/_shared/staging-db-binding.mjs`:
+
+- Tên miền branch Preview **chính xác**
+  `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`
+  sẽ dùng **duy nhất** `env.AUTH_DB_PREVIEW`. Nếu biến này vắng mặt,
+  tuyệt đối không rơi về `env.AUTH_DB`, dù Cloudflare kế thừa binding
+  Production test Pages.
+- Tên miền canonical `duongtrcnhiem-test.pages.dev` vẫn dùng `env.AUTH_DB`.
+- Những URL deployment hash khác hoặc branch Preview khác của cùng
+  Pages project không tự được phép truy cập một trong hai database.
+
+Cấu hình dự kiến tại **Cloudflare Pages → Settings → Preview → Bindings**:
+
+| Binding name | Database |
+| --- | --- |
+| `AUTH_DB_PREVIEW` | `duongtrcnhiem-auth-preview` |
+
+Không đặt `AUTH_DB_PREVIEW` trên Production. **Chỉ Save binding sau
+khi xác nhận hai ô đúng**, không thêm hay xóa binding `AUTH_DB` đang
+hoạt động ở Production. Tạo binding cần có một Preview deployment
+**sau khi Save** để Functions thấy thay đổi; không cần Merge PR #3.
+Việc tạo binding đơn thuần **không chạy SQL, không tạo bảng hoặc cấp
+quyền đăng nhập**.
+
+D1 Preview vẫn rỗng: `/api/auth/status` có thể chuyển thành
+`d1Connected:true`, nhưng `tablesReady:false` và `ready:false`
+là kết quả **đúng dự kiến** cho đến khi có migration và secrets
+được thẩm định/cho phép riêng. Không chạy migration, không sao chép
+secrets hoặc tài khoản từ database cũ trong bước này.
+
+Bài test `tests/phase4-preview-d1-binding.test.mjs` chứng minh
+không có fallback nhầm Production D1 và không trả dữ liệu từ
+những URL Preview không được phê duyệt. GitHub CI cũng chạy kiểm
+tra này trên mỗi commit của PR #3.
+
 ## Giai đoạn 4M — bảo vệ Firebase trong bản Preview
 
 Đã xác minh Cloudflare Pages **deploy successful** commit

@@ -16,9 +16,9 @@ export async function onRequestPost({request,env}) {
   if(bad)return bad;
   if(env?.PHASE4_SYNTHETIC_QUIZ_ENABLED!=='true')
     return json({error:'NOT_FOUND'},404);
-  try{requireStaging(env);}catch{return noSecrets();}
   if(!isApprovedPhase4StagingHost(request,env))
     return json({error:'NOT_FOUND'},404);
+  try{requireStaging(env);}catch{return noSecrets();}
   try {
     const uid=await verifyActiveDemoQuizStudent(env.AUTH_DB,request);
     if(!uid)return json({error:'UNAUTHORIZED'},401);

@@ -1,3 +1,4 @@
+import {bindStagingDatabaseForRequest} from '../../_shared/staging-db-binding.mjs';
 import {
   requireStaging,json,checkRequest,smallJson,verifiedGoogleAdmin,
   noSecrets,failSafe,
@@ -9,6 +10,7 @@ import {isApprovedPhase4StagingHost}
 // Read-only Admin dashboard of synthetic D1 graded attempts.
 // A browser-local Admin role never grants access to this endpoint.
 export async function onRequestPost({request,env}) {
+  env=bindStagingDatabaseForRequest(env,request);
   const bad=checkRequest(request);
   if(bad)return bad;
   if(env?.PHASE4_SYNTHETIC_QUIZ_ENABLED!=='true')

@@ -10,9 +10,14 @@ import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 
 import productionConfig from '../firebase-applet-config.json';
 import stagingConfig from '../firebase-staging-config.json';
+import {shouldUseStagingFirebase} from './utils/firebaseStagingHost';
 
-// Chỉ dùng Firebase thử nghiệm khi cấu hình staging
-export const IS_FIREBASE_STAGING = import.meta.env.VITE_FIREBASE_ENV === 'staging';
+// Always select staging on the separately hosted Cloudflare Pages test project.
+// This also protects Preview deployments if their Vite env is misconfigured.
+export const IS_FIREBASE_STAGING = shouldUseStagingFirebase(
+  import.meta.env.VITE_FIREBASE_ENV,
+  typeof window!=='undefined'?window.location.hostname:'',
+);
 
 const firebaseConfig = IS_FIREBASE_STAGING
   ? stagingConfig

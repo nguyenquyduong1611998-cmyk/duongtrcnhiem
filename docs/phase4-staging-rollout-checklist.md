@@ -63,14 +63,36 @@ SQLite trong tệp cục bộ đã vượt qua `PRAGMA integrity_check`,
 Đây **không** phải xác thực sao lưu mới, so khớp với D1 thật,
 đã cấp quyền triển khai hay đã thử khôi phục thành công.
 
-**Quan trọng:** bản export Cloudflare D1 có thể là **file `.sql`**
-chứ không phải ảnh cơ sở dữ liệu SQLite (`.sqlite`/`.db`).
-Công cụ này cố ý **từ chối file SQL** (`BACKUP_NOT_SQLITE_SNAPSHOT`)
-để không vô tình thực thi các lệnh trong bản dump.
-File SQL bị từ chối **không đồng nghĩa backup bị hỏng**. Chỉ phân tích nó
-sau khi được khôi phục **riêng, offline, có thẩm định** thành tệp
-SQLite; không tự động phục hồi vào D1 đang sử dụng. Bước kiểm tra backup
-`.sql` chưa được tự động hóa trong giai đoạn này.
+**Quan trọng:** Cloudflare D1 có thể xuất bản sao lưu dạng `.sql`,
+khác với ảnh cơ sở dữ liệu SQLite (`.sqlite`/`.db`).
+Công cụ kiểm tra SQLite vẫn **từ chối file SQL**
+(`BACKUP_NOT_SQLITE_SNAPSHOT`) để không vô tình thực thi tệp SQL.
+Với file `.sql`, dùng **công cụ riêng chỉ đọc và không thực thi SQL**:
+
+```powershell
+node .\scripts\phase4-inspect-d1-sql-export.mjs "C:\duong-dan-rieng\staging-export.sql"
+```
+
+Công cụ Phase 4F này chỉ xem văn bản xuất D1 để đối chiếu **khai báo
+bảng và các cột bắt buộc**. Nó loại trừ nội dung comment/chuỗi dữ liệu,
+phát hiện thiếu bảng, khai báo trùng và những câu lệnh có thể làm thay
+đổi dữ liệu cần rà soát. Không chạy SQL, không gọi Cloudflare, không
+hiển thị hàng dữ liệu, tên tài khoản, mật khẩu hoặc đường dẫn file.
+
+Trạng thái `SQL_EXPORT_STRUCTURE_REVIEW_ONLY` chỉ có nghĩa phần
+**khai báo cấu trúc** đã được nhận diện để tiếp tục xem xét thủ công.
+Không có xác nhận bản SQL hoàn chỉnh, thực thi được hoặc chứa đầy đủ
+dữ liệu. Đầu ra luôn có `integrityVerified:false`,
+`foreignKeysVerified:false`, `rowsVerified:false`,
+`importabilityVerified:false`, `deployAllowed:false`.
+Khi `BLOCKED`, phải dừng để đánh giá nguyên nhân; không chạy SQL đó.
+
+Vẫn bắt buộc một lần **khôi phục thử được thẩm định trong môi trường
+SQLite cô lập**, rồi kiểm tra tính toàn vẹn, khóa ngoại, số bản ghi
+và đối chiếu với D1 staging thật. **Chưa có thao tác khôi phục thử nào
+được tự động hóa hoặc thực hiện trên bản sao lưu thực tế.**
+Công cụ chỉ đọc text hỗ trợ tối đa 32 MiB; tệp lớn hơn cần quy trình
+xét duyệt riêng, không tự cắt hoặc nén lại để coi là hoàn tất.
 
 Bộ kiểm thử `tests/phase4-local-backup-verify.test.mjs` chạy trên
 file SQLite giả được tạo tạm: xác nhận không thay đổi byte nào, không
@@ -82,7 +104,9 @@ SQL dump có nội dung nguy hiểm. **Chưa kiểm tra file backup thật**.
 1. GitHub Actions của **commit định triển khai** phải đạt: TypeScript/build,
    `phase4-synthetic-quiz.test.mjs`,
    `phase4-synthetic-quiz-http-e2e.test.mjs`,
-   `phase4-staging-migration-dry-run.test.mjs`, Firestore Emulator và kiểm
+   `phase4-staging-migration-dry-run.test.mjs`,
+   `phase4-local-backup-verify.test.mjs`,
+   `phase4-sql-export-static.test.mjs` và kiểm
    tra hồi quy các tính năng đang chạy.
 2. **Kiểm tra read-only trên D1 staging** bằng tài khoản có quyền phù hợp:
    xác nhận có `demo_students`, `login_attempts`, `unit_accounts`; đối chiếu

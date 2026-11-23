@@ -16,9 +16,9 @@ export async function onRequestPost({request,env}){
   if(invalid)return invalid;
   if(env?.PHASE4_STAGING_PREFLIGHT_ENABLED!=='true')
     return json({error:'NOT_FOUND'},404);
-  try{requireStaging(env);}catch{return noSecrets();}
   if(!isApprovedPhase4StagingHost(request,env))
     return json({error:'NOT_FOUND'},404);
+  try{requireStaging(env);}catch{return noSecrets();}
   if(!await verifiedGoogleAdmin(request))
     return json({error:'ADMIN_AUTH_REQUIRED'},403);
   let input;

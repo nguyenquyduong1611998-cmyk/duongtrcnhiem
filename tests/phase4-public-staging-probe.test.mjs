@@ -58,7 +58,7 @@ test('safe OFF-or-undeployed result makes NO claim of deployment/DB readiness',a
 
 test('explicit preview inspection uses ONLY reviewed branch alias and no credentials',async()=>{
   assert.equal(PREVIEW_HOST,
-    'feature-staging-demo-quiz-pilot.duongtrcnhiem-test.pages.dev');
+    'feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev');
   const {seen,transport}=mockSequence([
     json({stage:'staging-only',ready:false,mode:'demo-students-only'}),
     json({error:'NOT_FOUND'},404),

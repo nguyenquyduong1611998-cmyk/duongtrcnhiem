@@ -19,12 +19,10 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-      - name: Install dependencies
-        run: bun install
-      - name: Inspect lockfile drift (temporary diagnostic)
-        run: |
-          git diff --numstat -- bun.lock
-          git diff -- bun.lock
+      - name: Install exact committed dependencies (Cloudflare-equivalent)
+        run: bun install --frozen-lockfile
+      - name: Verify installation did not modify lockfile
+        run: git diff --exit-code -- bun.lock
       - name: TypeScript validation
         run: bun run lint
       - name: Check Cloudflare Functions syntax

@@ -1,3 +1,4 @@
+// @ts-expect-error Bun's runner-only test module has no browser TypeScript types.
 import {describe,test,expect} from 'bun:test';
 import {
   SyntheticQuizDeliveryUncertainError,reconcileSyntheticQuizSubmission,

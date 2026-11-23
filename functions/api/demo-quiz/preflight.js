@@ -1,3 +1,4 @@
+import {bindStagingDatabaseForRequest} from '../../_shared/staging-db-binding.mjs';
 import {
   requireStaging,json,checkRequest,smallJson,
   verifiedGoogleAdmin,noSecrets,failSafe,
@@ -10,6 +11,7 @@ import {isApprovedPhase4StagingHost}
 // Read-only, Admin-only and OFF until independently approved in staging.
 // NO migration execution, SQL input, table rows, credentials or identifiers.
 export async function onRequestPost({request,env}){
+  env=bindStagingDatabaseForRequest(env,request);
   const invalid=checkRequest(request);
   if(invalid)return invalid;
   if(env?.PHASE4_STAGING_PREFLIGHT_ENABLED!=='true')

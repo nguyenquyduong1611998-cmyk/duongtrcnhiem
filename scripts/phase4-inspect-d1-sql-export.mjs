@@ -107,7 +107,9 @@ export function inspectD1SqlExportText(source){
   const declarations=new Map();
   let unsafe=false,duplicate=false,oversize=false;
   for(const {part,overflow} of statements){
-    if(/^(?:ATTACH|DETACH|VACUUM|DROP|ALTER|REINDEX|LOAD_EXTENSION)\b/i.test(part)||
+    if(/^(?:ATTACH|DETACH|VACUUM|DROP|ALTER|REINDEX|LOAD_EXTENSION|DELETE|UPDATE|REPLACE)\b/i.test(part)||
+       /^INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+(?:sqlite_master|sqlite_schema)\b/i.test(part)||
+       /^CREATE\s+VIRTUAL\s+TABLE\b/i.test(part)||
        /^PRAGMA\s+(?:writable_schema|trusted_schema)\b/i.test(part))
       unsafe=true;
     const match=createTable.exec(part);

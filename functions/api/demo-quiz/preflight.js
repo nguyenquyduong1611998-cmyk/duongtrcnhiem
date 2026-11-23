@@ -4,6 +4,8 @@ import {
 } from '../../_shared/auth.mjs';
 import {inspectStagingDemoQuizSchema}
   from '../../_shared/phase4-staging-preflight.mjs';
+import {isApprovedPhase4StagingHost}
+  from '../../_shared/phase4-host-guard.mjs';
 
 // Read-only, Admin-only and OFF until independently approved in staging.
 // NO migration execution, SQL input, table rows, credentials or identifiers.
@@ -13,6 +15,8 @@ export async function onRequestPost({request,env}){
   if(env?.PHASE4_STAGING_PREFLIGHT_ENABLED!=='true')
     return json({error:'NOT_FOUND'},404);
   try{requireStaging(env);}catch{return noSecrets();}
+  if(!isApprovedPhase4StagingHost(request,env))
+    return json({error:'NOT_FOUND'},404);
   if(!await verifiedGoogleAdmin(request))
     return json({error:'ADMIN_AUTH_REQUIRED'},403);
   let input;

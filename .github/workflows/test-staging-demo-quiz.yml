@@ -15,10 +15,16 @@ jobs:
     steps:
       - name: Checkout clean feature branch
         uses: actions/checkout@v4
-      - name: Install Bun
+      - name: Install Bun (match Cloudflare Pages)
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - name: Install dependencies
         run: bun install
+      - name: Inspect lockfile drift (temporary diagnostic)
+        run: |
+          git diff --numstat -- bun.lock
+          git diff -- bun.lock
       - name: TypeScript validation
         run: bun run lint
       - name: Check Cloudflare Functions syntax

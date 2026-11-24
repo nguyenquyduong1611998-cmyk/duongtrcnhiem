@@ -49,7 +49,7 @@ function validTokenClaims(header,payload,now) {
 // provide options and never accept keys/UIDs/roles from the browser.
 export async function verifyDemoQuizIdToken(token,options={}) {
   if(typeof token!=='string'||token.length>8192||
-    !/^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(token)) {
+    !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
     noteAuthDiagnostic(options,'TOKEN_MISSING_OR_MALFORMED');
     return null;
   }

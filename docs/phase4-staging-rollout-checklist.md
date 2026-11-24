@@ -482,3 +482,26 @@ email, tên đăng nhập, khóa, hay header yêu cầu.
 **Tắt ngay `PHASE4_DEMO_AUTH_DIAGNOSTICS` và deploy lại** sau khi xác định
 nguyên nhân. Lỗi trả về vẫn là HTTP 401 `{"error":"UNAUTHORIZED"}`;
 không thử nộp bài hoặc sửa dữ liệu nếu chưa qua bước xác thực.
+
+## Phase 4R — phân biệt lỗi tải khóa công khai của Google
+
+Chẩn đoán Preview ngày 24/11/2026 cho `POST /api/demo-quiz/student`
+trả `401 UNAUTHORIZED`: `PHASE4_DEMO_AUTH_DIAGNOSTIC: GOOGLE_SIGNING_KEYS_UNAVAILABLE`.
+Điều này xác nhận khóa JWK của Google không được lấy/đọc thành công tại
+Cloudflare Function, nhưng **không** cho biết lỗi mạng hay HTTP status.
+Địa chỉ JWKS của Google đã được kiểm tra bên ngoài Cloudflare và đang trả
+danh sách khóa; điều này không chứng minh Cloudflare edge truy cập được.
+
+Bản vá tách thành các mã tĩnh `GOOGLE_KEYS_FETCH_FAILED`,
+`GOOGLE_KEYS_HTTP_403`, `GOOGLE_KEYS_HTTP_404`, `GOOGLE_KEYS_HTTP_429`,
+`GOOGLE_KEYS_HTTP_5XX`, `GOOGLE_KEYS_HTTP_OTHER`,
+`GOOGLE_KEYS_JSON_INVALID`, `GOOGLE_KEYS_SET_INVALID`.
+Chúng chỉ được ghi trong log của Preview khi cờ chẩn đoán tạm thời bật.
+Không ghi response body, token, claim, UID, email, URL, header hay secrets.
+API vẫn chỉ trả `401 UNAUTHORIZED`; không có fallback bỏ xác minh.
+
+Quy trình: review PR/CI; merge vào nhánh Preview sau phê duyệt;
+triển khai Preview đã cho phép; thực hiện một yêu cầu đọc câu hỏi;
+ghi nhận duy nhất mã tĩnh; tắt `PHASE4_DEMO_AUTH_DIAGNOSTICS` rồi
+deploy lại; điều tra nguyên nhân từ mã tĩnh trước khi sửa network logic.
+Không tạo thêm tài khoản, không cập nhật Production hay chạy SQL.

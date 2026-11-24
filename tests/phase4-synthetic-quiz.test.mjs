@@ -158,6 +158,41 @@ test('diagnostic callback reports only static stages, never token or UID',async(
   assert.equal(serialized.includes(valid),false);
 });
 
+test('Google JWKS failure stages are static, fail closed and recover safely',async()=>{
+  const savedFetch=globalThis.fetch;
+  const token=await sign();
+  const cases=[
+    {name:'network',fetcher:async()=>{throw new TypeError('private network detail');},code:'GOOGLE_KEYS_FETCH_FAILED'},
+    {name:'403',fetcher:async()=>new Response('',{status:403}),code:'GOOGLE_KEYS_HTTP_403'},
+    {name:'404',fetcher:async()=>new Response('',{status:404}),code:'GOOGLE_KEYS_HTTP_404'},
+    {name:'429',fetcher:async()=>new Response('',{status:429}),code:'GOOGLE_KEYS_HTTP_429'},
+    {name:'5xx',fetcher:async()=>new Response('',{status:502}),code:'GOOGLE_KEYS_HTTP_5XX'},
+    {name:'other-status',fetcher:async()=>new Response('',{status:401}),code:'GOOGLE_KEYS_HTTP_OTHER'},
+    {name:'json',fetcher:async()=>new Response('invalid json',{status:200}),code:'GOOGLE_KEYS_JSON_INVALID'},
+    {name:'set',fetcher:async()=>new Response(JSON.stringify({keys:[]}),{status:200}),code:'GOOGLE_KEYS_SET_INVALID'},
+  ];
+  try{
+    for(const item of cases){
+      const stages=[];
+      globalThis.fetch=item.fetcher;
+      assert.equal(await verifyDemoQuizIdToken(token,
+        {now:NOW,onDiagnostic:stage=>stages.push(stage)}),null,item.name);
+      assert.deepEqual(stages,[item.code],item.name);
+      assert.equal(JSON.stringify(stages).includes(token),false);
+      assert.equal(JSON.stringify(stages).includes(UID_A),false);
+    }
+    globalThis.fetch=async url=>{
+      assert.equal(url,'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
+      return new Response(JSON.stringify({keys:[jwk]}),{status:200,
+        headers:{'cache-control':'max-age=20'}});
+    };
+    const stages=[];
+    assert.equal(await verifyDemoQuizIdToken(token,
+      {now:NOW,onDiagnostic:stage=>stages.push(stage)}),UID_A);
+    assert.deepEqual(stages,[]);
+  }finally{globalThis.fetch=savedFetch;}
+});
+
 test('student identity comes from signed ID token AND active D1 demo enrollment',async()=>{
   const f=fixture();
   try {

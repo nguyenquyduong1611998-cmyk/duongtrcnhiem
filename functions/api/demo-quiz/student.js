@@ -5,7 +5,7 @@ import {
 import {
   verifyActiveDemoQuizStudent,handleDemoQuizStudent,
 } from '../../_shared/synthetic-quiz.mjs';
-import {isApprovedPhase4StagingHost}
+import {isApprovedPhase4StagingHost,PHASE4_PILOT_PREVIEW_HOST}
   from '../../_shared/phase4-host-guard.mjs';
 
 // Synthetic cross-device graded-quiz proof ONLY, flag OFF by default.
@@ -19,8 +19,17 @@ export async function onRequestPost({request,env}) {
   if(!isApprovedPhase4StagingHost(request,env))
     return json({error:'NOT_FOUND'},404);
   try{requireStaging(env);}catch{return noSecrets();}
+  // Diagnostics default OFF, only the exact approved Preview hostname.
+  // This prints static failure codes to server logs; never JWTs, UID or PII.
+  const diagnose=env?.PHASE4_DEMO_AUTH_DIAGNOSTICS==='true' &&
+    env?.PHASE4_PREVIEW_HOST_OPT_IN==='true' &&
+    new URL(request.url).hostname===PHASE4_PILOT_PREVIEW_HOST;
+  const onDiagnostic=diagnose
+    ? code=>console.warn('PHASE4_DEMO_AUTH_DIAGNOSTIC:',code)
+    : undefined;
   try {
-    const uid=await verifyActiveDemoQuizStudent(env.AUTH_DB,request);
+    const uid=await verifyActiveDemoQuizStudent(env.AUTH_DB,request,
+      {onDiagnostic});
     if(!uid)return json({error:'UNAUTHORIZED'},401);
     let data;
     try{data=await smallJson(request);}

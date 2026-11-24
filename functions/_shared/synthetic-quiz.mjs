@@ -14,6 +14,14 @@ const CORRECT_INDEX=1; // private to Cloudflare Functions, NOT shipped in Vite
 const OPTIONS=Object.freeze(['3','4','5','6']);
 const TOKEN_KID=/^[A-Za-z0-9_-]{1,128}$/;
 
+// Static diagnostics only. Never emit JWTs, usernames, UIDs, claims, keys,
+// passwords, origins or request headers. Callback is supplied by server code.
+function noteAuthDiagnostic(options,code){
+  if(typeof options?.onDiagnostic==='function'){
+    try{options.onDiagnostic(code);}catch{/* Logging must never change auth. */}
+  }
+}
+
 function bytes(value) {
   const string=value.replace(/-/g,'+').replace(/_/g,'/');
   return Uint8Array.from(
@@ -41,40 +49,73 @@ function validTokenClaims(header,payload,now) {
 // provide options and never accept keys/UIDs/roles from the browser.
 export async function verifyDemoQuizIdToken(token,options={}) {
   if(typeof token!=='string'||token.length>8192||
-    !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token))
+    !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) {
+    noteAuthDiagnostic(options,'TOKEN_MISSING_OR_MALFORMED');
     return null;
+  }
   const parts=token.split('.');
   const now=options.now??Math.floor(Date.now()/1000);
-  if(!Number.isSafeInteger(now)||now<=0)return null;
+  if(!Number.isSafeInteger(now)||now<=0){
+    noteAuthDiagnostic(options,'SERVER_CLOCK_INVALID');
+    return null;
+  }
   try {
     const header=decodeSegment(parts[0]);
     const payload=decodeSegment(parts[1]);
     if(!header||Array.isArray(header)||typeof header!=='object'||
       !payload||Array.isArray(payload)||typeof payload!=='object'||
-      !validTokenClaims(header,payload,now))return null;
-    const keys=options.keys??await fetchGoogleStudentSigningKeys();
-    if(!Array.isArray(keys))return null;
+      !validTokenClaims(header,payload,now)){
+      noteAuthDiagnostic(options,'TOKEN_CLAIMS_REJECTED');
+      return null;
+    }
+    let keys;
+    try{keys=options.keys??await fetchGoogleStudentSigningKeys();}
+    catch{
+      noteAuthDiagnostic(options,'GOOGLE_SIGNING_KEYS_UNAVAILABLE');
+      return null;
+    }
+    if(!Array.isArray(keys)){
+      noteAuthDiagnostic(options,'SIGNING_KEYS_INVALID');
+      return null;
+    }
     const jwk=keys.find(k=>k?.kid===header.kid&&k.kty==='RSA'&&
       typeof k.n==='string'&&typeof k.e==='string'&&
       (k.use===undefined||k.use==='sig'));
-    if(!jwk)return null;
+    if(!jwk){
+      noteAuthDiagnostic(options,'SIGNING_KEY_NOT_FOUND');
+      return null;
+    }
     const key=await crypto.subtle.importKey('jwk',jwk,
       {name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
     const ok=await crypto.subtle.verify('RSASSA-PKCS1-v1_5',
       key,bytes(parts[2]),te.encode(parts[0]+'.'+parts[1]));
-    return ok?payload.sub:null;
-  } catch{return null;}
+    if(!ok){
+      noteAuthDiagnostic(options,'TOKEN_SIGNATURE_REJECTED');
+      return null;
+    }
+    return payload.sub;
+  } catch{
+    noteAuthDiagnostic(options,'TOKEN_PARSE_OR_CRYPTO_FAILURE');
+    return null;
+  }
 }
 
 export async function verifyActiveDemoQuizStudent(db,request,options={}) {
-  if(!db?.prepare)return null;
+  if(!db?.prepare){
+    noteAuthDiagnostic(options,'D1_BINDING_MISSING');
+    return null;
+  }
   const uid=await verifyDemoQuizIdToken(bearerToken(request),options);
   if(!uid)return null;
   const row=await db.prepare(
     'SELECT firebase_uid FROM demo_students '+
     'WHERE firebase_uid=? AND active=1'
   ).bind(uid).first();
-  return row?.firebase_uid===uid?uid:null;
+  if(row?.firebase_uid!==uid){
+    noteAuthDiagnostic(options,'DEMO_ACCOUNT_NOT_ACTIVE_IN_BOUND_D1');
+    return null;
+  }
+  return uid;
 }
 
 function exact(data,fields) {

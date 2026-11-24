@@ -70,8 +70,16 @@ export async function verifyDemoQuizIdToken(token,options={}) {
     }
     let keys;
     try{keys=options.keys??await fetchGoogleStudentSigningKeys();}
-    catch{
-      noteAuthDiagnostic(options,'GOOGLE_SIGNING_KEYS_UNAVAILABLE');
+    catch(error){
+      // Do not forward arbitrary exception text or request metadata.
+      const allowed=new Set([
+        'GOOGLE_KEYS_FETCH_FAILED','GOOGLE_KEYS_HTTP_403',
+        'GOOGLE_KEYS_HTTP_404','GOOGLE_KEYS_HTTP_429',
+        'GOOGLE_KEYS_HTTP_5XX','GOOGLE_KEYS_HTTP_OTHER',
+        'GOOGLE_KEYS_JSON_INVALID','GOOGLE_KEYS_SET_INVALID',
+      ]);
+      noteAuthDiagnostic(options,allowed.has(error?.diagnosticCode)
+        ? error.diagnosticCode:'GOOGLE_SIGNING_KEYS_UNAVAILABLE');
       return null;
     }
     if(!Array.isArray(keys)){

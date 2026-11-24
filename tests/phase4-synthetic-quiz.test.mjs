@@ -123,6 +123,41 @@ test('JWT signature, issuer, audience, Firebase provider and timestamps verified
     await sign(),{now:NOW,keys:[]}),null);
 });
 
+test('diagnostic callback reports only static stages, never token or UID',async()=>{
+  const events=[];
+  const onDiagnostic=stage=>events.push(stage);
+  const valid=await sign();
+  assert.equal(await verifyDemoQuizIdToken(valid,
+    {now:NOW,keys:[jwk],onDiagnostic}),UID_A);
+  assert.deepEqual(events,[]);
+  assert.equal(await verifyDemoQuizIdToken('invalid',
+    {now:NOW,keys:[jwk],onDiagnostic}),null);
+  assert.equal(events.pop(),'TOKEN_MISSING_OR_MALFORMED');
+  assert.equal(await verifyDemoQuizIdToken(await sign({...payload,aud:'bad-project'}),
+    {now:NOW,keys:[jwk],onDiagnostic}),null);
+  assert.equal(events.pop(),'TOKEN_CLAIMS_REJECTED');
+  assert.equal(await verifyDemoQuizIdToken(valid,
+    {now:NOW,keys:[],onDiagnostic}),null);
+  assert.equal(events.pop(),'SIGNING_KEY_NOT_FOUND');
+  const split=valid.split('.');
+  split[2]=(split[2][0]==='A'?'B':'A')+split[2].slice(1);
+  assert.equal(await verifyDemoQuizIdToken(split.join('.'),
+    {now:NOW,keys:[jwk],onDiagnostic}),null);
+  assert.equal(events.pop(),'TOKEN_SIGNATURE_REJECTED');
+  const f=fixture();
+  try{
+    f.run('UPDATE demo_students SET active=0 WHERE firebase_uid=?',UID_A);
+    assert.equal(await verifyActiveDemoQuizStudent(f.db,
+      post('/api/demo-quiz/student',{action:'question'},valid),
+      {now:NOW,keys:[jwk],onDiagnostic}),null);
+    assert.equal(events.pop(),'DEMO_ACCOUNT_NOT_ACTIVE_IN_BOUND_D1');
+    assert.equal(events.length,0);
+  }finally{f.sqlite.close();}
+  const serialized=JSON.stringify(events);
+  assert.equal(serialized.includes(UID_A),false);
+  assert.equal(serialized.includes(valid),false);
+});
+
 test('student identity comes from signed ID token AND active D1 demo enrollment',async()=>{
   const f=fixture();
   try {

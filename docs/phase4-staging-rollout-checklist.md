@@ -456,3 +456,29 @@ theo feature flag giữ nguyên. Thiếu bất kỳ bảng bắt buộc nào v�
 Không tạo `unit_accounts` trên Preview chỉ để làm preflight báo xanh.
 
 Chưa merge PR hoặc bật cờ Phase 4, chưa chạy migration Cloudflare.
+
+## Phase 4Q — chẩn đoán lỗi 401 của học viên DEMO (chỉ thử nghiệm)
+
+Ngày 24/11/2026, học viên DEMO đã đăng nhập trên Preview nhưng `POST /api/demo-quiz/student`
+trả HTTP 401 với `{"error":"UNAUTHORIZED"}` ngay khi lấy câu hỏi.
+Truy vấn trực tiếp D1 Preview theo UID của học viên mới xác nhận 1 bản ghi, `active=1`.
+Điều này loại trừ nhầm lẫn rằng bản ghi vừa kiểm tra đang bị khóa, nhưng
+vẫn phải phân biệt lỗi xác minh Firebase ID token với lỗi đối chiếu tài khoản
+trong D1 được binding tới request. Không xóa/tạo thêm tài khoản để đoán lỗi.
+
+Mặc định không ghi thông tin xác thực. Để có thể xem loại lỗi, sau khi
+review CI và chỉ trên hostname Preview đã duyệt, đặt biến server-only:
+`PHASE4_DEMO_AUTH_DIAGNOSTICS=true` ở môi trường **Preview**, không đặt
+ở Production. Sau khi deploy lại, mở logs Cloudflare Pages Functions,
+thực hiện đúng một yêu cầu `Tải câu hỏi DEMO`. Tìm dòng
+`PHASE4_DEMO_AUTH_DIAGNOSTIC:` kèm mã tĩnh, ví dụ:
+`TOKEN_CLAIMS_REJECTED`, `GOOGLE_SIGNING_KEYS_UNAVAILABLE`,
+`SIGNING_KEY_NOT_FOUND`, `TOKEN_SIGNATURE_REJECTED`, hoặc
+`DEMO_ACCOUNT_NOT_ACTIVE_IN_BOUND_D1`. Chỉ chia sẻ **mã loại lỗi**;
+không chụp log chứa dữ liệu khác. Cấu hình này không trả mã chẩn đoán
+qua HTTP response, không nới lỏng xác thực và không log UID, token,
+email, tên đăng nhập, khóa, hay header yêu cầu.
+
+**Tắt ngay `PHASE4_DEMO_AUTH_DIAGNOSTICS` và deploy lại** sau khi xác định
+nguyên nhân. Lỗi trả về vẫn là HTTP 401 `{"error":"UNAUTHORIZED"}`;
+không thử nộp bài hoặc sửa dữ liệu nếu chưa qua bước xác thực.

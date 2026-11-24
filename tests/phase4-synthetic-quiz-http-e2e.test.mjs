@@ -7,6 +7,8 @@ import {webcrypto} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import {PROJECT_ID,ADMIN_UID} from '../functions/_shared/auth.mjs';
+import {PHASE4_PILOT_PREVIEW_HOST,PHASE4_PINNED_STAGING_HOST}
+  from '../functions/_shared/phase4-host-guard.mjs';
 import {onRequestPost as studentEndpoint}
   from '../functions/api/demo-quiz/student.js';
 import {onRequestPost as adminEndpoint}
@@ -227,4 +229,37 @@ test('both HTTP routes stay 404 without opt-in and never use public user fields'
 test.after(()=>{
   globalThis.fetch=fetchOriginal;
   assert.ok(outboundCalls>0,"Verifier should fetch Google's public JWKS");
+});
+
+test('diagnostics remain OFF by default and log static code only on exact opted-in Preview',async()=>{
+  const f=fixture();
+  const savedWarn=console.warn;
+  const warnings=[];
+  console.warn=(...args)=>warnings.push(args.join(' '));
+  try{
+    const preview='https://'+PHASE4_PILOT_PREVIEW_HOST;
+    const send=base=>new Request(base+'/api/demo-quiz/student',{
+      method:'POST',headers:{origin:base,'content-type':'application/json'},
+      body:JSON.stringify({action:'question'}),
+    });
+    f.env.AUTH_DB_PREVIEW=f.env.AUTH_DB;
+    f.env.PHASE4_STAGING_HOSTNAME=PHASE4_PILOT_PREVIEW_HOST;
+    f.env.PHASE4_PREVIEW_HOST_OPT_IN='true';
+    let response=await studentEndpoint({request:send(preview),env:f.env});
+    assert.equal(response.status,401);
+    assert.deepEqual(await response.json(),{error:'UNAUTHORIZED'});
+    assert.deepEqual(warnings,[]);
+    f.env.PHASE4_DEMO_AUTH_DIAGNOSTICS='true';
+    response=await studentEndpoint({request:send(preview),env:f.env});
+    assert.equal(response.status,401);
+    assert.deepEqual(await response.json(),{error:'UNAUTHORIZED'});
+    assert.deepEqual(warnings,
+      ['PHASE4_DEMO_AUTH_DIAGNOSTIC: TOKEN_MISSING_OR_MALFORMED']);
+    warnings.length=0;
+    f.env.PHASE4_STAGING_HOSTNAME=PHASE4_PINNED_STAGING_HOST;
+    response=await studentEndpoint({request:send(BASE),env:f.env});
+    assert.equal(response.status,401);
+    assert.deepEqual(warnings,[]);
+    assert.equal(f.first('SELECT COUNT(*) AS n FROM synthetic_graded_attempts').n,0);
+  }finally{console.warn=savedWarn;f.sqlite.close();}
 });

@@ -163,6 +163,7 @@ test('Google JWKS failure stages are static, fail closed and recover safely',asy
   const token=await sign();
   const cases=[
     {name:'network',fetcher:async()=>{throw new TypeError('private network detail');},code:'GOOGLE_KEYS_FETCH_FAILED'},
+    {name:'redirect',fetcher:async()=>new Response(null,{status:302,headers:{location:'https://example.net/invalid-redirect'}}),code:'GOOGLE_KEYS_HTTP_REDIRECT'},
     {name:'403',fetcher:async()=>new Response('',{status:403}),code:'GOOGLE_KEYS_HTTP_403'},
     {name:'404',fetcher:async()=>new Response('',{status:404}),code:'GOOGLE_KEYS_HTTP_404'},
     {name:'429',fetcher:async()=>new Response('',{status:429}),code:'GOOGLE_KEYS_HTTP_429'},
@@ -174,15 +175,24 @@ test('Google JWKS failure stages are static, fail closed and recover safely',asy
   try{
     for(const item of cases){
       const stages=[];
-      globalThis.fetch=item.fetcher;
+      globalThis.fetch=async(url,init)=>{
+        assert.equal(url,'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
+        // Match the strict Cloudflare Workers RequestInit contract.
+        if(init?.redirect==='error')throw new TypeError('Unsupported redirect mode: error');
+        assert.equal(init?.method,'GET');
+        assert.equal(init?.redirect,'manual');
+        return item.fetcher();
+      };
       assert.equal(await verifyDemoQuizIdToken(token,
         {now:NOW,onDiagnostic:stage=>stages.push(stage)}),null,item.name);
       assert.deepEqual(stages,[item.code],item.name);
       assert.equal(JSON.stringify(stages).includes(token),false);
       assert.equal(JSON.stringify(stages).includes(UID_A),false);
     }
-    globalThis.fetch=async url=>{
+    globalThis.fetch=async (url,init)=>{
       assert.equal(url,'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
+      assert.equal(init?.method,'GET');
+      assert.equal(init?.redirect,'manual');
       return new Response(JSON.stringify({keys:[jwk]}),{status:200,
         headers:{'cache-control':'max-age=20'}});
     };

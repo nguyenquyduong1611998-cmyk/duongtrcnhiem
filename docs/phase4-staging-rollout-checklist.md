@@ -505,3 +505,24 @@ triển khai Preview đã cho phép; thực hiện một yêu cầu đọc câu 
 ghi nhận duy nhất mã tĩnh; tắt `PHASE4_DEMO_AUTH_DIAGNOSTICS` rồi
 deploy lại; điều tra nguyên nhân từ mã tĩnh trước khi sửa network logic.
 Không tạo thêm tài khoản, không cập nhật Production hay chạy SQL.
+
+## Phase 4S — sửa lỗi redirect mode không hỗ trợ trong Cloudflare Workers
+
+Trên Preview ngày 24/11/2026, log chẩn đoán báo
+`GOOGLE_KEYS_FETCH_FAILED` trong bước lấy Google JWKS của Firebase.
+Nguyên nhân tìm thấy trong mã là `fetch(JWKS_URL,{method:'GET',redirect:'error'})`:
+Cloudflare Workers không hỗ trợ chế độ `redirect:'error'` và ném TypeError
+trước khi gửi yêu cầu HTTP, theo tài liệu Cloudflare Request API.
+
+Khắc phục tối thiểu: dùng `redirect:'manual'` (được Cloudflare hỗ trợ),
+kiểm tra `response.ok` và từ chối mọi 3xx/HTTP lỗi (mã
+`GOOGLE_KEYS_HTTP_REDIRECT` chỉ là chẩn đoán tĩnh, không gửi token).
+Vẫn xác minh đầy đủ chữ ký RSA và issuer/audience/UID/provider/thời hạn;
+không thay endpoint Google, không cấp quyền vượt qua xác minh, không đổi D1.
+Bổ sung test mô phỏng Worker từ chối redirect:'error', test chuyển hướng 302
+và test phản hồi JWKS thành công. Sau Merge vào nhánh Preview, kiểm thử
+`Tải câu hỏi DEMO` chỉ đọc một lần và xem response. Nếu thành công,
+tắt `PHASE4_DEMO_AUTH_DIAGNOSTICS` trong Preview và deploy lại.
+Nếu vẫn lỗi, giữ nguyên dữ liệu và xem mã chẩn đoán tĩnh mới.
+
+Tài liệu: https://developers.cloudflare.com/workers/runtime-apis/request/

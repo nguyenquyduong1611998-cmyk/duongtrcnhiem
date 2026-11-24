@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - feature/staging-demo-quiz-pilot
-      - fix/phase4-preview-two-table-preflight-20261123
+      - 'fix/phase4-*'
   workflow_dispatch:
 
 permissions:

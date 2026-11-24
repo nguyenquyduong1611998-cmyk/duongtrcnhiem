@@ -11,11 +11,14 @@ function publicKeyFetchFailure(diagnosticCode){
 export async function fetchGoogleStudentSigningKeys(){
   if(keys && Date.now()<validUntil)return keys;
   let response;
-  try{response=await fetch(JWKS_URL,{method:'GET',redirect:'error'});}
+  // Cloudflare Workers rejects redirect:'error' before any network request.
+  // Use manual mode and fail closed on all 3xx responses instead.
+  try{response=await fetch(JWKS_URL,{method:'GET',redirect:'manual'});}
   catch{throw publicKeyFetchFailure('GOOGLE_KEYS_FETCH_FAILED');}
   if(!response.ok){
     // Do not include arbitrary status codes in logs; use a fixed allowlist.
-    const category=response.status===403?'GOOGLE_KEYS_HTTP_403':
+    const category=response.status>=300&&response.status<400?'GOOGLE_KEYS_HTTP_REDIRECT':
+      response.status===403?'GOOGLE_KEYS_HTTP_403':
       response.status===404?'GOOGLE_KEYS_HTTP_404':
       response.status===429?'GOOGLE_KEYS_HTTP_429':
       response.status>=500?'GOOGLE_KEYS_HTTP_5XX':

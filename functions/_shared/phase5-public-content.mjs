@@ -1,5 +1,5 @@
-// Phase 5 data-contract rehearsal ONLY. No HTTP route imports this module.
-// It is an allowlist projection for public/published question fields.
+// Phase 5B staging-only read API projects published DEMO questions via this allowlist.
+// The HTTP route is OFF by default and never authorized for production content.
 // Never use SELECT * or spread a database row into a browser response.
 // The correct answer and grading explanation remain SERVER ONLY.
 const ID=/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/;

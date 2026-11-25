@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -20,6 +20,12 @@ import {
   getGradeBadgeStyle,
   getGradeLevel,
 } from '../utils/grading';
+import {
+  MAX_PRACTICE_MINUTES,
+  getDefaultPracticeMinutes,
+  getElapsedPracticeSeconds,
+  parsePracticeMinutes,
+} from '../utils/quizTiming';
 
 interface QuizFlowProps {
   topic: Topic;
@@ -50,22 +56,32 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showConfirmFinish, setShowConfirmFinish] = useState(false);
   const [completedAttempt, setCompletedAttempt] = useState<QuizAttempt | null>(null);
-
-  const totalTimeSeconds = Math.max(60, (topic.timeLimitMinutes || 10) * 60);
+  const [requestedMinutes, setRequestedMinutes] = useState(() =>
+    String(getDefaultPracticeMinutes(topic.timeLimitMinutes))
+  );
+  // Fixed when the student presses Start; not editable while taking the test.
+  const [activeMinutes, setActiveMinutes] = useState(() =>
+    getDefaultPracticeMinutes(topic.timeLimitMinutes)
+  );
+  const finalizedRef = useRef(false);
+  const totalTimeSeconds = activeMinutes * 60;
 
   useEffect(() => {
-    if (stage !== 'taking') return;
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((prev) => {
-        const next = prev + 1;
-        if (next >= totalTimeSeconds) {
-          window.clearInterval(timer);
-        }
-        return next;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [stage, totalTimeSeconds]);
+    if (stage !== 'taking' || !startedAtIso) return;
+    const updateElapsed = () =>
+      setElapsedSeconds(getElapsedPracticeSeconds(startedAtIso, Date.now()));
+
+    updateElapsed();
+    const timer = window.setInterval(updateElapsed, 1000);
+    // A background tab may pause intervals. Recalculate from the start timestamp.
+    window.addEventListener('focus', updateElapsed);
+    document.addEventListener('visibilitychange', updateElapsed);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', updateElapsed);
+      document.removeEventListener('visibilitychange', updateElapsed);
+    };
+  }, [stage, startedAtIso]);
 
   useEffect(() => {
     if (stage === 'taking' && elapsedSeconds >= totalTimeSeconds) {
@@ -93,6 +109,14 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
       return;
     }
 
+    const minutes = parsePracticeMinutes(requestedMinutes);
+    if (minutes === null) {
+      setFormError(`Thời gian làm bài phải là số phút nguyên từ 1 đến ${MAX_PRACTICE_MINUTES}.`);
+      return;
+    }
+
+    setActiveMinutes(minutes);
+    finalizedRef.current = false;
     setCandidateName(cleanName);
     setUnitName(cleanUnit);
     setFormError(null);
@@ -104,7 +128,8 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
   };
 
   const finalizeQuiz = () => {
-    if (completedAttempt) return;
+    if (completedAttempt || finalizedRef.current) return;
+    finalizedRef.current = true;
     let correctCount = 0;
     for (const q of topic.questions) {
       if (answers[q.id] === q.correctIndex) {
@@ -129,7 +154,10 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
       totalCount,
       score10,
       grade,
-      durationSeconds: Math.max(1, elapsedSeconds),
+      durationSeconds: Math.max(
+        1,
+        Math.min(totalTimeSeconds, getElapsedPracticeSeconds(startedAtIso, Date.now()))
+      ),
       startedAt: startedAtIso || submittedAt,
       submittedAt,
     };
@@ -169,7 +197,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
           <div className="bg-white border border-[#DDE3DC] rounded-xl p-6 sm:p-8 shadow-sm">
             <div className="border-b border-[#EDF1EC] pb-5 mb-6">
               <p className="text-xs font-semibold tracking-wider uppercase text-[#8C6516] mb-1">
-                {topic.code} · {topic.questions.length} câu hỏi · {topic.timeLimitMinutes} phút
+                {topic.code} · {topic.questions.length} câu hỏi · thời gian gợi ý {getDefaultPracticeMinutes(topic.timeLimitMinutes)} phút
               </p>
               <h2 className="text-2xl font-bold text-[#152019]">{topic.title}</h2>
               <p className="text-sm text-[#4B5B50] mt-2">{topic.description}</p>
@@ -226,6 +254,40 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
                     className="w-full pl-10 pr-4 py-2.5 bg-[#FAFBF9] border border-[#CFD8CE] rounded-lg text-sm text-[#152019] placeholder:text-[#8A9A8F] focus:outline-none focus:ring-2 focus:ring-[#1F4D36]/25 focus:border-[#1F4D36] transition-all"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="practice-time-minutes"
+                  className="block text-sm font-semibold text-[#243329] mb-1.5"
+                >
+                  Thời gian làm bài (phút) <span className="text-[#B91C1C]">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#64756A]">
+                    <Clock className="w-4 h-4" />
+                  </span>
+                  <input
+                    id="practice-time-minutes"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={MAX_PRACTICE_MINUTES}
+                    step={1}
+                    required
+                    value={requestedMinutes}
+                    onChange={(e) => {
+                      setRequestedMinutes(e.target.value);
+                      if (formError) setFormError(null);
+                    }}
+                    className="w-full pl-10 pr-4 py-2.5 bg-[#FAFBF9] border border-[#CFD8CE] rounded-lg text-sm text-[#152019] focus:outline-none focus:ring-2 focus:ring-[#1F4D36]/25 focus:border-[#1F4D36] transition-all"
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-[#64756A]">
+                  Mặc định {getDefaultPracticeMinutes(topic.timeLimitMinutes)} phút;
+                  có thể chọn từ 1 đến {MAX_PRACTICE_MINUTES} phút.
+                  Khi bắt đầu, thời gian sẽ được khóa và hết giờ bài sẽ tự nộp.
+                </p>
               </div>
 
               <AnimatePresence>
@@ -629,6 +691,10 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
                       setAnswers({});
                       setCurrentIdx(0);
                       setElapsedSeconds(0);
+                      setStartedAtIso('');
+                      setRequestedMinutes(String(getDefaultPracticeMinutes(topic.timeLimitMinutes)));
+                      setActiveMinutes(getDefaultPracticeMinutes(topic.timeLimitMinutes));
+                      finalizedRef.current = false;
                       setStage('candidate_info');
                     }}
                     className="px-5 py-2.5 text-sm font-semibold text-[#243329] bg-[#F4F6F4] hover:bg-[#E7ECE7] border border-[#DDE3DC] rounded-lg transition-colors cursor-pointer"

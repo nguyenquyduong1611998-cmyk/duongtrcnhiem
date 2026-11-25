@@ -226,6 +226,9 @@ export async function handlePhase6StudentExam(db,uid,data){
     const version=await versionFor(db,id,revision);
     if(!version)return json({error:'NOT_FOUND'},404);
     if(data.action==='start'){
+      // Fail closed before creating a session if the separately reviewed
+      // Phase 6D submission schema is not installed on this Preview DB.
+      await db.prepare('SELECT 1 FROM phase6_exam_submissions LIMIT 1').first();
       const existing=await readSession(db,uid,id,revision);
       if(!existing){
         const sessionId='p6_session_'+crypto.randomUUID().replaceAll('-','');

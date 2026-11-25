@@ -31,7 +31,7 @@ export async function onRequestPost({request,env}){
     let data;
     try{data=await smallJson(request);}
     catch{return json({error:'INVALID_REQUEST'},400);}
-    return handlePhase6StudentExam(bound.AUTH_DB,uid,data);
+    return await handlePhase6StudentExam(bound.AUTH_DB,uid,data);
   }catch(error){
     console.error('Phase6 timed demo exam:',error?.name||'unknown');
     return failSafe();

@@ -96,6 +96,8 @@ jobs:
         run: node --test tests/phase5-admin-results-http.test.mjs
       - name: Phase 5F browser Google Admin only scores, response allowlist and no tokens
         run: bun test tests/phase5-admin-results-browser.test.ts
+      - name: Configurable practice timer validation and background-tab timekeeping
+        run: bun test tests/quiz-timing.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

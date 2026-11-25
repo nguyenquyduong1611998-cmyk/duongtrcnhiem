@@ -145,10 +145,10 @@ describe('Phase 5E DEMO browser submits only after explicit opt-in',()=>{
   test('invalid answers and untrusted identity never attempt network',async()=>{
     let calls=0;
     globalThis.fetch=(mock(async()=>{calls++;return reply({attempt:null});})) as unknown as typeof globalThis.fetch;
-    for(const answers of [
+    for(const answers of ([
       {q1:1}, {q1:1,q2:4}, {q1:1,q2:1,other:0},
       {q1:1,q2:1.5}, {q1:-1,q2:1},
-    ]){
+    ] as Array<Record<string,number>>)){
       await expect(client.submitPhase5SyntheticAttempt(user(),answers,ids))
         .rejects.toThrow();
     }

@@ -49,6 +49,9 @@ jobs:
           node --check functions/api/phase5/attempts/student.js
           node --check functions/_shared/phase5-synthetic-admin.mjs
           node --check functions/api/phase5/attempts/admin.js
+          node --check functions/_shared/phase6-timed-exam.mjs
+          node --check functions/_shared/phase6-synthetic-admin-drafts.mjs
+          node --check functions/api/phase6/admin/drafts.js
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -102,6 +105,8 @@ jobs:
         run: bun test tests/quiz-adjustable-duration.test.ts
       - name: Phase 6A offline trusted exam deadlines, student isolation and D1 draft tests
         run: node --test tests/phase6-timed-exam.test.mjs
+      - name: Phase 6B Google Admin synthetic draft CRUD, version races, host/auth and existing Phase5 data isolation
+        run: node --test tests/phase6b-admin-drafts-http.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

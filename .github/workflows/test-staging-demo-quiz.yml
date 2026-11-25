@@ -78,6 +78,8 @@ jobs:
         run: node --test tests/phase5-content-model.test.mjs
       - name: Phase 5B authenticated Preview-only read API, negative auth and answer secrecy
         run: node --test tests/phase5-readonly-topics-http.test.mjs
+      - name: Phase 5C Preview backup profile and math-only seed are safe (offline)
+        run: node --test tests/phase5-preview-backup-and-seed.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

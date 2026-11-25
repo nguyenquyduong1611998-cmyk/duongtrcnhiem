@@ -5,6 +5,7 @@ import {BOOTSTRAPPED_ADMIN_UID,IS_FIREBASE_STAGING} from '../firebase';
 import {isPhase5DemoPreviewHostname} from './phase5DemoTopics';
 
 const ENDPOINT='/api/phase6/admin/drafts';
+const PUBLISH_ENDPOINT='/api/phase6/admin/publish';
 export type Phase6TitleCode='basic'|'practice'|'challenge';
 export type Phase6TemplateCode='sum_2_2'|'sum_3_5'|'sum_7_8'|'minus_10_3';
 
@@ -27,6 +28,13 @@ export interface Phase6DraftSummary {
 export interface Phase6AdminDraft extends Phase6DraftSummary {
   templates:Phase6TemplateCode[];
   questions:{id:string;templateCode:Phase6TemplateCode;text:string;options:string[]}[];
+}
+export interface Phase6Publication {
+  topicId:string;revision:number;questionCount:number;
+  timeLimitSeconds:number;publishedAt:number;status:'published';
+}
+export interface Phase6PublishReceipt {
+  publication:Phase6Publication;created:boolean;
 }
 function object(raw:unknown):Record<string,unknown>{
   if(raw===null||typeof raw!=='object'||Array.isArray(raw))
@@ -87,7 +95,7 @@ export function isPhase6AdminDraftsUiEnabled(hostname:string,flag:unknown):boole
   return IS_FIREBASE_STAGING && flag==='true'&&
     isPhase5DemoPreviewHostname(hostname);
 }
-async function request(user:User|null,body:Record<string,unknown>):Promise<Record<string,unknown>>{
+async function request(user:User|null,body:Record<string,unknown>,endpoint=ENDPOINT):Promise<Record<string,unknown>>{
   if(!IS_FIREBASE_STAGING||!user||user.uid!==BOOTSTRAPPED_ADMIN_UID||
      typeof window==='undefined'||
      !isPhase5DemoPreviewHostname(window.location.hostname))
@@ -96,7 +104,7 @@ async function request(user:User|null,body:Record<string,unknown>):Promise<Recor
   if(!token)throw new Error('Hãy đăng nhập lại Google Admin.');
   let response:Response;
   try{
-    response=await fetch(ENDPOINT,{
+    response=await fetch(endpoint,{
       method:'POST',headers:{
         'content-type':'application/json',authorization:'Bearer '+token,
       },body:JSON.stringify(body),
@@ -147,4 +155,31 @@ export async function deletePhase6Draft(user:User|null,draft:Phase6AdminDraft):P
   });
   if(result.deleted!==true||result.draftId!==draft.draftId)
     throw new Error('Không xác nhận được việc xóa bản nháp DEMO.');
+}
+
+export async function publishPhase6Draft(user:User|null,draft:Phase6AdminDraft)
+  :Promise<Phase6PublishReceipt>{
+  if(draft.questionCount<1)
+    throw new Error('Bản nháp DEMO cần ít nhất một câu hỏi trước khi xuất bản.');
+  const raw=await request(user,{
+    action:'publish',draftId:draft.draftId,version:draft.version,
+    confirmation:'PUBLISH_SYNTHETIC_MATH_REVISION',
+  },PUBLISH_ENDPOINT);
+  const x=object(raw.publication);
+  if(raw.mode!=='phase6-synthetic-publication'||
+     typeof raw.created!=='boolean'||
+     x.topicId!==draft.draftId||x.revision!==draft.version||
+     x.questionCount!==draft.questionCount||
+     x.timeLimitSeconds!==draft.minutes*60||
+     !Number.isSafeInteger(x.publishedAt)||Number(x.publishedAt)<=0||
+     x.status!=='published')
+    throw new Error('Xác nhận xuất bản từ máy chủ không hợp lệ.');
+  return {
+    publication:{
+      topicId:draft.draftId,revision:draft.version,
+      questionCount:draft.questionCount,timeLimitSeconds:draft.minutes*60,
+      publishedAt:Number(x.publishedAt),status:'published',
+    },
+    created:raw.created,
+  };
 }

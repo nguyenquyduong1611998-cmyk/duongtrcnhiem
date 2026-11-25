@@ -3,6 +3,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { Cloud, X } from 'lucide-react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { AdminPanel } from './components/AdminPanel';
+import { Phase6AdminDraftsPanel } from './components/Phase6AdminDraftsPanel';
 import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
@@ -12,6 +13,7 @@ import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, asse
 import {getSyntheticQuizQuestion,submitSyntheticQuiz,readOwnSyntheticQuiz,listSyntheticQuizAttempts} from './utils/syntheticGradedQuiz';
 import {isPhase5DemoPreviewHostname,listPhase5DemoTopics,readPhase5DemoTopic} from './utils/phase5DemoTopics';
 import {listPhase5AdminScores} from './utils/phase5AdminResults';
+import {isPhase6AdminDraftsUiEnabled} from './utils/phase6AdminDrafts';
 import {isPhase5SyntheticSubmitUiEnabled,submitPhase5SyntheticAttempt,readOwnPhase5SyntheticAttempt} from './utils/phase5SyntheticSubmission';
 import type {Phase5DemoAnswerMap} from './utils/phase5SyntheticSubmission';
 import {readStagingD1Preflight} from './utils/stagingD1Preflight';
@@ -1233,6 +1235,14 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                           onSyncCloudNow={handleSyncCloudNow}
                         />
                       )}
+                      {activeTab === 'admin' && currentUser.role === 'admin' &&
+                        adminAccessAllowed && firebaseUser &&
+                        isPhase6AdminDraftsUiEnabled(
+                          typeof window !== 'undefined' ? window.location.hostname : '',
+                          import.meta.env.VITE_PHASE6_ADMIN_DRAFTS_UI,
+                        ) && (
+                          <Phase6AdminDraftsPanel user={firebaseUser}/>
+                        )}
                     </>
                   )}
                 </motion.div>

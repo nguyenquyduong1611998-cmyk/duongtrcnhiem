@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Ứng dụng toán học DEMO</title>
+  <desc id="desc">Biểu tượng chữ D và ký hiệu phép cộng, nền xanh đậm</desc>
+  <rect width="512" height="512" rx="112" fill="#1f4d36"/>
+  <rect x="72" y="72" width="368" height="368" rx="80" fill="none" stroke="#effbf3" stroke-width="16"/>
+  <path d="M150 158h82c73 0 116 40 116 98 0 63-43 98-116 98h-82z" fill="none" stroke="#ffffff" stroke-width="32" stroke-linejoin="round"/>
+  <path d="M389 141v80m-40-40h80" fill="none" stroke="#f4d37c" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="386" cy="356" r="10" fill="#f4d37c"/>
+</svg>

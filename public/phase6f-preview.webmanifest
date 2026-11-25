@@ -1,0 +1,21 @@
+{
+  "id": "/phase6f-preview",
+  "name": "Tiểu đoàn 3 — Toán học DEMO (Preview)",
+  "short_name": "TĐ3 DEMO",
+  "description": "Phiên thử nghiệm toán học giả, không phải ứng dụng thi chính thức.",
+  "lang": "vi",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f4",
+  "theme_color": "#1f4d36",
+  "icons": [
+    {
+      "src": "/phase6f-preview-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

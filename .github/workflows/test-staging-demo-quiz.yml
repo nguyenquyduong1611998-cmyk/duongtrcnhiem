@@ -88,6 +88,8 @@ jobs:
         run: bun test tests/phase5-browser-readonly.test.ts
       - name: Phase 5D server-owned scoring, immutable replay, Preview-only disabled POST tests
         run: node --test tests/phase5-synthetic-grading-http.test.mjs
+      - name: Phase 5E browser submit once, lost-response recovery and Preview UI OFF tests
+        run: bun test tests/phase5-submission-browser.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

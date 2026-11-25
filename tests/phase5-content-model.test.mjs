@@ -93,6 +93,13 @@ test('only a published version accepts one immutable submission per UID',()=>{
     assert.throws(()=>f.attempt(),/PHASE5_REVISION_NOT_PUBLISHED/);
     f.publish();f.attempt();
     assert.equal(f.one('SELECT score_tenths FROM phase5_content_attempts WHERE student_uid=?',UID).score_tenths,100);
+    assert.throws(()=>f.run(
+      'INSERT INTO phase5_content_attempts (attempt_id,student_uid,topic_id,revision,'+
+      'answers_json,correct_count,total_count,score_tenths,started_at,submitted_at) '+
+      'VALUES (?,?,?,?,?,?,?,?,?,?)',
+      'attempt-demo-invalid','student_'+'b'.repeat(32),TOPIC,1,
+      JSON.stringify({q1:0}),0,1,100,NOW+2,NOW+4
+    ),/CHECK constraint failed/);
     assert.throws(()=>f.attempt(UID,1,'attempt-demo-0002'),/UNIQUE constraint failed/);
     assert.throws(()=>f.run("UPDATE phase5_content_attempts SET score_tenths=0"),/PHASE5_ATTEMPT_IMMUTABLE/);
     assert.throws(()=>f.run("DELETE FROM phase5_content_attempts"),/PHASE5_ATTEMPT_IMMUTABLE/);

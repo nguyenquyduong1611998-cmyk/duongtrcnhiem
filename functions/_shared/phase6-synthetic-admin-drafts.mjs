@@ -130,5 +130,16 @@ export async function handlePhase6SyntheticAdminDrafts(db,data){
   return json({error:'INVALID_REQUEST'},400);
 }
 
+// Server-only Phase 6C adapter: validates DB rows and returns fixed math facts.
+export function validatePhase6SyntheticPublishDraft(row) {
+  return publicDraft(row,true);
+}
+export function privatePhase6SyntheticTemplate(code) {
+  if(typeof code!=='string'||!Object.hasOwn(TEMPLATES,code))
+    throw new Error('PHASE6_TEMPLATE_NOT_ALLOWED');
+  const t=TEMPLATES[code];
+  return {text:t.text,options:[...t.options],correctIndex:t.correctIndex};
+}
+
 export const PHASE6_SYNTHETIC_TITLES=Object.keys(TITLES);
 export const PHASE6_SYNTHETIC_TEMPLATES=Object.keys(TEMPLATES);

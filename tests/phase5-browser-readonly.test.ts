@@ -99,8 +99,7 @@ describe('Phase5 DEMO student browser read-only contract',()=>{
 
   test('rejects malformed revision/IDs before network and never sends client score',async()=>{
     let calls=0;
-    globalThis.fetch=mock(async ()=>{calls++;return respond({topic:goodDetail});})
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async ()=>{calls++;return respond({topic:goodDetail});})) as unknown as typeof globalThis.fetch;
     for(const [id,rev] of [
       ['internal_math',1],['p5_demo_math',0],
       ['p5_demo_math',100001],['p5_demo_math',1.5],
@@ -113,8 +112,7 @@ describe('Phase5 DEMO student browser read-only contract',()=>{
 
   test('401, 403, 404 and missing schema are errors; token never in messages',async()=>{
     for(const status of [401,403,404,503]){
-      globalThis.fetch=mock(async ()=>respond({error:'NEVER_REFLECT_SECRETS'},status))
-        as unknown as typeof globalThis.fetch;
+      globalThis.fetch=(mock(async ()=>respond({error:'NEVER_REFLECT_SECRETS'},status))) as unknown as typeof globalThis.fetch;
       let message='';
       try{await client.listPhase5DemoTopics(mkUser(A));}
       catch(e){message=String(e);}

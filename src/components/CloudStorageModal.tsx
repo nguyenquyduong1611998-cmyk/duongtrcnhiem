@@ -16,6 +16,8 @@ import { formatDateTime } from '../utils/grading';
 import { testBackendReady, type DemoStudentCredentials, type SyntheticD1Account, type SyntheticTemporaryCredential } from '../utils/serverlessAuth';
 import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
 import { StagingDemoQuizPanel } from './StagingDemoQuizPanel';
+import { Phase5DemoTopicPanel } from './Phase5DemoTopicPanel';
+import type {Phase5DemoTopic,Phase5DemoTopicSummary} from '../utils/phase5DemoTopics';
 import type {SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt} from '../utils/syntheticGradedQuiz';
 import type {StagingD1PreflightReport} from '../utils/stagingD1Preflight';
 import type {SyntheticQuizReceipt} from '../utils/syntheticQuizSubmissionRecovery';
@@ -44,6 +46,8 @@ interface CloudStorageModalProps {
   onGetSyntheticQuizQuestion?: () => Promise<SyntheticQuizQuestion>;
   onSubmitSyntheticQuiz?: (answerIndex:number) => Promise<SyntheticQuizReceipt<SyntheticQuizAttempt>>;
   onReadOwnSyntheticQuiz?: () => Promise<SyntheticQuizAttempt|null>;
+  onListPhase5DemoTopics?: () => Promise<Phase5DemoTopicSummary[]>;
+  onReadPhase5DemoTopic?: (topicId:string,revision:number) => Promise<Phase5DemoTopic>;
   onListSyntheticQuizResults?: () => Promise<SyntheticQuizAdminAttempt[]>;
   onReadStagingD1Preflight?: () => Promise<StagingD1PreflightReport>;
   onCreateDemoResultProbe?: () => Promise<void>;
@@ -81,6 +85,8 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onGetSyntheticQuizQuestion,
   onSubmitSyntheticQuiz,
   onReadOwnSyntheticQuiz,
+  onListPhase5DemoTopics,
+  onReadPhase5DemoTopic,
   onListSyntheticQuizResults,
   onReadStagingD1Preflight,
   onCreateDemoResultProbe,
@@ -655,6 +661,13 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                 </div>
               )}
             </div>
+          )}
+          {onListPhase5DemoTopics && onReadPhase5DemoTopic && demoStudentUid && (
+            <Phase5DemoTopicPanel
+              key={'phase5-'+demoStudentUid}
+              onList={onListPhase5DemoTopics}
+              onRead={onReadPhase5DemoTopic}
+            />
           )}
           {(onGetSyntheticQuizQuestion || onListSyntheticQuizResults || onReadStagingD1Preflight) && (
             <StagingDemoQuizPanel

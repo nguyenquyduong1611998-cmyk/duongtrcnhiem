@@ -8,6 +8,7 @@ on:
       - 'feature/phase5-*'
       - 'feature/quiz-*'
       - 'feature/phase6*'
+      - 'feature/phase7*'
   workflow_dispatch:
 
 permissions:

@@ -59,6 +59,8 @@ jobs:
           node --check functions/_shared/phase6-results-readonly.mjs
           node --check functions/api/phase6/results/student.js
           node --check functions/api/phase6/results/admin.js
+          node --check functions/_shared/phase7-preview-d1-schema-preflight.mjs
+          node --check functions/api/phase7/preflight.js
           node --check public/phase6f-preview-sw.js
           node --check scripts/phase6f-ci-readiness-report.mjs
       - name: Existing DEMO authentication and D1 regressions
@@ -134,6 +136,10 @@ jobs:
         run: |
           node --test tests/phase6f-readiness-report.test.mjs
           node scripts/phase6f-ci-readiness-report.mjs
+      - name: Phase 7A Preview D1 schema inventory, blocked partial migrations and signed Admin gate
+        run: node --test tests/phase7a-preview-d1-schema-http.test.mjs
+      - name: Phase 7A Google Admin browser inspect-only and no-leak contract
+        run: bun test tests/phase7a-preview-browser.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

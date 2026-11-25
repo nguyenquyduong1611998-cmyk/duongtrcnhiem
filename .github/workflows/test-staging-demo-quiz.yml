@@ -40,6 +40,9 @@ jobs:
           node --check functions/api/demo-quiz/student.js
           node --check functions/api/demo-quiz/admin.js
           node --check functions/api/demo-quiz/preflight.js
+          node --check functions/_shared/phase5-readonly-topics.mjs
+          node --check functions/api/phase5/topics.js
+          node --check 'functions/api/phase5/topics/[topicId]/versions/[revision].js'
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -73,6 +76,8 @@ jobs:
         run: node --test tests/phase4-pilot-isolation.test.mjs
       - name: Phase 5 synthetic-only content model and public-key isolation tests
         run: node --test tests/phase5-content-model.test.mjs
+      - name: Phase 5B authenticated Preview-only read API, negative auth and answer secrecy
+        run: node --test tests/phase5-readonly-topics-http.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

@@ -76,8 +76,7 @@ describe('Phase 5 Google Admin browser-only DEMO grades',()=>{
 
   test('wrong role, missing Firebase session, other host have zero requests',async()=>{
     let calls=0;
-    globalThis.fetch=(mock(async()=>{calls++;return reply({});}))
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async()=>{calls++;return reply({});})) as unknown as typeof globalThis.fetch;
     const other={uid:'student_'+'a'.repeat(32),
       getIdToken:async()=>TOKEN} as unknown as User;
     await expect(client.listPhase5AdminScores(other)).rejects.toThrow();
@@ -94,8 +93,7 @@ describe('Phase 5 Google Admin browser-only DEMO grades',()=>{
 
   test('unauthorized, disabled flag, server unavailable and network are safe failures',async()=>{
     for(const status of [401,403,404,503]){
-      globalThis.fetch=(mock(async()=>reply({error:'SECRET_DO_NOT_REFLECT'},status)))
-        as unknown as typeof globalThis.fetch;
+      globalThis.fetch=(mock(async()=>reply({error:'SECRET_DO_NOT_REFLECT'},status))) as unknown as typeof globalThis.fetch;
       let error='';
       try{await client.listPhase5AdminScores(validUser);}
       catch(cause){error=String(cause);}
@@ -103,8 +101,7 @@ describe('Phase 5 Google Admin browser-only DEMO grades',()=>{
       expect(error.includes('SECRET_DO_NOT_REFLECT')).toBe(false);
       expect(error.includes(TOKEN)).toBe(false);
     }
-    globalThis.fetch=(mock(async()=>{throw new Error('network no response');}))
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async()=>{throw new Error('network no response');})) as unknown as typeof globalThis.fetch;
     await expect(client.listPhase5AdminScores(validUser)).rejects.toThrow(
       'Không kết nối được D1'
     );
@@ -129,8 +126,7 @@ describe('Phase 5 Google Admin browser-only DEMO grades',()=>{
 
   test('Firebase token refresh errors cause no request and no token output',async()=>{
     let calls=0;
-    globalThis.fetch=(mock(async()=>{calls++;return reply({});}))
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async()=>{calls++;return reply({});})) as unknown as typeof globalThis.fetch;
     const user=({uid:ADMIN,getIdToken:async()=>{
       throw new Error('token refresh unavailable');
     }}) as unknown as User;

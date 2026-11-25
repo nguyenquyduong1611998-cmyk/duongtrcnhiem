@@ -4,6 +4,7 @@ import { Cloud, X } from 'lucide-react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { AdminPanel } from './components/AdminPanel';
 import { Phase6AdminDraftsPanel } from './components/Phase6AdminDraftsPanel';
+import { Phase6StudentExamPanel } from './components/Phase6StudentExamPanel';
 import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
@@ -14,6 +15,7 @@ import {getSyntheticQuizQuestion,submitSyntheticQuiz,readOwnSyntheticQuiz,listSy
 import {isPhase5DemoPreviewHostname,listPhase5DemoTopics,readPhase5DemoTopic} from './utils/phase5DemoTopics';
 import {listPhase5AdminScores} from './utils/phase5AdminResults';
 import {isPhase6AdminDraftsUiEnabled} from './utils/phase6AdminDrafts';
+import {isPhase6StudentExamUiEnabled} from './utils/phase6StudentExam';
 import {isPhase5SyntheticSubmitUiEnabled,submitPhase5SyntheticAttempt,readOwnPhase5SyntheticAttempt} from './utils/phase5SyntheticSubmission';
 import type {Phase5DemoAnswerMap} from './utils/phase5SyntheticSubmission';
 import {readStagingD1Preflight} from './utils/stagingD1Preflight';
@@ -1204,6 +1206,14 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                           onStartTopic={(topic) => setActiveQuizTopic(topic)}
                         />
                       )}
+                      {activeTab === 'topics' && currentUser.role === 'student' &&
+                         firebaseUser && currentUser.id === firebaseUser.uid &&
+                         isPhase6StudentExamUiEnabled(
+                           typeof window !== 'undefined' ? window.location.hostname : '',
+                           import.meta.env.VITE_PHASE6_STUDENT_TIMED_UI,
+                         ) && (
+                           <Phase6StudentExamPanel user={firebaseUser}/>
+                         )}
                       {activeTab === 'history' && (
                         <HistoryView
                           currentUser={currentUser}

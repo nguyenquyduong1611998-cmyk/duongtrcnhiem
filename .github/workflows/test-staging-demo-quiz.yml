@@ -5,6 +5,7 @@ on:
     branches:
       - feature/staging-demo-quiz-pilot
       - 'fix/phase4-*'
+      - 'feature/phase5-*'
   workflow_dispatch:
 
 permissions:
@@ -70,6 +71,8 @@ jobs:
         run: node --test tests/phase4-sql-export-static.test.mjs
       - name: Phase 4 isolation and flags OFF by default
         run: node --test tests/phase4-pilot-isolation.test.mjs
+      - name: Phase 5 synthetic-only content model and public-key isolation tests
+        run: node --test tests/phase5-content-model.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

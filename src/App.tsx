@@ -6,6 +6,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { Phase6AdminDraftsPanel } from './components/Phase6AdminDraftsPanel';
 import { Phase6StudentExamPanel } from './components/Phase6StudentExamPanel';
 import { Phase6ResultsPanel } from './components/Phase6ResultsPanel';
+import { Phase7PreviewPreflightPanel } from './components/Phase7PreviewPreflightPanel';
 import { CloudStorageModal } from './components/CloudStorageModal';
 import { HistoryView } from './components/HistoryView';
 import { HonorBoardView } from './components/HonorBoardView';
@@ -18,6 +19,7 @@ import {listPhase5AdminScores} from './utils/phase5AdminResults';
 import {isPhase6AdminDraftsUiEnabled} from './utils/phase6AdminDrafts';
 import {isPhase6StudentExamUiEnabled} from './utils/phase6StudentExam';
 import {isPhase6StudentHistoryUiEnabled,isPhase6AdminResultsUiEnabled} from './utils/phase6Results';
+import {isPhase7PreviewPreflightUiEnabled} from './utils/phase7PreviewPreflight';
 import {isPhase5SyntheticSubmitUiEnabled,submitPhase5SyntheticAttempt,readOwnPhase5SyntheticAttempt} from './utils/phase5SyntheticSubmission';
 import type {Phase5DemoAnswerMap} from './utils/phase5SyntheticSubmission';
 import {readStagingD1Preflight} from './utils/stagingD1Preflight';
@@ -1262,6 +1264,15 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                           import.meta.env.VITE_PHASE6_ADMIN_RESULTS_UI,
                         ) && (
                           <Phase6ResultsPanel role="admin" user={firebaseUser}/>
+                        )}
+                      {activeTab === 'admin' && currentUser.role === 'admin' &&
+                        adminAccessAllowed && firebaseUser &&
+                        firebaseUser.uid === BOOTSTRAPPED_ADMIN_UID &&
+                        isPhase7PreviewPreflightUiEnabled(
+                          typeof window !== 'undefined' ? window.location.hostname : '',
+                          import.meta.env.VITE_PHASE7_PREVIEW_PREFLIGHT_UI,
+                        ) && (
+                          <Phase7PreviewPreflightPanel user={firebaseUser}/>
                         )}
                       {activeTab === 'admin' && currentUser.role === 'admin' &&
                         adminAccessAllowed && firebaseUser &&

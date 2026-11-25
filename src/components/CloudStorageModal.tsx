@@ -17,6 +17,8 @@ import { testBackendReady, type DemoStudentCredentials, type SyntheticD1Account,
 import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
 import { StagingDemoQuizPanel } from './StagingDemoQuizPanel';
 import { Phase5DemoTopicPanel } from './Phase5DemoTopicPanel';
+import { Phase5AdminResultsPanel } from './Phase5AdminResultsPanel';
+import type {Phase5AdminScore} from '../utils/phase5AdminResults';
 import type {Phase5DemoTopic,Phase5DemoTopicSummary} from '../utils/phase5DemoTopics';
 import type {Phase5SyntheticAttempt,Phase5DemoAnswerMap} from '../utils/phase5SyntheticSubmission';
 import type {SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt} from '../utils/syntheticGradedQuiz';
@@ -52,6 +54,7 @@ interface CloudStorageModalProps {
   onSubmitPhase5Demo?: (answers:Phase5DemoAnswerMap,questionIds:readonly string[]) => Promise<SyntheticQuizReceipt<Phase5SyntheticAttempt>>;
   onReadOwnPhase5Demo?: () => Promise<Phase5SyntheticAttempt|null>;
   onListSyntheticQuizResults?: () => Promise<SyntheticQuizAdminAttempt[]>;
+  onListPhase5AdminScores?: () => Promise<Phase5AdminScore[]>;
   onReadStagingD1Preflight?: () => Promise<StagingD1PreflightReport>;
   onCreateDemoResultProbe?: () => Promise<void>;
   onReadDemoResultProbe?: () => Promise<void>;
@@ -93,6 +96,7 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onSubmitPhase5Demo,
   onReadOwnPhase5Demo,
   onListSyntheticQuizResults,
+  onListPhase5AdminScores,
   onReadStagingD1Preflight,
   onCreateDemoResultProbe,
   onReadDemoResultProbe,
@@ -675,6 +679,9 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
               onSubmit={onSubmitPhase5Demo}
               onReadOwn={onReadOwnPhase5Demo}
             />
+          )}
+          {onListPhase5AdminScores && (
+            <Phase5AdminResultsPanel onList={onListPhase5AdminScores}/>
           )}
           {(onGetSyntheticQuizQuestion || onListSyntheticQuizResults || onReadStagingD1Preflight) && (
             <StagingDemoQuizPanel

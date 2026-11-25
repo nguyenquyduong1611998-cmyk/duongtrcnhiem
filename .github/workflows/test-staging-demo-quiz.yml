@@ -45,6 +45,8 @@ jobs:
           node --check 'functions/api/phase5/topics/[topicId]/versions/[revision].js'
           node --check functions/_shared/phase5-synthetic-grading.mjs
           node --check functions/api/phase5/attempts/student.js
+          node --check functions/_shared/phase5-synthetic-admin.mjs
+          node --check functions/api/phase5/attempts/admin.js
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -90,6 +92,10 @@ jobs:
         run: node --test tests/phase5-synthetic-grading-http.test.mjs
       - name: Phase 5E browser submit once, lost-response recovery and Preview UI OFF tests
         run: bun test tests/phase5-submission-browser.test.ts
+      - name: Phase 5F Google Admin Preview read-only D1 API, isolation and no-secrets tests
+        run: node --test tests/phase5-admin-results-http.test.mjs
+      - name: Phase 5F browser Google Admin only scores, response allowlist and no tokens
+        run: bun test tests/phase5-admin-results-browser.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

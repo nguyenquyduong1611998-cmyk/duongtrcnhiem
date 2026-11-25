@@ -7,6 +7,7 @@ on:
       - 'fix/phase4-*'
       - 'feature/phase5-*'
       - 'feature/quiz-*'
+      - 'feature/phase6*'
   workflow_dispatch:
 
 permissions:
@@ -99,6 +100,8 @@ jobs:
         run: bun test tests/phase5-admin-results-browser.test.ts
       - name: Pre-start local quiz minute selection and wall-clock timer regression tests
         run: bun test tests/quiz-adjustable-duration.test.ts
+      - name: Phase 6A offline trusted exam deadlines, student isolation and D1 draft tests
+        run: node --test tests/phase6-timed-exam.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

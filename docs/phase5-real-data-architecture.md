@@ -112,3 +112,63 @@ Endpoint chỉ là bản thiết kế. Không tạo đường dẫn công khai h
 
 **Không chạy** tệp SQL bản nháp này trong Cloudflare Console. GitHub PR ở trạng
 thái Draft không có nghĩa backend hay Firestore production đã được cập nhật.
+
+## VI. Giai đoạn 5B — API chỉ đọc chuyên đề giả (nhánh tiếp theo)
+
+**Trạng thái:** PR thử nghiệm, chưa áp dụng tệp SQL vào D1 Cloudflare,
+không có dữ liệu chuyên đề 5B trên Cloudflare, **mặc định API trả 404**.
+Không thay đổi giao diện hoặc luồng 3 chuyên đề cũ trong `TopicsView`.
+
+- `GET /api/phase5/topics`: trả tối đa 25 chuyên đề **đã publish**
+  có mã kỹ thuật bắt đầu bằng `p5_demo_`, chỉ revision published mới nhất.
+- `GET /api/phase5/topics/{topicId}/versions/{revision}`: trả
+  `topicId,revision,code,title,description,timeLimitSeconds,questions`
+  và `questions[].{id,orderIndex,text,options}`.
+  Không trả `correct_index`, `correctIndex`, `explanation`,
+  khóa đáp án, điểm, tài khoản hoặc dữ liệu thi thật.
+- Hai GET đều yêu cầu **Firebase ID Token đã xác minh chữ ký** và UID
+  `student_...` có `demo_students.active=1` trong **AUTH_DB_PREVIEW**.
+  Không dùng vai trò/quyền do client tự cung cấp.
+- Chỉ dùng exact hostname
+  `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`,
+  `PHASE4_STAGING_HOSTNAME` phải trỏ đến tên này và
+  `PHASE4_PREVIEW_HOST_OPT_IN=true`.
+  Biến kích hoạt mới là `PHASE5_READONLY_TOPICS_ENABLED=true`
+  ở môi trường Preview **sau khi** hoàn tất quy trình được phê duyệt.
+  Mặc định `PHASE5_READONLY_TOPICS_ENABLED` **không có** hoặc `false`:
+  API trả 404. Không bao giờ bật trên Production.
+- `AUTH_DB_PREVIEW` là binding được lấy từ hostname thật trong Request URL.
+  Không dùng `AUTH_DB` dự phòng trên bất kỳ Preview khác.
+- API **chỉ dùng SELECT**, không ghi bảng/đổi mật khẩu,
+  không tự tạo migration, không nhập dữ liệu từ `defaultData` hoặc
+  `localStorage`. Thiếu bảng Phase5: trả lỗi tối giản 503, không tự tạo.
+  `Cache-Control: no-store` ngăn cache nội dung qua trình duyệt/CDN.
+- Không triển khai UI mới cho người dùng thật hoặc cấp phép mở rộng quyền
+  truy cập học viên chỉ vì có API thử nghiệm.
+
+### Kiểm thử
+
+`tests/phase5-readonly-topics-http.test.mjs` dùng SQLite in-memory và
+Firebase RSA tự tạo cho thử nghiệm. Những trường hợp được kiểm:
+A và B đọc phiên bản publish, draft bị ẩn, namespace khác bị từ chối,
+JWT sai/thiếu hoặc UID khóa bị 401, endpoint mặc định 404, chỉ host Preview
+được phép, DB khác không được truy cập, thiếu bảng 503, không có câu SQL
+ghi hoặc đọc bảng `phase5_content_answer_keys`. Không truy cập network thật.
+
+### Điều kiện cho phép tiến tới Preview có dữ liệu giả
+
+1. Review PR và đợi CI test/build thành công.
+2. Backup và **xác minh khôi phục** D1 Preview nếu sau này quyết định tạo
+   bảng thật; không dùng `Time Travel` thay cho thử khôi phục.
+3. Review bản SQL Phase5A và thiết kế migration riêng dành cho D1 Preview;
+   phải duyệt trước khi chạy, không dán SQL bản nháp vào Production.
+4. Tạo duy nhất nội dung giả 2+2 ở namespace `p5_demo_` sau khi được duyệt.
+   Không lấy câu hỏi thật từ các chuyên đề nội bộ.
+5. Khi bật cờ chỉ-Preview, kiểm thử rằng GET trả câu hỏi nhưng không trả khóa,
+   tài khoản bị khóa bị từ chối, và không làm hỏng Phase4.
+6. Chỉ sau kiểm thử quyền sâu hơn mới bắt đầu thiết kế Endpoint Admin và chấm
+   điểm nhiều câu ở giai đoạn 5C/5D.
+
+**Lưu ý:** Không bao giờ nhập dữ liệu quân sự nhạy cảm, phương án hoặc hồ sơ
+học viên thật lên Internet/cloud bên ngoài nếu chưa được người có thẩm quyền
+phê duyệt phân loại và xử lý dữ liệu.

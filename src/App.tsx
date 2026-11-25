@@ -1241,7 +1241,10 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                           typeof window !== 'undefined' ? window.location.hostname : '',
                           import.meta.env.VITE_PHASE6_ADMIN_DRAFTS_UI,
                         ) && (
-                          <Phase6AdminDraftsPanel user={firebaseUser}/>
+                          <Phase6AdminDraftsPanel
+                            user={firebaseUser}
+                            canPublish={import.meta.env.VITE_PHASE6_ADMIN_PUBLISH_UI === 'true'}
+                          />
                         )}
                     </>
                   )}

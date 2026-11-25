@@ -151,8 +151,7 @@ describe('Phase 6E Preview-only read-only browser scores',()=>{
 
   test('HTTP rejection/network failure does not leak body or JWT',async()=>{
     for(const status of [401,403,404,503]){
-      globalThis.fetch=(mock(async()=>reply({secret:'DO_NOT_REFLECT'},status)))
-        as unknown as typeof globalThis.fetch;
+      globalThis.fetch=(mock(async()=>reply({secret:'DO_NOT_REFLECT'},status))) as unknown as typeof globalThis.fetch;
       for(const fn of [
         ()=>client.listPhase6OwnHistory(mkUser(A)),
         ()=>client.listPhase6AdminResults(mkUser(ADMIN_UID)),
@@ -164,8 +163,7 @@ describe('Phase 6E Preview-only read-only browser scores',()=>{
         expect(message.includes(TOKEN)).toBe(false);
       }
     }
-    globalThis.fetch=(mock(async()=>{throw new Error('network details private');}))
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async()=>{throw new Error('network details private');})) as unknown as typeof globalThis.fetch;
     await expect(client.listPhase6OwnHistory(mkUser(A))).rejects.toThrow(
       'Không kết nối được D1'
     );

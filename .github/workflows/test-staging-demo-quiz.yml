@@ -6,6 +6,7 @@ on:
       - feature/staging-demo-quiz-pilot
       - 'fix/phase4-*'
       - 'feature/phase5-*'
+      - 'feature/quiz-*'
   workflow_dispatch:
 
 permissions:
@@ -96,6 +97,8 @@ jobs:
         run: node --test tests/phase5-admin-results-http.test.mjs
       - name: Phase 5F browser Google Admin only scores, response allowlist and no tokens
         run: bun test tests/phase5-admin-results-browser.test.ts
+      - name: Pre-start local quiz minute selection and wall-clock timer regression tests
+        run: bun test tests/quiz-adjustable-duration.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

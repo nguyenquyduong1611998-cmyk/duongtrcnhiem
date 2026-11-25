@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -12,6 +12,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { QuizAttempt, Topic, UserAccount } from '../types';
+import {defaultQuizMinutes,parseQuizMinutes,elapsedQuizSeconds,MIN_QUIZ_MINUTES,MAX_QUIZ_MINUTES} from '../utils/quizDuration';
 import {
   calculateScore10,
   formatDateTime,
@@ -43,6 +44,13 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
   const [candidateName, setCandidateName] = useState('');
   const [unitName, setUnitName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  // The candidate can change the limit only while on the pre-start screen.
+  const [timeMinutesInput,setTimeMinutesInput] = useState(() =>
+    String(defaultQuizMinutes(topic.timeLimitMinutes)));
+  const [activeTimeMinutes,setActiveTimeMinutes] = useState(() =>
+    defaultQuizMinutes(topic.timeLimitMinutes));
+  const startedAtMsRef=useRef<number|null>(null);
+  const finalizedRef=useRef(false);
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -51,21 +59,27 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
   const [showConfirmFinish, setShowConfirmFinish] = useState(false);
   const [completedAttempt, setCompletedAttempt] = useState<QuizAttempt | null>(null);
 
-  const totalTimeSeconds = Math.max(60, (topic.timeLimitMinutes || 10) * 60);
+  const totalTimeSeconds = activeTimeMinutes * 60;
 
   useEffect(() => {
-    if (stage !== 'taking') return;
-    const timer = window.setInterval(() => {
-      setElapsedSeconds((prev) => {
-        const next = prev + 1;
-        if (next >= totalTimeSeconds) {
-          window.clearInterval(timer);
-        }
-        return next;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [stage, totalTimeSeconds]);
+    if(stage !== 'taking' || startedAtMsRef.current === null)return;
+    const updateElapsed=()=>{
+      const startedAtMs=startedAtMsRef.current;
+      if(startedAtMs===null)return;
+      const current=elapsedQuizSeconds(startedAtMs,Date.now(),activeTimeMinutes);
+      // A suspended/background tab catches up; never move time backwards.
+      setElapsedSeconds(prev=>Math.max(prev,current));
+    };
+    updateElapsed();
+    const timer=window.setInterval(updateElapsed,500);
+    window.addEventListener('focus',updateElapsed);
+    document.addEventListener('visibilitychange',updateElapsed);
+    return ()=>{
+      window.clearInterval(timer);
+      window.removeEventListener('focus',updateElapsed);
+      document.removeEventListener('visibilitychange',updateElapsed);
+    };
+  },[stage,activeTimeMinutes]);
 
   useEffect(() => {
     if (stage === 'taking' && elapsedSeconds >= totalTimeSeconds) {
@@ -92,11 +106,20 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
       setFormError('Vui lòng điền Đơn vị công tác trước khi vào làm bài.');
       return;
     }
+    const chosenMinutes=parseQuizMinutes(timeMinutesInput);
+    if(chosenMinutes===null){
+      setFormError(`Thời gian làm bài phải là số phút nguyên từ ${MIN_QUIZ_MINUTES} đến ${MAX_QUIZ_MINUTES}.`);
+      return;
+    }
 
     setCandidateName(cleanName);
     setUnitName(cleanUnit);
     setFormError(null);
-    setStartedAtIso(new Date().toISOString());
+    const startMs=Date.now();
+    startedAtMsRef.current=startMs;
+    finalizedRef.current=false;
+    setActiveTimeMinutes(chosenMinutes);
+    setStartedAtIso(new Date(startMs).toISOString());
     setElapsedSeconds(0);
     setAnswers({});
     setCurrentIdx(0);
@@ -104,7 +127,8 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
   };
 
   const finalizeQuiz = () => {
-    if (completedAttempt) return;
+    if(completedAttempt||finalizedRef.current||stage!=='taking')return;
+    finalizedRef.current=true;
     let correctCount = 0;
     for (const q of topic.questions) {
       if (answers[q.id] === q.correctIndex) {
@@ -129,7 +153,10 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
       totalCount,
       score10,
       grade,
-      durationSeconds: Math.max(1, elapsedSeconds),
+      durationSeconds: Math.max(1,elapsedQuizSeconds(
+        startedAtMsRef.current ?? Date.now(),Date.now(),activeTimeMinutes
+      )),
+      timeLimitMinutes:activeTimeMinutes,
       startedAt: startedAtIso || submittedAt,
       submittedAt,
     };
@@ -169,7 +196,7 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
           <div className="bg-white border border-[#DDE3DC] rounded-xl p-6 sm:p-8 shadow-sm">
             <div className="border-b border-[#EDF1EC] pb-5 mb-6">
               <p className="text-xs font-semibold tracking-wider uppercase text-[#8C6516] mb-1">
-                {topic.code} · {topic.questions.length} câu hỏi · {topic.timeLimitMinutes} phút
+                {topic.code} · {topic.questions.length} câu hỏi · Mặc định {defaultQuizMinutes(topic.timeLimitMinutes)} phút
               </p>
               <h2 className="text-2xl font-bold text-[#152019]">{topic.title}</h2>
               <p className="text-sm text-[#4B5B50] mt-2">{topic.description}</p>
@@ -226,6 +253,29 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
                     className="w-full pl-10 pr-4 py-2.5 bg-[#FAFBF9] border border-[#CFD8CE] rounded-lg text-sm text-[#152019] placeholder:text-[#8A9A8F] focus:outline-none focus:ring-2 focus:ring-[#1F4D36]/25 focus:border-[#1F4D36] transition-all"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="quiz-time-minutes"
+                  className="block text-sm font-semibold text-[#243329] mb-1.5">
+                  Thời gian làm bài (phút) <span className="text-[#B91C1C]">*</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <Clock className="w-4 h-4 shrink-0 text-[#64756A]" />
+                  <input id="quiz-time-minutes" type="number"
+                    min={MIN_QUIZ_MINUTES} max={MAX_QUIZ_MINUTES} step={1}
+                    inputMode="numeric" required value={timeMinutesInput}
+                    onChange={e=>{
+                      setTimeMinutesInput(e.target.value);
+                      if(formError)setFormError(null);
+                    }}
+                    className="w-full rounded-lg border border-[#CFD8CE] bg-[#FAFBF9] px-3 py-2.5 text-sm text-[#152019] focus:outline-none focus:ring-2 focus:ring-[#1F4D36]/25 focus:border-[#1F4D36]"
+                  />
+                  <span className="shrink-0 text-sm text-[#4B5B50]">phút</span>
+                </div>
+                <p className="mt-1.5 text-xs text-[#64756A]">
+                  Có thể chọn từ {MIN_QUIZ_MINUTES} đến {MAX_QUIZ_MINUTES} phút trước khi bắt đầu. Thời gian đã chọn không thể đổi giữa bài.
+                </p>
               </div>
 
               <AnimatePresence>
@@ -603,6 +653,9 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
                     <span className="font-mono-num font-bold text-[#152019]">
                       {formatDuration(completedAttempt.durationSeconds)}
                     </span>
+                    <span className="block text-xs text-[#64756A] mt-1">
+                      Giới hạn: {completedAttempt.timeLimitMinutes ?? topic.timeLimitMinutes} phút
+                    </span>
                   </div>
                   <div className="p-3.5 rounded-lg bg-[#FAFBF9] border border-[#EDF1EC]">
                     <span className="block text-xs text-[#64756A] mb-1">Thời gian nộp bài</span>
@@ -629,6 +682,9 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
                       setAnswers({});
                       setCurrentIdx(0);
                       setElapsedSeconds(0);
+                      startedAtMsRef.current=null;
+                      finalizedRef.current=false;
+                      setTimeMinutesInput(String(activeTimeMinutes));
                       setStage('candidate_info');
                     }}
                     className="px-5 py-2.5 text-sm font-semibold text-[#243329] bg-[#F4F6F4] hover:bg-[#E7ECE7] border border-[#DDE3DC] rounded-lg transition-colors cursor-pointer"

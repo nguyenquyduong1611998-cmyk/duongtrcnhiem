@@ -60,6 +60,7 @@ jobs:
           node --check functions/api/phase6/results/student.js
           node --check functions/api/phase6/results/admin.js
           node --check public/phase6f-preview-sw.js
+          node --check scripts/phase6f-ci-readiness-report.mjs
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -129,9 +130,16 @@ jobs:
         run: node --test tests/phase6f-pwa-sw-security.test.mjs
       - name: Phase 6F staging Preview PWA registration and default-OFF browser tests
         run: bun test tests/phase6f-pwa-browser.test.ts
+      - name: Phase 6F code-only audit with explicit live Production NO-GO gates
+        run: |
+          node --test tests/phase6f-readiness-report.test.mjs
+          node scripts/phase6f-ci-readiness-report.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website
         env:
           VITE_FIREBASE_ENV: staging
         run: bun run build
+      - name: Verify Preview PWA static assets copied without advertising install in HTML
+        run: |
+          node -e "const fs=require('fs');for(const x of ['dist/phase6f-preview.webmanifest','dist/phase6f-preview-icon.svg','dist/phase6f-preview-sw.js'])if(!fs.existsSync(x))throw Error('PWA_BUILD_ASSET_MISSING');const html=fs.readFileSync('dist/index.html','utf8');if(html.includes('phase6f-preview.webmanifest')||html.includes('phase6f-preview-sw.js'))throw Error('PWA_DEFAULT_OFF_BROKEN');"

@@ -68,10 +68,11 @@ function parseDraft(raw:unknown):Phase6AdminDraft{
      !x.templates.every(templateCode)||!Array.isArray(x.questions)||
      x.questions.length!==x.templates.length)
     throw new Error('Bộ câu hỏi bản nháp không hợp lệ.');
+  const validatedTemplates=x.templates as Phase6TemplateCode[];
   const questions=x.questions.map((value,index)=>{
     const q=object(value);
-    const label=PHASE6_TEMPLATES.find(t=>t.code===x.templates[index])?.label;
-    if(q.id!=='q'+(index+1)||q.templateCode!==x.templates[index]||
+    const label=PHASE6_TEMPLATES.find(t=>t.code===validatedTemplates[index])?.label;
+    if(q.id!=='q'+(index+1)||q.templateCode!==validatedTemplates[index]||
        q.text!==label||!Array.isArray(q.options)||q.options.length!==4||
        !q.options.every(o=>typeof o==='string'&&o.length<=1000))
       throw new Error('Câu hỏi bản nháp không hợp lệ.');
@@ -80,7 +81,7 @@ function parseDraft(raw:unknown):Phase6AdminDraft{
       text:q.text as string,options:q.options as string[],
     };
   });
-  return {...base,templates:[...(x.templates as Phase6TemplateCode[])],questions};
+  return {...base,templates:[...validatedTemplates],questions};
 }
 export function isPhase6AdminDraftsUiEnabled(hostname:string,flag:unknown):boolean{
   return IS_FIREBASE_STAGING && flag==='true'&&

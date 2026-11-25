@@ -18,6 +18,7 @@ import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
 import { StagingDemoQuizPanel } from './StagingDemoQuizPanel';
 import { Phase5DemoTopicPanel } from './Phase5DemoTopicPanel';
 import type {Phase5DemoTopic,Phase5DemoTopicSummary} from '../utils/phase5DemoTopics';
+import type {Phase5SyntheticAttempt,Phase5DemoAnswerMap} from '../utils/phase5SyntheticSubmission';
 import type {SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt} from '../utils/syntheticGradedQuiz';
 import type {StagingD1PreflightReport} from '../utils/stagingD1Preflight';
 import type {SyntheticQuizReceipt} from '../utils/syntheticQuizSubmissionRecovery';
@@ -48,6 +49,8 @@ interface CloudStorageModalProps {
   onReadOwnSyntheticQuiz?: () => Promise<SyntheticQuizAttempt|null>;
   onListPhase5DemoTopics?: () => Promise<Phase5DemoTopicSummary[]>;
   onReadPhase5DemoTopic?: (topicId:string,revision:number) => Promise<Phase5DemoTopic>;
+  onSubmitPhase5Demo?: (answers:Phase5DemoAnswerMap,questionIds:readonly string[]) => Promise<SyntheticQuizReceipt<Phase5SyntheticAttempt>>;
+  onReadOwnPhase5Demo?: () => Promise<Phase5SyntheticAttempt|null>;
   onListSyntheticQuizResults?: () => Promise<SyntheticQuizAdminAttempt[]>;
   onReadStagingD1Preflight?: () => Promise<StagingD1PreflightReport>;
   onCreateDemoResultProbe?: () => Promise<void>;
@@ -87,6 +90,8 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   onReadOwnSyntheticQuiz,
   onListPhase5DemoTopics,
   onReadPhase5DemoTopic,
+  onSubmitPhase5Demo,
+  onReadOwnPhase5Demo,
   onListSyntheticQuizResults,
   onReadStagingD1Preflight,
   onCreateDemoResultProbe,
@@ -667,6 +672,8 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
               key={'phase5-'+demoStudentUid}
               onList={onListPhase5DemoTopics}
               onRead={onReadPhase5DemoTopic}
+              onSubmit={onSubmitPhase5Demo}
+              onReadOwn={onReadOwnPhase5Demo}
             />
           )}
           {(onGetSyntheticQuizQuestion || onListSyntheticQuizResults || onReadStagingD1Preflight) && (

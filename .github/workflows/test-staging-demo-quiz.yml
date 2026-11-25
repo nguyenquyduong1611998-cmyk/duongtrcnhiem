@@ -82,6 +82,8 @@ jobs:
         run: node --test tests/phase5-preview-backup-and-seed.test.mjs
       - name: Phase 5 additive Preview schema preserves existing DEMO data (offline)
         run: node --test tests/phase5-preview-additive-schema.test.mjs
+      - name: Phase 5 student browser read-only identity, URL and no-key tests
+        run: bun test tests/phase5-browser-readonly.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

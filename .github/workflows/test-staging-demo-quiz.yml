@@ -120,6 +120,8 @@ jobs:
         run: node --test tests/phase6d-student-timed-exam-http.test.mjs
       - name: Phase 6E signed read-only student histories and Admin paged DEMO score dashboard
         run: node --test tests/phase6e-results-readonly-http.test.mjs
+      - name: Phase 6E browser read-only role boundaries, strict response projections and no-token leaks
+        run: bun test tests/phase6e-results-browser.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

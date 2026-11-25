@@ -61,6 +61,8 @@ export interface QuizAttempt {
   score10: number;
   grade: GradeLevel;
   durationSeconds: number;
+  /** Minutes selected before this local practice attempt began (optional on old results). */
+  timeLimitMinutes?: number;
   startedAt: string;
   submittedAt: string;
 }

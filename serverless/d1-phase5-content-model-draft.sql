@@ -82,7 +82,8 @@ CREATE TABLE IF NOT EXISTS phase5_content_attempts (
   UNIQUE(student_uid,topic_id,revision),
   FOREIGN KEY(topic_id,revision)
     REFERENCES phase5_content_versions(topic_id,revision) ON DELETE RESTRICT,
-  CHECK(correct_count<=total_count)
+  CHECK(correct_count<=total_count),
+  CHECK(score_tenths=CAST(ROUND(correct_count*100.0/total_count) AS INTEGER))
 );
 
 CREATE INDEX IF NOT EXISTS phase5_attempt_student_time

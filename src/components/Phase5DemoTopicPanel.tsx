@@ -157,12 +157,12 @@ export const Phase5DemoTopicPanel:React.FC<Props>=({
               )}
             </fieldset>
           ))}
-          {canGrade&&onSubmit&&onReadOwn?(
+          {canGrade?(
             <div className="space-y-2">
               <button type="button"
                 disabled={busy||!!attempt||submissionState!=='ready'||!allAnswered}
                 onClick={()=>void run(async()=>{
-                  if(!current||submissionState!=='ready'||attempt||
+                  if(!onSubmit||!current||submissionState!=='ready'||attempt||
                     !allAnswered)return;
                   // Once a POST is attempted, NEVER enable a second POST
                   // from this panel if the network or response is uncertain.
@@ -186,6 +186,7 @@ export const Phase5DemoTopicPanel:React.FC<Props>=({
               </button>
               <button type="button" disabled={busy}
                 onClick={()=>void run(async()=>{
+                  if(!onReadOwn)return;
                   const saved=await onReadOwn();
                   setAttempt(saved);
                   if(saved){

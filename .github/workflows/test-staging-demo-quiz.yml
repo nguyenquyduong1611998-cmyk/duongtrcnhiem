@@ -43,6 +43,8 @@ jobs:
           node --check functions/_shared/phase5-readonly-topics.mjs
           node --check functions/api/phase5/topics.js
           node --check 'functions/api/phase5/topics/[topicId]/versions/[revision].js'
+          node --check functions/_shared/phase5-synthetic-grading.mjs
+          node --check functions/api/phase5/attempts/student.js
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -84,6 +86,8 @@ jobs:
         run: node --test tests/phase5-preview-additive-schema.test.mjs
       - name: Phase 5 student browser read-only identity, URL and no-key tests
         run: bun test tests/phase5-browser-readonly.test.ts
+      - name: Phase 5D server-owned scoring, immutable replay, Preview-only disabled POST tests
+        run: node --test tests/phase5-synthetic-grading-http.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

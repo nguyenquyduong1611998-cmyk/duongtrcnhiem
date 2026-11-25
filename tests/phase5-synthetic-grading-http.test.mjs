@@ -219,6 +219,32 @@ test('duplicate same answer is idempotent, conflicting answer rejected and grade
   }finally{f.sqlite.close();}
 });
 
+test('parallel same-UID submits cannot create two scores or overwrite the winner',async()=>{
+  const f=fixture();
+  try{
+    const before=f.phase4();
+    const [a,b]=await Promise.all([
+      f.submit(tokens.A,{q1:1,q2:1}),
+      f.submit(tokens.A,{q1:0,q2:0}),
+    ]);
+    assert.equal(f.count(),1);
+    assert.deepEqual(f.phase4(),before);
+    const resultA=await a.json(),resultB=await b.json();
+    assert.deepEqual([a.status,b.status].sort(),[200,409]);
+    const saved=await (await f.result(tokens.A)).json();
+    assert.ok(saved.attempt);
+    assert.equal(saved.attempt.score===0||saved.attempt.score===10,true);
+    assert.deepEqual(
+      (a.status===200?resultA:resultB).attempt,
+      saved.attempt
+    );
+    assert.deepEqual(
+      (a.status===409?resultA:resultB).attempt,
+      saved.attempt
+    );
+  }finally{f.sqlite.close();}
+});
+
 test('missing/locked/forged auth denied before INSERT, even with valid body',async()=>{
   const f=fixture();
   try{

@@ -162,10 +162,8 @@ describe('Phase 5E DEMO browser submits only after explicit opt-in',()=>{
 
   test('a failed Firebase token refresh happens before any POST and is not assumed saved',async()=>{
     let calls=0;
-    globalThis.fetch=mock(async()=>{calls++;return reply({attempt:baseAttempt});})
-      as unknown as typeof globalThis.fetch;
-    const brokenUser={uid,getIdToken:async()=>{throw new Error('token refresh failed')}}
-      as unknown as User;
+    globalThis.fetch=(mock(async()=>{calls++;return reply({attempt:baseAttempt});})) as unknown as typeof globalThis.fetch;
+    const brokenUser=({uid,getIdToken:async()=>{throw new Error('token refresh failed')}}) as unknown as User;
     await expect(client.submitPhase5SyntheticAttempt(brokenUser,goodAnswers,ids))
       .rejects.toThrow('token refresh failed');
     expect(calls).toBe(0);

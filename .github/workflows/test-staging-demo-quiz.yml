@@ -6,6 +6,7 @@ on:
       - feature/staging-demo-quiz-pilot
       - 'fix/phase4-*'
       - 'feature/phase5-*'
+      - 'feature/quiz-*'
   workflow_dispatch:
 
 permissions:

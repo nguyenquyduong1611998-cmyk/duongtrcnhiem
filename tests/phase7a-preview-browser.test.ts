@@ -62,8 +62,7 @@ describe('Phase 7A Google Admin browser Preview-only schema checker',()=>{
   });
   test('student, unknown Admin and other hostname never make HTTP request',async()=>{
     let calls=0;
-    globalThis.fetch=(mock(async()=>{calls++;return reply(valid);}))
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async()=>{calls++;return reply(valid);})) as unknown as typeof globalThis.fetch;
     for(const user of [
       null,{uid:'student_'+'a'.repeat(32),getIdToken:async()=>TOKEN} as unknown as User,
     ]){
@@ -96,8 +95,7 @@ describe('Phase 7A Google Admin browser Preview-only schema checker',()=>{
   });
   test('network errors, 404, 403, 503 and token refresh errors do not leak secrets',async()=>{
     for(const status of [401,403,404,503]){
-      globalThis.fetch=(mock(async()=>reply({private:'SERVER_SECRET'},status)))
-        as unknown as typeof globalThis.fetch;
+      globalThis.fetch=(mock(async()=>reply({private:'SERVER_SECRET'},status))) as unknown as typeof globalThis.fetch;
       let message='';
       try{await client.readPhase7PreviewSchema(admin);}
       catch(error){message=String(error);}
@@ -105,14 +103,12 @@ describe('Phase 7A Google Admin browser Preview-only schema checker',()=>{
       expect(message.includes(TOKEN)).toBe(false);
       expect(message.includes('SERVER_SECRET')).toBe(false);
     }
-    globalThis.fetch=(mock(async()=>{throw new Error('hidden fetch error');}))
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async()=>{throw new Error('hidden fetch error');})) as unknown as typeof globalThis.fetch;
     await expect(client.readPhase7PreviewSchema(admin)).rejects.toThrow(
       'Không thể kết nối Preview D1'
     );
     let calls=0;
-    globalThis.fetch=(mock(async()=>{calls++;return reply(valid);}))
-      as unknown as typeof globalThis.fetch;
+    globalThis.fetch=(mock(async()=>{calls++;return reply(valid);})) as unknown as typeof globalThis.fetch;
     await expect(client.readPhase7PreviewSchema({
       uid:ADMIN,getIdToken:async()=>{throw new Error('private token error');},
     } as unknown as User)).rejects.toThrow();

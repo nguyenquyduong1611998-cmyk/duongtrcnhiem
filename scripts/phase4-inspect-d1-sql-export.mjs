@@ -13,6 +13,12 @@ const EXPECTED=Object.freeze({
   unit_accounts:['username','firebase_uid','password_salt','password_hash','active','auth_version'],
 });
 const SYNTHETIC=['firebase_uid','quiz_id','answer_index','score','submitted_at','marker'];
+// Preview D1 was provisioned with 2 legacy DEMO tables + Phase 4 quiz.
+// Do not require unit_accounts there: it belongs to the separate Phase 2 design.
+const PREVIEW_EXPECTED=Object.freeze({
+  demo_students:EXPECTED.demo_students,
+  login_attempts:EXPECTED.login_attempts,
+});
 const identifier='(?:"([^"]+)"|\\x60([^\\x60]+)\\x60|\\[([^\\]]+)\\]|([A-Za-z_][A-Za-z0-9_]*))';
 const createTable=new RegExp(
   '^CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?'+identifier+'\\s*\\(','i',
@@ -99,7 +105,10 @@ function declaredColumns(statement,from){
   return fields;
 }
 
-export function inspectD1SqlExportText(source){
+export function inspectD1SqlExportText(source,{profile='canonical'}={}){
+  if(profile!=='preview-demo'&&profile!=='canonical')
+    return {status:'BLOCKED',reason:'INVALID_PROFILE',deployAllowed:false};
+  const requirements=profile==='preview-demo'?PREVIEW_EXPECTED:EXPECTED;
   if(typeof source!=='string'||source.length===0||source.includes('\0'))
     return {status:'BLOCKED',reason:'NOT_SQL_TEXT',deployAllowed:false};
   const {statements,unclosed}=sqlStatements(source);
@@ -123,7 +132,7 @@ export function inspectD1SqlExportText(source){
   }
   const tables={};
   let baselineComplete=true;
-  for(const [name,fields] of Object.entries(EXPECTED)){
+  for(const [name,fields] of Object.entries(requirements)){
     const present=declarations.has(name);
     const columns=declarations.get(name);
     const requiredColumnsPresent=columns instanceof Set&&
@@ -136,7 +145,8 @@ export function inspectD1SqlExportText(source){
   const syntheticColumnsPresent=columns instanceof Set&&
     SYNTHETIC.every(field=>columns.has(field));
   const blocked=unsafe||oversize||duplicate||!baselineComplete||
-    (syntheticDeclared&&!syntheticColumnsPresent);
+    (syntheticDeclared&&!syntheticColumnsPresent)||
+    (profile==='preview-demo'&&!syntheticColumnsPresent);
   return {
     status:blocked?'BLOCKED':'SQL_EXPORT_STRUCTURE_REVIEW_ONLY',
     ...(blocked?{reason:unsafe?'SQL_OPERATIONS_REQUIRE_MANUAL_REVIEW':
@@ -144,6 +154,7 @@ export function inspectD1SqlExportText(source){
       duplicate?'DUPLICATE_SCHEMA_DECLARATIONS':
       'EXPECTED_SCHEMA_DECLARATIONS_MISSING_OR_INCOMPLETE'}:{}),
     mode:'static-text-inspection-no-sql-execution',
+    profile,
     baselineTables:tables,
     syntheticTableDeclared:syntheticDeclared,
     syntheticColumnsPresent,
@@ -158,7 +169,7 @@ export function inspectD1SqlExportText(source){
   };
 }
 
-export function inspectLocalD1SqlExport(file){
+export function inspectLocalD1SqlExport(file,options={}){
   if(typeof file!=='string'||!file.trim())
     throw new Error('SQL_EXPORT_PATH_REQUIRED');
   const stats=lstatSync(file);
@@ -166,7 +177,7 @@ export function inspectLocalD1SqlExport(file){
     throw new Error('SQL_EXPORT_SIZE_OR_TYPE_INVALID');
   const buffer=readFileSync(file);
   const text=new TextDecoder('utf-8',{fatal:true}).decode(buffer);
-  return inspectD1SqlExportText(text.replace(/^\uFEFF/,''));
+  return inspectD1SqlExportText(text.replace(/^\uFEFF/,''),options);
 }
 
 function safeError(error){
@@ -181,13 +192,15 @@ function safeError(error){
 }
 async function main(){
   const args=process.argv.slice(2);
-  if(args.length!==1||args[0]==='--help'){
-    process.stdout.write('Usage: node scripts/phase4-inspect-d1-sql-export.mjs <local-d1-export.sql>\n');
-    if(args.length!==1)process.exitCode=2;
+  const isPreview=args.length===2&&args[0]==='--preview';
+  if(!(args.length===1&&args[0]!=='--help')&&!isPreview){
+    process.stdout.write('Usage: node scripts/phase4-inspect-d1-sql-export.mjs [--preview] <local-d1-export.sql>\n');
+    process.exitCode=2;
     return;
   }
   try{
-    const report=inspectLocalD1SqlExport(args[0]);
+    const report=inspectLocalD1SqlExport(isPreview?args[1]:args[0],
+      {profile:isPreview?'preview-demo':'canonical'});
     process.stdout.write(JSON.stringify(report,null,2)+'\n');
     if(report.status==='BLOCKED')process.exitCode=1;
   }catch(e){

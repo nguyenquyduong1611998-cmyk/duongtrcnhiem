@@ -356,10 +356,9 @@ test('missing Phase6D schema fails safely rather than creating a table',async()=
   const f=fixture();
   try{
     f.sqlite.exec('DROP TABLE phase6_exam_submissions');
-    const session=(await (await f.call(f.start)).json()).session;
-    assert.ok(session);
+    assert.equal((await f.call(f.start)).status,503);
+    assert.equal(f.count('phase6_exam_sessions'),0,'no orphan start on incomplete schema');
     assert.equal((await f.call(f.result)).status,503);
-    assert.equal((await f.call(f.submit(session,{q1:1,q2:2}))).status,503);
     assert.equal(f.count('phase5_content_attempts'),2);
   }finally{f.sqlite.close();}
 });

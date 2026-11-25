@@ -74,6 +74,11 @@ describe('Phase 5E DEMO browser submits only after explicit opt-in',()=>{
     for(const forbidden of ['uid','score','correctIndex','student_uid',
       'correct_index','password','token']){
       expect(JSON.stringify(body).includes(forbidden)).toBe(false);
+    }
+    // The server's graded receipt MUST have a score, but not the answer key.
+    expect(result.attempt.score).toBe(10);
+    for(const forbidden of ['uid','correctIndex','student_uid',
+      'correct_index','password','token','answers_json','explanation']){
       expect(JSON.stringify(result).includes(forbidden)).toBe(false);
     }
   });

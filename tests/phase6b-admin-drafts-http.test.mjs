@@ -153,7 +153,7 @@ test('Google Admin can create/list/get/save/delete synthetic drafts, metadata au
     assert.equal(f.count('phase6_admin_drafts'),0);
     assert.deepEqual(f.sqlite.prepare(
       'SELECT event_type,version FROM phase6_admin_draft_events ORDER BY id'
-    ).all(),[
+    ).all().map(({event_type,version})=>({event_type,version})),[
       {event_type:'create',version:1},
       {event_type:'save',version:2},
       {event_type:'delete',version:2},

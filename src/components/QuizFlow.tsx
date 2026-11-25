@@ -653,6 +653,9 @@ export const QuizFlow: React.FC<QuizFlowProps> = ({
                     <span className="font-mono-num font-bold text-[#152019]">
                       {formatDuration(completedAttempt.durationSeconds)}
                     </span>
+                    <span className="block text-xs text-[#64756A] mt-1">
+                      Giới hạn: {completedAttempt.timeLimitMinutes ?? topic.timeLimitMinutes} phút
+                    </span>
                   </div>
                   <div className="p-3.5 rounded-lg bg-[#FAFBF9] border border-[#EDF1EC]">
                     <span className="block text-xs text-[#64756A] mb-1">Thời gian nộp bài</span>

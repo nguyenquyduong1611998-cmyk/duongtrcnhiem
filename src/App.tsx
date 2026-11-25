@@ -11,6 +11,8 @@ import { loginWithStagingUsername, provisionDemoStudent, deleteDemoStudent, list
 import { createDemoResultProbe, readDemoResultProbe, deleteDemoResultProbe, assertOtherDemoStudentDenied } from './utils/stagingResultProbe';
 import {getSyntheticQuizQuestion,submitSyntheticQuiz,readOwnSyntheticQuiz,listSyntheticQuizAttempts} from './utils/syntheticGradedQuiz';
 import {isPhase5DemoPreviewHostname,listPhase5DemoTopics,readPhase5DemoTopic} from './utils/phase5DemoTopics';
+import {isPhase5SyntheticSubmitUiEnabled,submitPhase5SyntheticAttempt,readOwnPhase5SyntheticAttempt} from './utils/phase5SyntheticSubmission';
+import type {Phase5DemoAnswerMap} from './utils/phase5SyntheticSubmission';
 import {readStagingD1Preflight} from './utils/stagingD1Preflight';
 import { Navbar } from './components/Navbar';
 import { QuizFlow } from './components/QuizFlow';
@@ -737,6 +739,12 @@ const isAdmin = await checkIsCloudAdmin(signedInUser).catch(() => false);
   const handleReadPhase5DemoTopic = useCallback((topicId:string,revision:number) => {
     return readPhase5DemoTopic(requireCurrentDemoStudent(),topicId,revision);
   }, [requireCurrentDemoStudent]);
+  const handleSubmitPhase5Demo = useCallback((answers:Phase5DemoAnswerMap,questionIds:readonly string[])=>{
+    return submitPhase5SyntheticAttempt(requireCurrentDemoStudent(),answers,questionIds);
+  },[requireCurrentDemoStudent]);
+  const handleReadOwnPhase5Demo = useCallback(()=>{
+    return readOwnPhase5SyntheticAttempt(requireCurrentDemoStudent());
+  },[requireCurrentDemoStudent]);
   const handleCreateDemoResultProbe = useCallback(async () => {
     await createDemoResultProbe(requireCurrentDemoStudent());
   }, [requireCurrentDemoStudent]);
@@ -1259,6 +1267,8 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                   onReadOwnSyntheticQuiz={IS_FIREBASE_STAGING && currentUser?.role === 'student' && !!firebaseUser && currentUser.id === firebaseUser.uid && cloudState.connected ? handleReadOwnSyntheticQuiz : undefined}
                   onListPhase5DemoTopics={IS_FIREBASE_STAGING && typeof window!=='undefined' && isPhase5DemoPreviewHostname(window.location.hostname) && currentUser?.role==='student' && !!firebaseUser && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) && currentUser.id===firebaseUser.uid && cloudState.connected ? handleListPhase5DemoTopics : undefined}
                   onReadPhase5DemoTopic={IS_FIREBASE_STAGING && typeof window!=='undefined' && isPhase5DemoPreviewHostname(window.location.hostname) && currentUser?.role==='student' && !!firebaseUser && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) && currentUser.id===firebaseUser.uid && cloudState.connected ? handleReadPhase5DemoTopic : undefined}
+                  onSubmitPhase5Demo={IS_FIREBASE_STAGING && typeof window!=='undefined' && isPhase5SyntheticSubmitUiEnabled(window.location.hostname,import.meta.env.VITE_PHASE5_SYNTHETIC_SUBMIT_UI) && currentUser?.role==='student' && !!firebaseUser && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) && currentUser.id===firebaseUser.uid && cloudState.connected ? handleSubmitPhase5Demo : undefined}
+                  onReadOwnPhase5Demo={IS_FIREBASE_STAGING && typeof window!=='undefined' && isPhase5SyntheticSubmitUiEnabled(window.location.hostname,import.meta.env.VITE_PHASE5_SYNTHETIC_SUBMIT_UI) && currentUser?.role==='student' && !!firebaseUser && /^student_[a-f0-9]{32}$/.test(firebaseUser.uid) && currentUser.id===firebaseUser.uid && cloudState.connected ? handleReadOwnPhase5Demo : undefined}
                   onListSyntheticQuizResults={IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticQuizResults : undefined}
                   onReadStagingD1Preflight={IS_FIREBASE_STAGING && adminAccessAllowed ? handleReadStagingD1Preflight : undefined}
                   onListSyntheticD1Accounts={IS_FIREBASE_STAGING && adminAccessAllowed ? handleListSyntheticD1Accounts : undefined}

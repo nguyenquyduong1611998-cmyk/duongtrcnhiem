@@ -59,6 +59,7 @@ jobs:
           node --check functions/_shared/phase6-results-readonly.mjs
           node --check functions/api/phase6/results/student.js
           node --check functions/api/phase6/results/admin.js
+          node --check public/phase6f-preview-sw.js
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -122,6 +123,12 @@ jobs:
         run: node --test tests/phase6e-results-readonly-http.test.mjs
       - name: Phase 6E browser read-only role boundaries, strict response projections and no-token leaks
         run: bun test tests/phase6e-results-browser.test.ts
+      - name: Phase 6F isolated SQLite backup/restore and synthetic 100-student Phase6 rehearsal
+        run: node --test tests/phase6f-offline-recovery-100students.test.mjs
+      - name: Phase 6F PWA service worker cannot cache authenticated APIs, grades or tokens
+        run: node --test tests/phase6f-pwa-sw-security.test.mjs
+      - name: Phase 6F staging Preview PWA registration and default-OFF browser tests
+        run: bun test tests/phase6f-pwa-browser.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

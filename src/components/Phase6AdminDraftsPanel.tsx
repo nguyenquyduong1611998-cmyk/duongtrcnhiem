@@ -2,20 +2,20 @@ import React from 'react';
 import type {User} from 'firebase/auth';
 import {
   PHASE6_TITLES,PHASE6_TEMPLATES,listPhase6Drafts,getPhase6Draft,
-  createPhase6Draft,savePhase6Draft,deletePhase6Draft,
+  createPhase6Draft,savePhase6Draft,deletePhase6Draft,publishPhase6Draft,
 } from '../utils/phase6AdminDrafts';
 import type {
   Phase6AdminDraft,Phase6DraftSummary,Phase6TitleCode,Phase6TemplateCode,
 } from '../utils/phase6AdminDrafts';
 
-interface Props {user:User|null;}
+interface Props {user:User|null;canPublish?:boolean;}
 const button='rounded-md border border-[#1F4D36] bg-white px-3 py-2 text-xs font-semibold text-[#1F4D36] disabled:opacity-40';
 const input='w-full rounded-md border border-[#B9C8BB] bg-white p-2 text-sm text-[#152019]';
 
 // Phase 6B: staging Google Admin ONLY, rendered behind an explicit Vite flag.
 // All content is synthetic arithmetic; publishing and real-text input are absent.
 // Server independently verifies the signed Google Admin token on every operation.
-export const Phase6AdminDraftsPanel:React.FC<Props>=({user})=>{
+export const Phase6AdminDraftsPanel:React.FC<Props>=({user,canPublish=false})=>{
   const [drafts,setDrafts]=React.useState<Phase6DraftSummary[]|null>(null);
   const [selected,setSelected]=React.useState<Phase6AdminDraft|null>(null);
   const [titleCode,setTitleCode]=React.useState<Phase6TitleCode>('basic');
@@ -23,6 +23,8 @@ export const Phase6AdminDraftsPanel:React.FC<Props>=({user})=>{
   const [templates,setTemplates]=React.useState<Phase6TemplateCode[]>([]);
   const [newTemplate,setNewTemplate]=React.useState<Phase6TemplateCode>('sum_2_2');
   const [confirmDelete,setConfirmDelete]=React.useState(false);
+  const [confirmPublish,setConfirmPublish]=React.useState(false);
+  const [publishedRevision,setPublishedRevision]=React.useState<number|null>(null);
   const [busy,setBusy]=React.useState(false);
   const busyRef=React.useRef(false);
   const [notice,setNotice]=React.useState('');
@@ -30,6 +32,7 @@ export const Phase6AdminDraftsPanel:React.FC<Props>=({user})=>{
   const setEditor=(draft:Phase6AdminDraft)=>{
     setSelected(draft);setTitleCode(draft.titleCode);setMinutes(draft.minutes);
     setTemplates([...draft.templates]);setConfirmDelete(false);
+    setConfirmPublish(false);setPublishedRevision(null);
   };
   const run=async(action:()=>Promise<void>)=>{
     if(busyRef.current)return;
@@ -42,6 +45,8 @@ export const Phase6AdminDraftsPanel:React.FC<Props>=({user})=>{
   };
   const refresh=async()=>setDrafts(await listPhase6Drafts(user));
   const validTime=Number.isSafeInteger(minutes)&&minutes>=1&&minutes<=240;
+  const unsaved=!!selected&&(titleCode!==selected.titleCode||minutes!==selected.minutes||
+    templates.join('|')!==selected.templates.join('|'));
   const draftTitle=PHASE6_TITLES.find(x=>x.code===titleCode)?.label??'Toán học DEMO';
   return (
     <section className="space-y-3 rounded-xl border border-[#BDD7C5] bg-[#F2F9F3] p-4"
@@ -143,10 +148,40 @@ export const Phase6AdminDraftsPanel:React.FC<Props>=({user})=>{
                 setEditor(next);await refresh();
                 setNotice('Đã lưu bản nháp '+draftTitle+'. Chưa xuất bản.');
               })}>Lưu thay đổi vào D1 Preview</button>
+            {canPublish&&(
+              <div className="space-y-2 rounded-lg border border-[#94A3B8] p-3">
+                <p className="text-xs font-semibold">6C — Duyệt xuất bản bản toán học DEMO</p>
+                <p className="text-xs">
+                  Hãy lưu mọi thay đổi trước. Phiên bản đã xuất bản không thể sửa
+                  hoặc thu hồi bằng chức năng này. Học viên chưa có API Phase 6D để làm đề.
+                </p>
+                {unsaved&&<p className="text-xs text-amber-700">
+                  Bạn có thay đổi chưa lưu. Hãy bấm Lưu thay đổi trước khi xuất bản.
+                </p>}
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={confirmPublish} disabled={busy}
+                    onChange={e=>setConfirmPublish(e.target.checked)}/>
+                  Tôi xác nhận đây chỉ là đề toán DEMO và đã kiểm tra nội dung
+                </label>
+                <button type="button" className={button}
+                  disabled={busy||!confirmPublish||unsaved||templates.length<1}
+                  onClick={()=>void run(async()=>{
+                    const receipt=await publishPhase6Draft(user,selected);
+                    setPublishedRevision(receipt.publication.revision);
+                    setConfirmPublish(false);
+                    setNotice(receipt.created
+                      ?'Đã xuất bản revision '+receipt.publication.revision+' vào D1 Preview.'
+                      :'Phiên bản này đã xuất bản trước đó, không tạo bản sao.');
+                  })}>Xuất bản phiên bản toán học DEMO</button>
+                {publishedRevision!==null&&<p className="text-xs text-green-800">
+                  Đã xác nhận phiên bản {publishedRevision} được lưu cố định ở máy chủ.
+                </p>}
+              </div>
+            )}
             <label className="flex items-center gap-2 text-xs">
               <input type="checkbox" checked={confirmDelete} disabled={busy}
                 onChange={e=>setConfirmDelete(e.target.checked)}/>
-              Xác nhận xóa bản nháp đã chọn
+              Xác nhận xóa bản nháp đã chọn (bản đã xuất bản vẫn được giữ nguyên)
             </label>
             <button type="button" disabled={busy||!confirmDelete} className={button}
               onClick={()=>void run(async()=>{

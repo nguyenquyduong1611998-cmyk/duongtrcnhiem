@@ -56,6 +56,9 @@ jobs:
           node --check functions/api/phase6/admin/publish.js
           node --check functions/_shared/phase6-student-timed-exam.mjs
           node --check functions/api/phase6/exam.js
+          node --check functions/_shared/phase6-results-readonly.mjs
+          node --check functions/api/phase6/results/student.js
+          node --check functions/api/phase6/results/admin.js
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -115,6 +118,10 @@ jobs:
         run: node --test tests/phase6c-synthetic-publish-http.test.mjs
       - name: Phase 6D signed student A/B, server DB-clock deadlines, immutable scoring and recovery
         run: node --test tests/phase6d-student-timed-exam-http.test.mjs
+      - name: Phase 6E signed read-only student histories and Admin paged DEMO score dashboard
+        run: node --test tests/phase6e-results-readonly-http.test.mjs
+      - name: Phase 6E browser read-only role boundaries, strict response projections and no-token leaks
+        run: bun test tests/phase6e-results-browser.test.ts
       - name: Build website
         run: bun run build
       - name: Build staging website

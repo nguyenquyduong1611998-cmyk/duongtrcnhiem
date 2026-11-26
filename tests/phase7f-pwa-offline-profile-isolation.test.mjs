@@ -129,12 +129,10 @@ test('only valid hashed immutable same-origin GET assets are intercepted',async(
     '/assets/not-hashed.js',
     '/assets/runtime-abcdef1234.json',
     '/assets/secret-abcdef1234.html',
-    '/assets/index-abcDEF1234.js?token=ignore',
+    '/assets/index-abcDEF1234.js?token=PRIVATE_TOKEN_SHOULD_NOT_CACHE',
+    '/assets/index-abcDEF1234.js?score=10',
     'https://outside.example/assets/index-abcDEF1234.js',
   ]){
-    // Query URL still has safe pathname; do not rely on caching unsafe
-    // GET query variants; this check covers only forbidden paths.
-    if(path.includes('?'))continue;
     assert.equal(sw.dispatch(path),undefined,path);
   }
   assert.equal(sw.networkCalls(),0);
@@ -142,10 +140,12 @@ test('only valid hashed immutable same-origin GET assets are intercepted',async(
 });
 test('activation purges older public SW cache entries, never restores API state',async()=>{
   const sw=sandbox();
+  sw.cachesStore.set('phase6f-preview-immutable-assets-v1',new Map());
   sw.cachesStore.set('phase6f-preview-immutable-assets-old',new Map());
   sw.cachesStore.set('unrelated-cache',new Map());
   await sw.activate();
   assert.equal(sw.cachesStore.has('phase6f-preview-immutable-assets-old'),false);
+  assert.equal(sw.cachesStore.has('phase6f-preview-immutable-assets-v1'),false);
   assert.equal(sw.cachesStore.has('unrelated-cache'),true);
   assert.equal(sw.networkCalls(),0);
 });

@@ -1216,7 +1216,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                            typeof window !== 'undefined' ? window.location.hostname : '',
                            import.meta.env.VITE_PHASE6_STUDENT_TIMED_UI,
                          ) && (
-                           <Phase6StudentExamPanel user={firebaseUser}/>
+                           <Phase6StudentExamPanel key={firebaseUser.uid} user={firebaseUser}/>
                          )}
                       {activeTab === 'history' && (
                         <HistoryView
@@ -1231,7 +1231,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                            typeof window !== 'undefined' ? window.location.hostname : '',
                            import.meta.env.VITE_PHASE6_STUDENT_HISTORY_UI,
                          ) && (
-                           <Phase6ResultsPanel role="student" user={firebaseUser}/>
+                           <Phase6ResultsPanel key={firebaseUser.uid} role="student" user={firebaseUser}/>
                          )}
                       {activeTab === 'honor' && (
                         <HonorBoardView
@@ -1263,7 +1263,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                           typeof window !== 'undefined' ? window.location.hostname : '',
                           import.meta.env.VITE_PHASE6_ADMIN_RESULTS_UI,
                         ) && (
-                          <Phase6ResultsPanel role="admin" user={firebaseUser}/>
+                          <Phase6ResultsPanel key={firebaseUser.uid} role="admin" user={firebaseUser}/>
                         )}
                       {activeTab === 'admin' && currentUser.role === 'admin' &&
                         adminAccessAllowed && firebaseUser &&

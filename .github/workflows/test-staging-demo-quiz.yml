@@ -158,6 +158,12 @@ jobs:
           node scripts/phase7c-operator-evidence-gate.mjs
       - name: Phase 7D read-only comparison of isolated SQLite snapshots (no Cloudflare, no SQL import)
         run: node --test tests/phase7d-restored-sqlite-verification.test.mjs
+      - name: Phase 7E independent signed PC/phone/Admin HTTP sessions using one synthetic SQLite file (NO network)
+        run: node --test tests/phase7e-multidevice-shared-d1-http.test.mjs
+      - name: Phase 7E browser token separation, cross-device recovery and no auto re-submit
+        run: bun test tests/phase7e-multidevice-browser-recovery.test.ts
+      - name: Phase 7E Firebase UID keyed UI resets, no-store API and PWA private cache isolation
+        run: node --test tests/phase7e-account-state-isolation.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

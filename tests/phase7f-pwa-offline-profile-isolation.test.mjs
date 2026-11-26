@@ -11,7 +11,7 @@ function sandbox(){
   const listeners=new Map(),cachesStore=new Map(),puts=[];
   let offline=false,networkCalls=0;
   const ctx={
-    URL,Promise,
+    URL,Promise,Response,
     self:{
       location:{origin:ORIGIN},
       addEventListener:(type,fn)=>listeners.set(type,fn),
@@ -112,6 +112,26 @@ test('offline A→B switch never serves an authenticated exam/grade/HTML from SW
     assert.equal(cachedContent.includes(forbidden),false,forbidden);
   }
 });
+test('iPhone root offline fallback has no stored user HTML, grades or account state',async()=>{
+  const sw=sandbox();
+  const online=await sw.dispatch('/',{mode:'navigate',cookie:true});
+  assert.equal(online.body,'STATIC_HASHED_ASSET');
+  assert.equal(sw.puts.length,0);
+  sw.setOffline(true);
+  const offline=await sw.dispatch('/',{mode:'navigate',cookie:true});
+  assert.equal(offline.status,503);
+  assert.match(offline.headers.get('cache-control'),/no-store/);
+  const text=await offline.text();
+  assert.match(text,/Bạn đang ngoại tuyến/);
+  for(const secret of ['student_uid','firebase_uid','answers_json',
+    'score_tenths','test_hv_','password_hash','<form','<script'])
+    assert.equal(text.includes(secret),false,secret);
+  assert.equal(sw.dispatch('/?q=secret',{mode:'navigate'}),undefined);
+  assert.equal(sw.dispatch('/api/phase6/exam',{mode:'navigate'}),undefined);
+  assert.equal(sw.puts.length,0);
+  assert.equal(sw.cachesStore.size,0);
+});
+
 test('private HTTP cache controls cannot cause even hash-named assets to be cached',async()=>{
   const sw=sandbox();
   const privateAsset='/assets/do-not-cache-private-abcDEF1234.js';

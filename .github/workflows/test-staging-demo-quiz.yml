@@ -69,6 +69,7 @@ jobs:
           node --check scripts/phase7c-github-deployment-evidence.mjs
           node --check scripts/phase7c-operator-evidence-gate.mjs
           node --check scripts/phase7d-verify-restored-sqlite.mjs
+          node --check scripts/phase7f-offline-load-rehearsal.mjs
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -164,6 +165,12 @@ jobs:
         run: bun test tests/phase7e-multidevice-browser-recovery.test.ts
       - name: Phase 7E Firebase UID keyed UI resets, no-store API and PWA private cache isolation
         run: node --test tests/phase7e-account-state-isolation.test.mjs
+      - name: Phase 7F 30-60-100 synthetic clients, server-owned grades and Admin summaries (OFFLINE, NOT live load)
+        run: |
+          node --test tests/phase7f-offline-load-30-60-100.test.mjs
+          node scripts/phase7f-offline-load-rehearsal.mjs
+      - name: Phase 7F PWA offline, A-to-B account isolation, query cache key denial and SW v2 rotation
+        run: node --test tests/phase7f-pwa-offline-profile-isolation.test.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

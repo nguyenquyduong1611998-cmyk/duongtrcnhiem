@@ -163,6 +163,16 @@ test('symlinks, hardlinks, same path, malformed SQLite and missing file blocked'
     assert.ok(existsSync(f.source));
   }finally{f.close();}
 });
+test('reject an uncheckpointed SQLite WAL sidecar instead of trusting stale bytes',async()=>{
+  const f=create();
+  try{
+    writeFileSync(f.candidate+'-wal',Buffer.from('FAKE_UNCHECKPOINTED_WAL'));
+    const result=await verifyPhase7dLocalSnapshots(f.source,f.candidate);
+    assert.equal(result.status,'BLOCKED');
+    assert.equal(result.reason,'INVALID_SQLITE_FILE');
+    noLeak(result,f);
+  }finally{f.close();}
+});
 test('CLI uses only existing local snapshot inputs, never exports or emits private filenames',()=>{
   const f=create();
   try{

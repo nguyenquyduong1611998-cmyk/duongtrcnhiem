@@ -49,7 +49,7 @@ const response=(body:unknown,status=200)=>new Response(JSON.stringify(body),{
 });
 const EMPTY={mode:'phase6-student-history-readonly',
   entries:[],offset:0,nextOffset:null};
-const OWN={...EMPTY,entries:[receipt]};
+const OWN={...EMPTY,entries:[{...receipt,title:topic.title}]};
 const SUMMARY={mode:'phase6-admin-results-readonly',summary:{
   attemptCount:1,studentCount:1,averageScore:10,maxScore:10,
 }};
@@ -80,7 +80,7 @@ describe('Phase 7E separate browser identity and lost-response recovery',()=>{
     const recovered=await exam.readPhase6ExamResult(phoneA,topic);
     expect(recovered).toEqual(receipt);
     const historyOnPhone=await history.listPhase6OwnHistory(phoneA);
-    expect(historyOnPhone.entries).toEqual([receipt]);
+    expect(historyOnPhone.entries).toEqual([{...receipt,title:topic.title}]);
     expect(calls.filter(x=>x.action==='submit')).toHaveLength(1);
     expect(calls.filter(x=>x.action==='result')).toHaveLength(1);
     expect(calls[0].token).toBe('Bearer '+TOKENS.A);
@@ -112,7 +112,7 @@ describe('Phase 7E separate browser identity and lost-response recovery',()=>{
       throw Error('UNEXPECTED_ENDPOINT');
     })) as unknown as typeof globalThis.fetch;
     expect((await exam.readPhase6ExamResult(pcA,topic))?.score).toBe(10);
-    expect((await history.listPhase6OwnHistory(pcA)).entries).toEqual([receipt]);
+    expect((await history.listPhase6OwnHistory(pcA)).entries).toEqual([{...receipt,title:topic.title}]);
     // New Firebase user/profile -> independent request identity, no A cache.
     expect(await exam.readPhase6ExamResult(browserB,topic)).toBeNull();
     expect((await history.listPhase6OwnHistory(browserB)).entries).toEqual([]);

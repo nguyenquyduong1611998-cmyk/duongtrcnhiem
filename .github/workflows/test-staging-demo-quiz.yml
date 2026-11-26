@@ -70,6 +70,7 @@ jobs:
           node --check scripts/phase7c-operator-evidence-gate.mjs
           node --check scripts/phase7d-verify-restored-sqlite.mjs
           node --check scripts/phase7f-offline-load-rehearsal.mjs
+          node --check scripts/phase7g-preview-acceptance-gate.mjs
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -171,6 +172,10 @@ jobs:
           node scripts/phase7f-offline-load-rehearsal.mjs
       - name: Phase 7F PWA offline, A-to-B account isolation, query cache key denial and SW v2 rotation
         run: node --test tests/phase7f-pwa-offline-profile-isolation.test.mjs
+      - name: Phase 7G offline Cloudflare Preview operator evidence gate, stale SHA and zero-secrets security regressions
+        run: |
+          node --test tests/phase7g-preview-acceptance-gate.test.mjs
+          node scripts/phase7g-preview-acceptance-gate.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

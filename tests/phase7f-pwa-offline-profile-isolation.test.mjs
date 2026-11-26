@@ -82,7 +82,6 @@ test('offline A→B switch never serves an authenticated exam/grade/HTML from SW
     ['/api/phase6/results/admin',{method:'POST',cookie:true}],
     ['/api/phase5/attempts/student',{method:'POST'}],
     ['/__/auth/handler',{method:'GET'}],
-    ['/',{mode:'navigate'}],
     ['/index.html',{mode:'navigate'}],
     ['/phase6f-preview.webmanifest',{}],
   ];

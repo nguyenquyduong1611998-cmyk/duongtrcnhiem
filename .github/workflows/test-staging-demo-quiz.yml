@@ -66,6 +66,8 @@ jobs:
           node --check scripts/phase6f-ci-readiness-report.mjs
           node --check scripts/phase7b-backup-evidence.mjs
           node --check scripts/phase7b-preview-surface-probe.mjs
+          node --check scripts/phase7c-github-deployment-evidence.mjs
+          node --check scripts/phase7c-operator-evidence-gate.mjs
       - name: Existing DEMO authentication and D1 regressions
         run: |
           node --test tests/staging-security.test.mjs
@@ -147,6 +149,12 @@ jobs:
         run: node --test tests/phase7b-backup-evidence.test.mjs
       - name: Phase 7B credential-free fixed-host HEAD probe simulation (NO network)
         run: node --test tests/phase7b-preview-surface-probe.test.mjs
+      - name: Phase 7C GitHub Cloudflare Pages check tied to exact staging SHA, offline mocks only
+        run: node --test tests/phase7c-github-deployment-evidence.test.mjs
+      - name: Phase 7C private operator readiness ledger remains NO-GO even if self-reported reviewed
+        run: |
+          node --test tests/phase7c-operator-evidence-gate.test.mjs
+          node scripts/phase7c-operator-evidence-gate.mjs
       - name: Build website
         run: bun run build
       - name: Build staging website

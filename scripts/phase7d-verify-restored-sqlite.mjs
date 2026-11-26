@@ -5,7 +5,7 @@
 // freshness, isolation from Cloudflare, or authorization for any live deployment.
 import {DatabaseSync} from 'node:sqlite';
 import {
-  lstatSync,statSync,realpathSync,openSync,readSync,closeSync,
+  lstatSync,statSync,realpathSync,openSync,readSync,closeSync,existsSync,
 } from 'node:fs';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
@@ -43,6 +43,10 @@ function checkedPath(path){
   const actual=resolve(path),lstat=lstatSync(actual),stat=statSync(actual);
   if(!lstat.isFile()||!stat.isFile()||stat.size<MAGIC.length||
      stat.size>MAX_BYTES)throw Error('INVALID_FILE');
+  // Live WAL/journal sidecars can hide uncheckpointed rows and can make a
+  // read-only comparison misleading. Require an offline checkpointed copy.
+  if(['-wal','-shm','-journal'].some(suffix=>existsSync(actual+suffix)))
+    throw Error('SQLITE_BUSY_SIDECAR');
   const fd=openSync(actual,'r');
   try{
     const b=Buffer.alloc(MAGIC.length);

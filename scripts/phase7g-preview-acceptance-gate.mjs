@@ -67,7 +67,7 @@ function output(status,review={},extra={}){
 }
 const invalid=()=>output('BLOCKED_INVALID_EVIDENCE');
 export function inspectPhase7gPreviewAcceptance(phase7c,session,expectedHeadSha=null){
-  if(!exact(session,[
+  if(!exactly(session,[
     'schemaVersion','environment','project','branch','previewAlias',
     'gitCommitSha','operatorReview',
   ])||session.schemaVersion!==1||
@@ -76,7 +76,7 @@ export function inspectPhase7gPreviewAcceptance(phase7c,session,expectedHeadSha=
     session.previewAlias!==ALIAS||
     (session.gitCommitSha!==null&&
       (typeof session.gitCommitSha!=='string'||!SHA.test(session.gitCommitSha)))||
-    !exact(session.operatorReview,FIELDS)||
+    !exactly(session.operatorReview,FIELDS)||
     !FIELDS.every(k=>STATUS.has(session.operatorReview[k])))
     return invalid();
 

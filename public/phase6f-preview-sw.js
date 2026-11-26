@@ -2,7 +2,7 @@
 // This worker MUST NEVER serve authenticated HTML, API replies, Firebase
 // tokens, profile data, student answers, grades, exam submissions or D1 data
 // from cache. Offline exams are NOT allowed. Fail with network error offline.
-const CACHE_NAME='phase6f-preview-immutable-assets-v1';
+const CACHE_NAME='phase6f-preview-immutable-assets-v2';
 const CACHE_PREFIX='phase6f-preview-immutable-assets-';
 const IMMUTABLE_ASSET=/^\/assets\/[A-Za-z0-9_./-]+-[A-Za-z0-9_-]{8,}\.(?:js|css|svg|png|webp|avif|woff2?)$/;
 
@@ -26,7 +26,9 @@ self.addEventListener('fetch',event=>{
      request.cache==='no-store')
     return;
   const url=new URL(request.url);
-  if(url.origin!==self.location.origin||
+  // Even a hash-named static asset must not cache query parameters:
+  // query strings may carry session data and are not immutable asset IDs.
+  if(url.origin!==self.location.origin||url.search||
      url.pathname.startsWith('/api/')||
      url.pathname.startsWith('/__/auth/')||
      !IMMUTABLE_ASSET.test(url.pathname))

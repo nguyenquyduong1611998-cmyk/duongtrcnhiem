@@ -12,8 +12,9 @@ function harness(){
   const stored=new Map();
   const cacheOps=[];
   const network=[];
+  let offline=false;
   const scope={
-    URL,Promise,
+    URL,Promise,Response,
     self:{
       location:{origin},
       addEventListener:(name,handler)=>listeners.set(name,handler),
@@ -37,6 +38,7 @@ function harness(){
     },
     fetch:async req=>{
       network.push(req.url);
+      if(offline)throw new Error('SYNTHETIC_NETWORK_OFFLINE');
       const url=new URL(req.url);
       return {
         ok:true,status:200,type:'basic',
@@ -66,7 +68,7 @@ function harness(){
       waitUntil:promise=>Promise.resolve(promise).then(resolve,reject),
     });
   });
-  return {eventFor,network,cacheOps,lifecycle,stored};
+  return {eventFor,network,cacheOps,lifecycle,stored,setOffline:v=>{offline=v;}};
 }
 
 test('Phase6F SW never intercepts exams, API results, POST, auth or navigation',()=>{
@@ -114,6 +116,31 @@ test('SW only caches immutable, public hashed assets and keeps response unchange
   assert.equal(h.stored.size,1);
 });
 
+test('Preview root navigation is network-first with static offline message, zero caching',async()=>{
+  const h=harness();
+  const accessCookie={has:key=>key==='cookie'};
+  const online=await h.eventFor('/',{mode:'navigate',headers:accessCookie});
+  assert.equal(online.url,origin+'/');
+  assert.equal(h.cacheOps.length,0);
+  h.setOffline(true);
+  const result=await h.eventFor('/',{mode:'navigate',headers:accessCookie});
+  assert.equal(result.status,503);
+  assert.match(result.headers.get('cache-control'),/no-store/);
+  assert.match(result.headers.get('content-security-policy'),/default-src 'none'/);
+  const body=await result.text();
+  assert.match(body,/Bạn đang ngoại tuyến/);
+  assert.match(body,/mở lại ứng dụng/);
+  for(const forbidden of ['test_hv_','student_','password','answers_json',
+    'score_tenths','Bearer','localStorage','<script','<form'])
+    assert.equal(body.includes(forbidden),false,forbidden);
+  assert.equal(h.eventFor('/?auth=token',{mode:'navigate'}),undefined);
+  assert.equal(h.eventFor('/api/phase6/exam',{mode:'navigate'}),undefined);
+  assert.equal(h.eventFor('/__/auth/handler',{mode:'navigate'}),undefined);
+  assert.equal(h.cacheOps.length,0);
+  assert.equal(h.stored.size,0);
+  assert.equal(h.network.length,2);
+});
+
 test('manifest declares installable shell but SW never provides fake offline exams',()=>{
   const manifest=JSON.parse(readFileSync('public/phase6f-preview.webmanifest','utf8'));
   assert.equal(manifest.display,'standalone');
@@ -123,7 +150,8 @@ test('manifest declares installable shell but SW never provides fake offline exa
   assert.ok(manifest.icons.some(icon=>
     icon.src==='/phase6f-preview-icon.svg'&&
     icon.type==='image/svg+xml'&&icon.sizes==='any'));
-  assert.doesNotMatch(script,/addEventListener\s*\(\s*['"]message|new Response\s*\(/);
+  assert.doesNotMatch(script,/addEventListener\s*\(\s*['"]message/);
+  assert.match(script,/new Response\s*\(OFFLINE_NOTICE/);
   assert.doesNotMatch(script,/caches\s*\.\s*open\s*\(\s*['"](?:api|answers|grades)/);
   assert.doesNotMatch(script,/localStorage|indexedDB|Bearer|firebase_uid|answers_json/i);
 });

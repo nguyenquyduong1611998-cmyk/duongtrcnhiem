@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "environment": "cloudflare-pages-branch-preview",
+  "branch": "feature/staging-demo-quiz-pilot",
+  "gitCommitSha": null,
+  "operatorReview": {
+    "exactPreviewAlias": "NOT_CHECKED",
+    "deployedCommitInCloudflareDashboard": "NOT_CHECKED",
+    "previewAccessPolicyAndHashUrls": "NOT_CHECKED",
+    "canonicalTestHostnameProtection": "NOT_CHECKED",
+    "previewD1BindingMatchesExpectedIdPrivately": "NOT_CHECKED",
+    "stagingFirebaseConfiguration": "NOT_CHECKED",
+    "freshPrivateD1Export": "NOT_CHECKED",
+    "independentRestoreAndIntegrity": "NOT_CHECKED",
+    "signedAdminStudentABDeviceTests": "NOT_CHECKED",
+    "realPwaDeviceInstallAndAccountSwitch": "NOT_CHECKED",
+    "authorizedNetworkLoad30to100": "NOT_CHECKED",
+    "dataHandlingAuthorization": "NOT_CHECKED"
+  }
+}

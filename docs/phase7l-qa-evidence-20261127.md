@@ -83,3 +83,11 @@ Các kết quả dưới đây là quan sát từ ảnh Cloudflare Dashboard/CMD
 - Các bằng chứng là ảnh CMD do operator cung cấp, không phải kết quả thực thi trực tiếp của trợ lý. Chưa kiểm chứng tình trạng dữ liệu D1 live hiện tại, test restore D1 remote, Cloudflare Access enforcement, hoặc phê duyệt migration.
 
 **Quyết định:** đánh dấu PASS cho kiểm thử bảo toàn 8 bảng của **bản sao SQLite RAM**. Giữ `deploymentAllowed:false`, PR Draft, mọi cờ Phase 6 OFF; không thực thi draft SQL trên Cloudflare khi chưa có phê duyệt và review chuyên biệt.
+
+## 7. Bước 137–138: Bảng và trigger trên bản sao SQLite RAM
+
+Ảnh CMD do người vận hành cung cấp cho thấy sau khi nạp export D1 Preview vào `:memory:` và áp dụng các SQL Phase 6 **chỉ cục bộ**:
+
+- Bước 137: Có chính xác 5 bảng ứng dụng `phase6_*`: `phase6_admin_draft_events`, `phase6_admin_drafts`, `phase6_admin_publications`, `phase6_exam_sessions`, `phase6_exam_submissions`.
+- Bước 138: Có đúng 12 trigger `phase6_*`, gồm 3 trigger admin draft, 3 trigger publication, 3 trigger session và 3 trigger submission.
+- Đây là **schema presence checks**, không chứng minh tất cả hành vi bảo vệ trigger; nghiệm thu D1 cloud còn BLOCKED. Không thay đổi dữ liệu live, không bật flags, không merge.

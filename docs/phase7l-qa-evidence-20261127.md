@@ -113,3 +113,11 @@ Người vận hành chạy bài thử Node.js `node:sqlite` trong RAM với duy
 - `Drafts: 2 Audit events: 2`; `Result: PASS`.
 
 Đây là test ràng buộc cơ sở dữ liệu **đối với draft Admin**, không phải test thời gian của phiên thi live; không kết nối Cloudflare, không sửa file export. Chưa có phê duyệt bật tính năng hay triển khai D1.
+
+## 10. Bước 141 — Bảo vệ deadline và phiên thi (operator screenshot)
+
+Người vận hành chạy phép thử độc lập trên `node:sqlite` trong RAM: tạo 1 phiên thi DEMO giả với `phase6_exam_sessions` và trigger từ dự thảo Phase 6A, sau đó thử tăng `expires_at` và `DELETE` phiên.
+
+Kết quả ảnh CMD: `Extend deadline: PASS`; `Delete session: PASS`; `Result: PASS`. Hai thao tác đều bị SQLite từ chối với trigger `PHASE6_SESSION_IMMUTABLE`.
+
+Giới hạn: đây chỉ là thử nghiệm trigger cục bộ trên dữ liệu giả, không chứng minh một client/API bên ngoài không thể khai thác lỗ hổng khác. Không thao tác vào D1 Cloudflare, không áp dụng migration thật hoặc bật flags.

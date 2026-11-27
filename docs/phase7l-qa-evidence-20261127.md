@@ -214,3 +214,13 @@ So sánh GitHub `fc24211...feature/staging-demo-quiz-pilot`: `ahead_by:11`, `beh
 **Chưa xác minh** có hoặc không một deployment mới hơn ở SHA `75f2d81`: ảnh chỉ hiển thị một hàng Staging, không phải danh sách lọc đầy đủ. GitHub combined statuses của merge commit PR35 không trả về status trong lần kiểm tra; không suy ra build thành công/thất bại.
 
 **Bước tiếp theo:** tìm chính xác deployment commit `75f2d81` trên Cloudflare Pages (hoặc chứng minh không có) bằng bộ lọc Staging và trạng thái Details; không Retry/Deploy/Change branch controls trong bước này. PR36 tiếp tục Draft, SQL/flags Phase 6 giữ OFF.
+
+## 20. Bước 150 — Tìm thấy Staging Preview tại HEAD PR35
+
+Theo ảnh Cloudflare Pages → All deployments do người vận hành cung cấp ngày 27/11/2026, bản Preview có Source `feature/stagin...` và commit `75f2d81` hiển thị dấu triển khai **thành công**. URL deployment dạng hash được hiển thị: `https://bb66501a.duongtrcnhiem-test.pages.dev`. Một bản Preview khác thuộc `feature/phase7...` cũng xuất hiện với cùng commit `75f2d81`; chỉ bản Source Staging mới được dùng để xác minh nhánh Staging.
+
+Đối chiếu GitHub: merge commit PR #35 là `75f2d814b0ef70b5a4ae7118885cd2e0548e69a8`; so sánh với `feature/staging-demo-quiz-pilot` cho trạng thái `identical`, ahead/behind đều 0. Vì thế có bằng chứng Dashboard về **Staging Preview deployment successful at HEAD PR35**; không cần kích hoạt redeploy chỉ để tìm commit này.
+
+Cảnh báo phạm vi: trạng thái Pages thành công **không** chứng minh Cloudflare Access áp dụng riêng cho URL hash, runtime đang dùng `AUTH_DB_PREVIEW`, migrations Phase 6 đã áp dụng, flags bật, hay API thực thi thành công. Các phép thử signed student/Admin và dữ liệu Preview vẫn chưa được phép tiến hành cho đến khi gate được review.
+
+**Bước kế tiếp:** click `Details` trên chính dòng `feature/stagin... 75f2d81`, kiểm tra đầy đủ Branch/Commit/Status/Deployment URL và ghi lại chỉ thông tin công khai. Không Retry/Promote/Rollback/merge, không SQL trên D1, không bật `PHASE6_*`.

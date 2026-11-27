@@ -132,3 +132,14 @@ Theo ảnh CMD người vận hành cung cấp, phép thử SQLite `:memory:` c�
 - `One immutable grade: PASS` — giữ lại đúng một điểm gốc trong thử nghiệm.
 
 Giới hạn: phép thử chỉ trong SQLite RAM với dữ liệu tổng hợp, không kiểm chứng phân quyền HTTP/Firebase hoặc tranh chấp đồng thời trên D1 thực tế. Không cập nhật D1 Cloudflare, flags, deployment hay dữ liệu người dùng.
+
+## 12. Bước 143 — Ràng buộc chủ phiên và hạn nộp (operator screenshot)
+
+Người vận hành thực thi phép thử SQLite `:memory:` cục bộ với cấu trúc DEMO giả và `serverless/d1-phase6d-timed-submissions-draft.sql`. Kết quả ảnh CMD:
+- `Wrong owner rejected: PASS` — `student_uid` khác chủ phiên bị từ chối.
+- `Valid submission: PASS` — phiên hợp lệ được nộp.
+- `Expired rejected: PASS` — phiên đã hết hạn bị từ chối.
+- `One valid grade: PASS` — chỉ một điểm được lưu.
+- `Result: PASS`.
+
+Giới hạn: bài thử xác nhận ràng buộc SQLite cục bộ, chưa kiểm tra quyền Firebase HTTP, Cloudflare Access enforcement, giờ thực tế bên ngoài, hoặc D1 live. Không thay đổi Production hoặc database Preview.

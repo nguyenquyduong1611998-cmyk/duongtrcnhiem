@@ -239,3 +239,14 @@ Cảnh báo phạm vi: trạng thái Pages thành công **không** chứng minh 
 **Kết luận:** đúng branch/commit/URL/alias và trạng thái build-deployment thành công theo Dashboard. **Không suy ra** Functions/API đã chạy đúng, D1 binding runtime đã hợp lệ, Access policy áp trên từng URL hash, SQL Phase 6 đã triển khai, hoặc các `PHASE6_*` đã bật.
 
 **Bước kế:** mở tab `Functions` của chính deployment này chỉ để xem các route Functions đã được đóng gói/triển khai, không thực hiện gọi API có quyền ghi, không chạy migration hoặc sửa cấu hình.
+
+## 22. Bước 152 — Tab Functions của Pages Deployment chỉ hiển thị log stream và hướng dẫn Bindings
+
+Ảnh Cloudflare Deployment Details → `Functions` do người vận hành cung cấp chỉ hiển thị thẻ `Bindings` (hướng dẫn cấu hình), khu vực `Real-time Logs (Beta)`, nút `Begin log stream` và trạng thái `Ready to stream`. Không thấy danh sách route hoặc invocation; **không thể suy ra từ ảnh rằng `/api/phase6/*` đang xử lý request thành công hay runtime binding đã sẵn sàng**.
+
+Đã kiểm tra mã tại đúng GitHub merge commit PR35 `75f2d814b0ef70b5a4ae7118885cd2e0548e69a8`:
+- `functions/api/auth/status.js` là GET-only, chỉ báo `stage`, `ready`, `d1Connected`, `tablesReady`, `login`, `mode`; chỉ kiểm tra schema `demo_students` và `login_attempts`.
+- `functions/_shared/staging-db-binding.mjs` chỉ dùng `AUTH_DB_PREVIEW` tại alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`. URL deployment **hash** bị cố ý đặt `AUTH_DB: undefined`.
+- Các endpoint Phase 6 exam/results có mặt trong mã nhưng POST-only, Preview-pinned, các cờ độc lập mặc định OFF. Không nên gọi để chẩn đoán trong bước đọc-only.
+
+**Bước kiểm tra an toàn tiếp theo:** trong trình duyệt đã qua Cloudflare Access, truy cập GET `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/api/auth/status`, chỉ đọc và báo lại các trường boolean; không gửi cookie, mã OTP, bearer token, nội dung bảng hoặc logs. Kết quả `ready:true` chỉ chứng minh endpoint auth baseline, **không** chứng minh schema Phase 6 hiện có. Không bấm `Begin log stream` nếu không cần.

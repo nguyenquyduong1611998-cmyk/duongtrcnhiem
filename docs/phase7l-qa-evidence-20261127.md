@@ -61,3 +61,16 @@ Ghi tối đa: thời gian, hostname Preview, commit SHA, loại thiết bị, m
 | CI PR #36 HEAD `7488bd103d4ef4d3b9ca930e600fab30940adde0` | NO STATUS / NO PR-WORKFLOW RETURNED khi kiểm tra | GitHub API; không suy ra thành công/thất bại |
 
 **Kết luận:** chưa đủ điều kiện chạy nghiệm thu PC/iPhone live hoặc bật Phase 6. Tiếp tục giữ mọi live case BLOCKED và PR Draft.
+
+## 5. Bằng chứng vận hành do người dùng cung cấp — 27/11/2026
+
+Các kết quả dưới đây là quan sát từ ảnh Cloudflare Dashboard/CMD do người vận hành chia sẻ, **không phải** việc trợ lý truy cập database hoặc thực thi thử nghiệm thay người dùng.
+
+- Cloudflare Access: Preview access hiển thị chính sách hạn chế; policy `Allow Members - Cloudflare Pages` với một rule `Emails` chỉ định một địa chỉ (không ghi email vào tài liệu). Enforcement trực tiếp trên URL Preview vẫn **UNVERIFIED**.
+- Pages Preview binding trên Dashboard: `AUTH_DB_PREVIEW → duongtrcnhiem-auth-preview`. Đây là bằng chứng cấu hình giao diện; deployment SHA và runtime binding còn **UNVERIFIED**.
+- D1 Preview Dashboard: 8 bảng (2 bảng DEMO căn bản, 5 bảng Phase 5 và `synthetic_graded_attempts`), Time Travel có cửa sổ khôi phục. Các bảng Phase 6 phiên thi riêng chưa được thấy trong ảnh.
+- Wrangler đã xuất SQL Preview về máy cục bộ thành công: 12,145 byte; đã tính SHA-256 nhưng **không lưu hash vào tài liệu**. Không tải bản SQL lên GitHub.
+- Static inspector `--preview`: `SQL_EXPORT_STRUCTURE_REVIEW_ONLY`; 2 bảng căn bản và synthetic schema có các cột kiểm tra bắt buộc. Tính toàn vẹn và importability ở công cụ static vẫn báo false theo thiết kế.
+- Người vận hành chạy Node.js `node:sqlite` trên máy cục bộ (SQLite 3.54.1). Bản export được nạp vào **SQLite :memory:**; kết quả màn hình: `Restore: SUCCESS`, `Integrity: ok`, `Foreign key errors: 0`, `Tables: 8`. Đây là **LOCAL RESTORE SMOKE PASS**, không chứng minh hàng dữ liệu đầy đủ, phục hồi D1 remote, hoặc backup đúng trạng thái live mới nhất.
+
+**Quyết định:** Gate kiểm thử khôi phục SQLite cục bộ được ghi nhận đã đạt ở mức smoke test; gate Cloudflare Access enforcement, tính khớp dữ liệu live, schema Phase 6, backup/restore D1 remote và phê duyệt vận hành vẫn **BLOCKED / UNVERIFIED**. Không bật `PHASE6_*`, không migration, không merge, không đổi Production.

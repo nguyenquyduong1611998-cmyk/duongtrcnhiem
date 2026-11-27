@@ -91,3 +91,13 @@ Các kết quả dưới đây là quan sát từ ảnh Cloudflare Dashboard/CMD
 - Bước 137: Có chính xác 5 bảng ứng dụng `phase6_*`: `phase6_admin_draft_events`, `phase6_admin_drafts`, `phase6_admin_publications`, `phase6_exam_sessions`, `phase6_exam_submissions`.
 - Bước 138: Có đúng 12 trigger `phase6_*`, gồm 3 trigger admin draft, 3 trigger publication, 3 trigger session và 3 trigger submission.
 - Đây là **schema presence checks**, không chứng minh tất cả hành vi bảo vệ trigger; nghiệm thu D1 cloud còn BLOCKED. Không thay đổi dữ liệu live, không bật flags, không merge.
+
+## 8. Bước 139 — Kiểm thử nhật ký Admin Draft
+
+Theo ảnh CMD từ người vận hành ngày 27/11/2026, phép thử độc lập bằng Node.js `node:sqlite` `:memory:` chỉ nạp `serverless/d1-phase6b-synthetic-admin-drafts-draft.sql`; tạo một draft toán giả, cập nhật phút làm bài từ 15 lên 30 và xóa draft. Kết quả:
+- `Audit events: create,save,delete`
+- `Result: PASS`
+
+Kết luận: các trigger audit cho tạo/sửa/xóa hoạt động đúng thứ tự trên schema giả lập. Đây không phải bằng chứng bảo mật truy cập Admin, không phải kiểm thử với D1 Cloudflare thật; không có dữ liệu thật nào được gửi vào GitHub.
+
+Chưa thay đổi trạng thái Draft hoặc gate triển khai. Vẫn giữ Phase 6 flags OFF và tuyệt đối không tự chạy SQL dự thảo lên D1 Cloudflare.

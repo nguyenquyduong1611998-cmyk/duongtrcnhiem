@@ -276,3 +276,16 @@ Người vận hành cung cấp hai ảnh trang Cloudflare Pages → Settings �
 Hai ảnh không hiển thị `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED`. Không được khẳng định dứt khoát các cờ này **không tồn tại** nếu chưa đối chiếu toàn bộ danh sách hoặc cấu hình deployment. Mã các route `functions/api/phase6/exam.js`, `results/student.js`, `results/admin.js` chỉ cho phép khi cờ tương ứng có chuỗi `'true'`, vì thế thiếu cờ hoặc giá trị khác `true` thì các route mặc định trả 404.
 
 **Quyết định:** vẫn `NO-GO` cho migration/bật flag Phase 6 server và kiểm thử bài thi live. Không Reveal/Edit/Save secrets, không thay đổi Cloudflare hay nhánh. Bước tiếp nên xác nhận ba cờ server nêu trên có được cấu hình ở Preview hay không, chỉ đọc tên và trạng thái; tuyệt đối không công bố secret.
+
+## 25. Bước 155 — Không cấu hình cả ba cờ API Phase 6 trên Preview
+
+Theo xác nhận trực tiếp của người vận hành sau khi xem `Workers & Pages → duongtrcnhiem-test → Settings → Preview → Variables and secrets`, **không có cả ba biến**:
+- `PHASE6_STUDENT_TIMED_EXAM_ENABLED`
+- `PHASE6_RESULTS_READONLY_ENABLED`
+- `PHASE6_ADMIN_RESULTS_ENABLED`
+
+Trong mã nguồn HEAD Staging PR35, các route `functions/api/phase6/exam.js`, `functions/api/phase6/results/student.js`, `functions/api/phase6/results/admin.js` đều bắt buộc cờ có giá trị `'true'` để cho phép xử lý. **Khi không có ba cờ, các API này mặc định trả 404 (fail-closed theo thiết kế)**.
+
+Khác với ba cờ API nói trên, `VITE_PHASE6F_PWA_PREVIEW_UI=true` đã được quan sát trong ảnh trước: chỉ là biến build-time cho PWA Preview, không tự bật thi/chấm điểm Phase 6.
+
+**Hành động/định hướng:** chưa thêm ba biến, chưa triển khai 6A–6D lên D1 Cloudflare, chưa gọi endpoint ghi dữ liệu, chưa merge PR36 hay thay đổi Production. Trước khi tính đến Phase 6 live, cần review schema/triggers, đảm bảo bản sao lưu D1 Preview cập nhật và thử khôi phục vào DB độc lập, có phê duyệt riêng cho migration và mở cờ, rồi nghiệm thu signed A/B/Admin trên Preview bằng dữ liệu giả.

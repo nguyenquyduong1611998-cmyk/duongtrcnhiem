@@ -183,3 +183,14 @@ Theo ảnh trình duyệt do người vận hành cung cấp ngày 27/11/2026, k
 **Chưa xác minh:** danh tính email không nằm trong allowlist có bị từ chối; người đã xác thực có truy cập được ứng dụng; route API có cùng chính sách; Cloudflare Access session timeout; Cloudflare deployment SHA/branch runtime/D1 schema; kiểm thử Phase 6 live. Cấu hình Dashboard trước đó cho thấy policy Allow chỉ gồm một rule Emails xác định, nhưng ảnh hiện tại chưa chứng minh hiệu lực tất cả trường hợp.
 
 **Quyết định:** Gate truy cập ẩn danh có bằng chứng tích cực; vẫn `NO-GO` cho chạy migration, bật `PHASE6_*`, dùng dữ liệu thật, hoặc merge PR. Bước sau kiểm tra đăng nhập bằng email chủ sở hữu được cho phép và so sánh deployment SHA, không gửi OTP hay cookie vào repo/chat.
+
+## 17. Bước 147 — Đăng nhập hợp lệ qua Access, Preview hiển thị website
+
+Ảnh trình duyệt do người vận hành cung cấp ngày 27/11/2026: sau khi hoàn tất đăng nhập Cloudflare Access tại URL Preview theo quy trình ở Bước 146, trình duyệt hiển thị giao diện website Tiểu đoàn 3, có phiên tài khoản thử nghiệm, ba thẻ chuyên đề và nhãn UI báo trạng thái lưu đám mây. **Không lưu ảnh, email, tên người dùng, nội dung chuyên đề hay dữ liệu tài khoản vào GitHub.**
+
+- `AUTHORIZED_ACCESS_PAGE_LOAD_OBSERVED: PASS` — người dùng được phép đã truy cập thành công giao diện website sau thử cổng Access ẩn danh.
+- `CLIENT_CLOUD_SAVED_BADGE_OBSERVED` — chỉ là nhãn hiển thị từ client; **không** tự xác nhận đồng bộ backend D1.
+- `DEPLOYED_BRANCH_SHA_VERIFIED: false` — chưa đối chiếu commit cụ thể với Cloudflare Pages Deployments.
+- `PHASE6_LIVE_TESTED: false` — không có bằng chứng đã triển khai SQL Phase 6 hay bật các flags, không nộp bài thử Phase 6.
+
+Bước tiếp theo: tại Cloudflare Pages test project → Deployments, kiểm tra đúng nhánh `feature/staging-demo-quiz-pilot`, deployment gần nhất, status và commit SHA; **không** deploy lại hoặc merge PR36, không bật `PHASE6_*`.

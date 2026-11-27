@@ -4,6 +4,7 @@ import {
   listPhase6Exams,readPhase6Exam,startPhase6Exam,
   readPhase6ExamResult,submitPhase6Exam,
 } from '../utils/phase6StudentExam';
+import {getPhase6RemainingSeconds} from '../utils/phase6ExamTime';
 import type {
   Phase6ExamSummary,Phase6ExamState,Phase6ExamResult,
 } from '../utils/phase6StudentExam';
@@ -34,7 +35,7 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
     setState(next);setAnswers({});setConfirmSubmit(false);
     setResult(next.result??null);
     sync.current=next.session?{
-      serverNow:next.session.serverNow,receivedAt:Date.now(),
+      serverNow:next.session.serverNow,receivedAt:performance.now(),
     }:null;
   };
   const run=async(action:()=>Promise<void>)=>{
@@ -48,11 +49,11 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
     }finally{busyRef.current=false;setBusy(false);}
   };
   const session=state?.session;
-  const elapsed=sync.current?
-    sync.current.serverNow+Math.max(0,Math.floor((Date.now()-sync.current.receivedAt)/1000)):
-    0;
   void tick;
-  const remaining=session?Math.max(0,session.expiresAt-elapsed):0;
+  const remaining=session&&sync.current
+    ?getPhase6RemainingSeconds(session.expiresAt,sync.current.serverNow,
+      sync.current.receivedAt,performance.now())
+    :0;
   const allAnswered=!!state?.topic&&state.topic.questions.length>0&&
     state.topic.questions.every(q=>Number.isSafeInteger(answers[q.id])&&
       answers[q.id]>=0&&answers[q.id]<=3);

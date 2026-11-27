@@ -250,3 +250,17 @@ Cảnh báo phạm vi: trạng thái Pages thành công **không** chứng minh 
 - Các endpoint Phase 6 exam/results có mặt trong mã nhưng POST-only, Preview-pinned, các cờ độc lập mặc định OFF. Không nên gọi để chẩn đoán trong bước đọc-only.
 
 **Bước kiểm tra an toàn tiếp theo:** trong trình duyệt đã qua Cloudflare Access, truy cập GET `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/api/auth/status`, chỉ đọc và báo lại các trường boolean; không gửi cookie, mã OTP, bearer token, nội dung bảng hoặc logs. Kết quả `ready:true` chỉ chứng minh endpoint auth baseline, **không** chứng minh schema Phase 6 hiện có. Không bấm `Begin log stream` nếu không cần.
+
+## 23. Bước 153 — Endpoint auth/status đã trả về kết quả từ Preview thật
+
+Người vận hành mở trình duyệt đã đăng nhập Cloudflare Access tại `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/api/auth/status` và cung cấp ảnh JSON phản hồi:
+
+```json
+{"stage":"staging-only","ready":true,"d1Connected":true,"tablesReady":true,"login":"username-password","mode":"demo-students-only"}
+```
+
+**Kết luận theo ảnh:** `/api/auth/status` chạy được trên alias Preview của Staging. Endpoint đã kết nối D1 được lựa chọn cho request và xác nhận có hai bảng đăng nhập cơ bản `demo_students` và `login_attempts`. Đã có ảnh Dashboard trước đó xác nhận binding Preview `AUTH_DB_PREVIEW → duongtrcnhiem-auth-preview`. Đây là bằng chứng tích cực về auth baseline runtime, không phải test signed student/Admin hay D1 Phase 6.
+
+**Giới hạn cần giữ:** endpoint không kiểm tra bảng Phase 5/6, trigger thời hạn thi, trạng thái cờ `PHASE6_*`, hiệu lực quyền với tài khoản khác hoặc khả năng đồng bộ điểm đa thiết bị. Không được coi `ready:true` là phép phê duyệt triển khai Phase 6.
+
+**Bước tiếp theo:** trong Pages project Settings chọn Preview và xem **tên** các biến `PHASE6_*` ở Variables and secrets, che kín giá trị secrets. Giữ cờ OFF cho tới khi review và phê duyệt riêng; không Save/Reveal/Modify.

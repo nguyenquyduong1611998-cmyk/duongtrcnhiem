@@ -143,3 +143,13 @@ Người vận hành thực thi phép thử SQLite `:memory:` cục bộ với c
 - `Result: PASS`.
 
 Giới hạn: bài thử xác nhận ràng buộc SQLite cục bộ, chưa kiểm tra quyền Firebase HTTP, Cloudflare Access enforcement, giờ thực tế bên ngoài, hoặc D1 live. Không thay đổi Production hoặc database Preview.
+
+## 13. Bước 144 — Từ chối nộp từ tài khoản không còn hoạt động
+
+Ảnh CMD người vận hành cung cấp cho thấy phép thử SQLite `:memory:` dùng SQL `serverless/d1-phase6d-timed-submissions-draft.sql` và học viên DEMO giả; lúc `demo_students.active=0` trigger chặn nộp, sau khi đổi `active=1` trong dữ liệu giả, bài nộp được lưu.
+
+- `Inactive student rejected: PASS`
+- `Active student accepted: PASS`
+- `Result: PASS`
+
+Đây là thử nghiệm **ràng buộc database cục bộ**, không phải bằng chứng Cloudflare/Firebase Access đang chặn đúng tài khoản bị khóa trên môi trường thực. Không thay đổi database, migration, flags hoặc Production. PR giữ Draft.

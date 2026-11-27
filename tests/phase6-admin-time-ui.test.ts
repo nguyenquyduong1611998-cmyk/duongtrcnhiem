@@ -26,12 +26,13 @@ test('student display countdown uses fixed server expiry and monotonic elapsed m
 
 test('untrusted or corrupt UI time values fail closed',()=>{
   const v=1_800_000_000;
-  for(const invalid of [
+  const invalidCases:Array<[number,number,number,number]> = [
     [v+60,v,NaN,1000],
     [v+60,v,1000,Infinity],
     [v+60,0,1000,2000],
     [v+60.5,v,1000,2000],
     [v+60,v+0.5,1000,2000],
-  ] as const)
+  ];
+  for(const invalid of invalidCases)
     expect(getPhase6RemainingSeconds(...invalid)).toBe(0);
 });

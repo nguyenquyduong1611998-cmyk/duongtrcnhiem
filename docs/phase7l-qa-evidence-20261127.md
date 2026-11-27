@@ -153,3 +153,23 @@ Giới hạn: bài thử xác nhận ràng buộc SQLite cục bộ, chưa kiể
 - `Result: PASS`
 
 Đây là thử nghiệm **ràng buộc database cục bộ**, không phải bằng chứng Cloudflare/Firebase Access đang chặn đúng tài khoản bị khóa trên môi trường thực. Không thay đổi database, migration, flags hoặc Production. PR giữ Draft.
+
+## 14. Bước 145 — Kiểm tra ranh giới giây hết hạn bằng đồng hồ giả lập
+
+Người vận hành chạy phép thử SQLite `:memory:` với `unixepoch()` được giả lập và bản dự thảo `serverless/d1-phase6d-timed-submissions-draft.sql`, hai học viên DEMO giả và hai phiên độc lập có cùng deadline.
+
+Kết quả ảnh CMD:
+- `Exact deadline: PASS` — bài được chấp nhận ở đúng `expires_at`.
+- `One second late: PASS` — bài nộp trễ một giây bị từ chối.
+- `Saved grades: 1` — chỉ một bài hợp lệ được ghi.
+- `Result: PASS`.
+
+**Giới hạn:** đây là kiểm thử trigger trong SQLite RAM với đồng hồ giả; chưa chứng minh độ chính xác giờ D1 Cloudflare live, điều kiện mạng hoặc phân quyền token trên thiết bị.
+
+## 15. Kết luận tạm thời sau Bước 145 — NO-GO cho vận hành Phase 6
+
+**Đã kiểm tra cục bộ theo ảnh người vận hành:** export SQL khôi phục được vào SQLite RAM; 8 bảng gốc không đổi sau khi áp dụng draft 6B→6C→6A→6D; 5 bảng và 12 trigger Phase 6 có mặt; test 100 học viên tổng hợp đạt; thử bounds 1–240 phút, audit create/save/delete, bất biến phiên và điểm, nộp trùng, sai chủ phiên, tài khoản khóa, hết giờ đều PASS trên SQLite.
+
+**Chưa được xác minh hoặc chưa hoàn tất:** ràng buộc Cloudflare Access thực thi trên đường dẫn Preview thật; Preview deployment commit và runtime D1 đúng phiên bản; snapshot mới nhất và phục hồi D1 độc lập/so sánh dòng; phê duyệt riêng cho SQL draft 6A–6D và kế hoạch rollback; kiểm thử signed Firebase A/B/Admin trên D1 Preview; kiểm thử thiết bị PC/iPhone với mạng gián đoạn; đo tải thực tế 30–100 người và hạn mức; review quyền dữ liệu thật.
+
+**Không được suy ra từ các PASS cục bộ rằng hệ thống đã an toàn để bật API.** Giữ PR Draft, không merge, không chạy D1 migration Cloudflare, không đổi `PHASE6_*` hoặc `main`/Production. Bước kế tiếp nên kiểm tra **hiệu lực Cloudflare Access trong cửa sổ ẩn danh** mà không gửi token hay dữ liệu, sau đó đối chiếu Preview deployment SHA (chỉ đọc).

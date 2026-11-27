@@ -204,3 +204,13 @@ Theo ảnh `Workers & Pages → duongtrcnhiem-test → Deployments` do người 
 - Trạng thái deploy thành công chỉ là bằng chứng build/deploy, không xác minh API Phase 6 đang bật, Phase 6 migrations ở D1, hoặc các kiểm thử live.
 
 **Bước tiếp theo (chỉ đọc):** lọc/tìm đúng deployment từ branch `feature/staging-demo-quiz-pilot` trên Cloudflare Pages và chụp `Branch / Commit SHA / Status / Deployment URL`. Không bấm Retry/Rollback, không đổi branch control, không kích hoạt Phase6, không merge PR.
+
+## 19. Bước 149 — Đối chiếu deployment Staging PR33 với HEAD PR35
+
+Ảnh Cloudflare Pages Deployments do người vận hành cung cấp hiển thị một Preview `feature/stagin...` tại commit `fc24211`, status thành công, URL deployment riêng dạng hash. GitHub xác nhận `fc242110911df8991d3f5265afbc2da0043e0591` là merge commit PR #33.
+
+So sánh GitHub `fc24211...feature/staging-demo-quiz-pilot`: `ahead_by:11`, `behind_by:0`. GitHub `feature/staging-demo-quiz-pilot` hiện khớp chính xác với PR #35 merge commit `75f2d814b0ef70b5a4ae7118885cd2e0548e69a8` (`status:identical`, `ahead_by:0`, `behind_by:0`). Do đó deployment trong ảnh **cũ hơn HEAD nhánh Staging 11 commit**.
+
+**Chưa xác minh** có hoặc không một deployment mới hơn ở SHA `75f2d81`: ảnh chỉ hiển thị một hàng Staging, không phải danh sách lọc đầy đủ. GitHub combined statuses của merge commit PR35 không trả về status trong lần kiểm tra; không suy ra build thành công/thất bại.
+
+**Bước tiếp theo:** tìm chính xác deployment commit `75f2d81` trên Cloudflare Pages (hoặc chứng minh không có) bằng bộ lọc Staging và trạng thái Details; không Retry/Deploy/Change branch controls trong bước này. PR36 tiếp tục Draft, SQL/flags Phase 6 giữ OFF.

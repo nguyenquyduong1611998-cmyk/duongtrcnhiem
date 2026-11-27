@@ -5,6 +5,7 @@ import {
   readPhase6ExamResult,submitPhase6Exam,
 } from '../utils/phase6StudentExam';
 import {getPhase6RemainingSeconds} from '../utils/phase6ExamTime';
+import {retainPhase6LocalSelections} from '../utils/phase7SessionRefresh';
 import type {
   Phase6ExamSummary,Phase6ExamState,Phase6ExamResult,
 } from '../utils/phase6StudentExam';
@@ -32,7 +33,10 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
     return ()=>window.clearInterval(timer);
   },[]);
   const setExam=(next:Phase6ExamState)=>{
-    setState(next);setAnswers({});setConfirmSubmit(false);
+    // Reading the identical server session must not erase unsubmitted answers
+    // on this device. A different/altered session or a final score clears them.
+    setAnswers(current=>retainPhase6LocalSelections(state,next,current));
+    setState(next);setConfirmSubmit(false);
     setResult(next.result??null);
     sync.current=next.session?{
       serverNow:next.session.serverNow,receivedAt:performance.now(),
@@ -66,6 +70,8 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
         Chỉ dữ liệu toán học giả. Thời hạn và điểm do Cloudflare D1 quyết định.
         Đồng hồ trên màn hình chỉ để tham khảo, không kéo dài hạn nộp ở máy chủ.
         Mỗi học viên có một lần nộp cho mỗi phiên bản đề.
+        Đáp án chưa nộp chỉ nằm trên thiết bị này: không đồng bộ sang điện thoại,
+        máy tính khác hay khôi phục khi đóng trang. Đồng bộ phiên không đặt lại giờ.
       </p>
       <button className={button} type="button" disabled={busy}
         onClick={()=>void run(async()=>{
@@ -157,13 +163,14 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
                 onClick={()=>void run(async()=>{
                   const stored=await readPhase6ExamResult(user,chosen);
                   setResult(stored);
+                  if(stored){setAnswers({});setConfirmSubmit(false);}
                   setNotice(stored?'Đã đọc điểm đã lưu từ D1.':
                     'D1 chưa ghi nhận bài nộp nào của bạn ở phiên bản này.');
                 })}>Đọc lại kết quả từ D1</button>
               <button className={button} type="button" disabled={busy}
                 onClick={()=>void run(async()=>{
                   setExam(await readPhase6Exam(user,chosen));
-                  setNotice('Đã đồng bộ trạng thái phiên thi từ máy chủ.');
+                  setNotice('Đã cập nhật phiên và thời gian từ D1. Đáp án chưa nộp chỉ giữ trên thiết bị này khi phiên không đổi.');
                 })}>Đồng bộ phiên thi</button>
             </>
           )}

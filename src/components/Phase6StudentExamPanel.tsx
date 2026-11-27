@@ -21,6 +21,9 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
   const [state,setState]=React.useState<Phase6ExamState|null>(null);
   const [answers,setAnswers]=React.useState<Record<string,number>>({});
   const [result,setResult]=React.useState<Phase6ExamResult|null>(null);
+  // A lost submit response may mean D1 already committed the grade.
+  // Do not allow another submit until the student explicitly checks D1.
+  const [unconfirmedSubmitId,setUnconfirmedSubmitId]=React.useState<string|null>(null);
   const [confirmSubmit,setConfirmSubmit]=React.useState(false);
   const [busy,setBusy]=React.useState(false);
   const busyRef=React.useRef(false);
@@ -38,6 +41,8 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
     setAnswers(current=>retainPhase6LocalSelections(state,next,current));
     setState(next);setConfirmSubmit(false);
     setResult(next.result??null);
+    if(next.result&&next.session)
+      setUnconfirmedSubmitId(prev=>prev===next.session?.sessionId?null:prev);
     sync.current=next.session?{
       serverNow:next.session.serverNow,receivedAt:performance.now(),
     }:null;
@@ -61,7 +66,8 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
   const allAnswered=!!state?.topic&&state.topic.questions.length>0&&
     state.topic.questions.every(q=>Number.isSafeInteger(answers[q.id])&&
       answers[q.id]>=0&&answers[q.id]<=3);
-  const disabled=busy||!session||!!result||remaining<=0;
+  const unconfirmed=!!session&&unconfirmedSubmitId===session.sessionId;
+  const disabled=busy||!session||!!result||remaining<=0||unconfirmed;
   return (
     <section className="space-y-3 rounded-xl border border-[#BCD5C5] bg-[#F2F9F3] p-4"
       aria-label="Bài thi toán học DEMO Phase 6D">
@@ -108,17 +114,33 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
             {chosen.title} · phiên bản {chosen.revision}
           </p>
           {!session?(
-            <button className={button} type="button" disabled={busy}
-              onClick={()=>void run(async()=>{
-                const started=await startPhase6Exam(user,chosen);
-                if(!started.session)throw new Error('Không nhận được phiên thi từ D1.');
-                setExam(started);setNotice('Máy chủ đã bắt đầu tính giờ.');
-              })}>Bắt đầu làm bài (máy chủ tính giờ)</button>
+            <div className="flex flex-wrap gap-2">
+              <button className={button} type="button" disabled={busy}
+                onClick={()=>void run(async()=>{
+                  const started=await startPhase6Exam(user,chosen);
+                  if(!started.session)throw new Error('Không nhận được phiên thi từ D1.');
+                  setExam(started);setNotice('Máy chủ đã bắt đầu tính giờ.');
+                })}>Bắt đầu làm bài (máy chủ tính giờ)</button>
+              <button className={button} type="button" disabled={busy}
+                onClick={()=>void run(async()=>{
+                  const recovered=await readPhase6Exam(user,chosen);
+                  setExam(recovered);
+                  setNotice(recovered.session
+                    ? 'Đã khôi phục phiên từ D1, thời gian không bắt đầu lại.'
+                    : 'D1 chưa ghi nhận phiên đã bắt đầu. Có thể bấm Bắt đầu.');
+                })}>Đọc lại phiên từ D1 (sau mất mạng)</button>
+            </div>
           ):(
             <>
               <p className="text-sm font-semibold tabular-nums">
                 Còn lại: {Math.floor(remaining/60)}:{String(remaining%60).padStart(2,'0')}
               </p>
+              {unconfirmed&&!result&&(
+                <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs font-semibold text-amber-900">
+                  Chưa xác định bài nộp đã được lưu hay chưa. Hãy bấm Đọc lại kết quả từ D1
+                  trước khi thử nộp lại. Không có thao tác nộp tự động.
+                </p>
+              )}
               {result?(
                 <div className="rounded-md bg-[#E9F7EC] p-3 text-sm">
                   Đã nộp: {result.score}/{result.maxScore} điểm ·
@@ -153,19 +175,34 @@ export const Phase6StudentExamPanel:React.FC<Props>=({user})=>{
                   <button className={button} type="button"
                     disabled={disabled||!allAnswered||!confirmSubmit}
                     onClick={()=>void run(async()=>{
-                      const score=await submitPhase6Exam(user,session,answers);
-                      setResult(score);setConfirmSubmit(false);
-                      setNotice('Điểm đã được máy chủ xác nhận và lưu trên D1.');
+                      setUnconfirmedSubmitId(session.sessionId);
+                      setConfirmSubmit(false);
+                      try{
+                        const score=await submitPhase6Exam(user,session,answers);
+                        setResult(score);setAnswers({});
+                        setUnconfirmedSubmitId(prev=>prev===session.sessionId?null:prev);
+                        setNotice('Điểm đã được máy chủ xác nhận và lưu trên D1.');
+                      }catch{
+                        // POST may already have been committed when the response vanished.
+                        // Never retry automatically or expose raw server error details.
+                        throw new Error('Chưa xác định bài đã được lưu. Bấm Đọc lại kết quả từ D1 trước khi nộp lại.');
+                      }
                     })}>Nộp bài lên máy chủ để chấm điểm</button>
                 </>
               )}
               <button className={button} type="button" disabled={busy}
                 onClick={()=>void run(async()=>{
                   const stored=await readPhase6ExamResult(user,chosen);
-                  setResult(stored);
-                  if(stored){setAnswers({});setConfirmSubmit(false);}
+                  if(stored){
+                    setResult(stored);setAnswers({});setConfirmSubmit(false);
+                  }else if(!result){
+                    // A verified empty D1 read permits a new *manual* attempt.
+                    // The server still enforces one immutable grade per session.
+                    setConfirmSubmit(false);
+                  }
+                  setUnconfirmedSubmitId(prev=>prev===session.sessionId?null:prev);
                   setNotice(stored?'Đã đọc điểm đã lưu từ D1.':
-                    'D1 chưa ghi nhận bài nộp nào của bạn ở phiên bản này.');
+                    'D1 chưa ghi nhận bài nộp. Nếu còn giờ, hãy xác nhận và nộp thủ công.');
                 })}>Đọc lại kết quả từ D1</button>
               <button className={button} type="button" disabled={busy}
                 onClick={()=>void run(async()=>{

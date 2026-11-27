@@ -264,3 +264,15 @@ Người vận hành mở trình duyệt đã đăng nhập Cloudflare Access t�
 **Giới hạn cần giữ:** endpoint không kiểm tra bảng Phase 5/6, trigger thời hạn thi, trạng thái cờ `PHASE6_*`, hiệu lực quyền với tài khoản khác hoặc khả năng đồng bộ điểm đa thiết bị. Không được coi `ready:true` là phép phê duyệt triển khai Phase 6.
 
 **Bước tiếp theo:** trong Pages project Settings chọn Preview và xem **tên** các biến `PHASE6_*` ở Variables and secrets, che kín giá trị secrets. Giữ cờ OFF cho tới khi review và phê duyệt riêng; không Save/Reveal/Modify.
+
+## 24. Bước 154 — Ảnh Variables and secrets môi trường Preview
+
+Người vận hành cung cấp hai ảnh trang Cloudflare Pages → Settings → Preview → Variables and secrets ngày 27/11/2026. Đã quan sát tên/giá trị các **biến text** sau (không trích xuất hoặc lưu các giá trị secret/tài khoản):
+- `STAGING_AUTH_ENABLED=true`; `VITE_FIREBASE_ENV=staging`.
+- `PHASE4_PREVIEW_HOST_OPT_IN=true`; `PHASE4_SYNTHETIC_QUIZ_ENABLED=true`; `PHASE4_DEMO_AUTH_DIAGNOSTICS=false`.
+- Một số flag Phase 5 trong ảnh có giá trị `true`.
+- `VITE_PHASE6F_PWA_PREVIEW_UI=true` hiển thị trong cấu hình Preview. Đã đối chiếu mã `src/main.tsx` và `src/utils/phase6fPreviewPwa.ts`: đây là cờ build-time cho PWA Preview (manifest/service worker) theo hostname HTTPS và Firebase staging, **không phải** cờ máy chủ để kích hoạt API/DB Phase 6.
+
+Hai ảnh không hiển thị `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED`. Không được khẳng định dứt khoát các cờ này **không tồn tại** nếu chưa đối chiếu toàn bộ danh sách hoặc cấu hình deployment. Mã các route `functions/api/phase6/exam.js`, `results/student.js`, `results/admin.js` chỉ cho phép khi cờ tương ứng có chuỗi `'true'`, vì thế thiếu cờ hoặc giá trị khác `true` thì các route mặc định trả 404.
+
+**Quyết định:** vẫn `NO-GO` cho migration/bật flag Phase 6 server và kiểm thử bài thi live. Không Reveal/Edit/Save secrets, không thay đổi Cloudflare hay nhánh. Bước tiếp nên xác nhận ba cờ server nêu trên có được cấu hình ở Preview hay không, chỉ đọc tên và trạng thái; tuyệt đối không công bố secret.

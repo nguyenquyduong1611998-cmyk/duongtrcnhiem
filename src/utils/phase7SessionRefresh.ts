@@ -9,7 +9,7 @@ export function retainPhase6LocalSelections(
   selections:Readonly<Record<string,number>>,
 ):Record<string,number>{
   const a=previous?.session,b=next.session;
-  if(!a||!b||next.result||
+  if(!a||!b||previous?.result||next.result||
      a.sessionId!==b.sessionId||a.topicId!==b.topicId||
      a.revision!==b.revision||a.startedAt!==b.startedAt||
      a.expiresAt!==b.expiresAt||

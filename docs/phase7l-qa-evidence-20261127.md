@@ -45,3 +45,19 @@ Ghi tối đa: thời gian, hostname Preview, commit SHA, loại thiết bị, m
 4. Không gộp PR #36 hoặc bật Phase 6 chỉ vì tài liệu đã đầy đủ.
 
 **Không kiểm thử trực tiếp với B/C/D, không chạy migration, không đổi Firebase/Cloudflare/D1, không bật cờ, không deploy main.**
+
+## 4. Rà soát mã nguồn bảo vệ Preview (27/11/2026)
+
+Đã đọc trực tiếp các tệp trên `feature/staging-demo-quiz-pilot`. Những kết luận sau **chỉ xác nhận thiết kế trong mã**, không chứng minh Cloudflare Dashboard đang cấu hình đúng hoặc API live đã được nghiệm thu.
+
+| Kiểm tra | Kết quả rà soát mã | Nguồn |
+| --- | --- | --- |
+| D1 Preview tách biệt | SOURCE VERIFIED: hostname Preview chính xác ánh xạ `AUTH_DB_PREVIEW`; nếu thiếu không fallback `AUTH_DB` | `functions/_shared/staging-db-binding.mjs`, `tests/phase4-preview-d1-binding.test.mjs` |
+| Hostname allowlist | SOURCE VERIFIED: canonical và branch alias chính xác, Preview cần opt-in riêng | `functions/_shared/phase4-host-guard.mjs`, `tests/phase4-pinned-host.test.mjs` |
+| Fail closed với host không hợp lệ | TEST CASES PRESENT, NOT EXECUTED HERE: case HTTPS/host spoof, hash alias, disabled flags | `tests/phase4-pinned-host.test.mjs` |
+| Không tự retry submit khi mất mạng | TEST CASES PRESENT, NOT EXECUTED HERE: PC/iPhone, kết quả trên D1 giả, deadline máy chủ | `tests/phase7k-offline-start-submit-browser.test.ts` |
+| Cloudflare Access | NOT VERIFIED | Cần mở Dashboard và xem policy/enforcement thực tế |
+| Binding và backup D1 trên Cloudflare | NOT VERIFIED | Mã nguồn không chứng minh trạng thái resource live |
+| CI PR #36 HEAD `7488bd103d4ef4d3b9ca930e600fab30940adde0` | NO STATUS / NO PR-WORKFLOW RETURNED khi kiểm tra | GitHub API; không suy ra thành công/thất bại |
+
+**Kết luận:** chưa đủ điều kiện chạy nghiệm thu PC/iPhone live hoặc bật Phase 6. Tiếp tục giữ mọi live case BLOCKED và PR Draft.

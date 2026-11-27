@@ -122,6 +122,8 @@ jobs:
         run: bun test tests/phase5-admin-results-browser.test.ts
       - name: Pre-start local quiz minute selection and wall-clock timer regression tests
         run: bun test tests/quiz-adjustable-duration.test.ts
+      - name: Phase 6 Admin minutes presets and monotonic browser countdown (offline)
+        run: bun test tests/phase6-admin-time-ui.test.ts
       - name: Phase 6A offline trusted exam deadlines, student isolation and D1 draft tests
         run: node --test tests/phase6-timed-exam.test.mjs
       - name: Phase 6B Google Admin synthetic draft CRUD, version races, host/auth and existing Phase5 data isolation

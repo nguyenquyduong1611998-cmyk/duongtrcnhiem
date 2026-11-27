@@ -101,3 +101,15 @@ Theo ảnh CMD từ người vận hành ngày 27/11/2026, phép thử độc l�
 Kết luận: các trigger audit cho tạo/sửa/xóa hoạt động đúng thứ tự trên schema giả lập. Đây không phải bằng chứng bảo mật truy cập Admin, không phải kiểm thử với D1 Cloudflare thật; không có dữ liệu thật nào được gửi vào GitHub.
 
 Chưa thay đổi trạng thái Draft hoặc gate triển khai. Vẫn giữ Phase 6 flags OFF và tuyệt đối không tự chạy SQL dự thảo lên D1 Cloudflare.
+
+## 9. Bước 140 — Giới hạn thời lượng bản nháp Admin (operator screenshot)
+
+Người vận hành chạy bài thử Node.js `node:sqlite` trong RAM với duy nhất SQL draft Phase 6B và 4 trường hợp. Kết quả ảnh CMD:
+
+- `Minutes 0: PASS` — giá trị dưới mức được từ chối.
+- `Minutes 1: PASS` — giá trị nhỏ nhất được chấp nhận.
+- `Minutes 240: PASS` — giá trị lớn nhất được chấp nhận.
+- `Minutes 241: PASS` — giá trị trên mức được từ chối.
+- `Drafts: 2 Audit events: 2`; `Result: PASS`.
+
+Đây là test ràng buộc cơ sở dữ liệu **đối với draft Admin**, không phải test thời gian của phiên thi live; không kết nối Cloudflare, không sửa file export. Chưa có phê duyệt bật tính năng hay triển khai D1.

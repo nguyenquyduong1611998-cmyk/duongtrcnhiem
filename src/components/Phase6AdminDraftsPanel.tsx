@@ -4,6 +4,7 @@ import {
   PHASE6_TITLES,PHASE6_TEMPLATES,listPhase6Drafts,getPhase6Draft,
   createPhase6Draft,savePhase6Draft,deletePhase6Draft,publishPhase6Draft,
 } from '../utils/phase6AdminDrafts';
+import {PHASE6_TIME_PRESETS,isValidPhase6Minutes} from '../utils/phase6ExamTime';
 import type {
   Phase6AdminDraft,Phase6DraftSummary,Phase6TitleCode,Phase6TemplateCode,
 } from '../utils/phase6AdminDrafts';
@@ -44,7 +45,7 @@ export const Phase6AdminDraftsPanel:React.FC<Props>=({user,canPublish=false})=>{
     }finally{busyRef.current=false;setBusy(false);}
   };
   const refresh=async()=>setDrafts(await listPhase6Drafts(user));
-  const validTime=Number.isSafeInteger(minutes)&&minutes>=1&&minutes<=240;
+  const validTime=isValidPhase6Minutes(minutes);
   const unsaved=!!selected&&(titleCode!==selected.titleCode||minutes!==selected.minutes||
     templates.join('|')!==selected.templates.join('|'));
   const draftTitle=PHASE6_TITLES.find(x=>x.code===titleCode)?.label??'Toán học DEMO';
@@ -106,6 +107,23 @@ export const Phase6AdminDraftsPanel:React.FC<Props>=({user,canPublish=false})=>{
           <input className={input} disabled={busy} type="number" min={1} max={240}
             step={1} value={minutes} onChange={event=>setMinutes(Number(event.target.value))}/>
         </label>
+        <div role="group" aria-label="Chọn nhanh thời gian làm bài"
+          className="flex flex-wrap gap-2">
+          {PHASE6_TIME_PRESETS.map(value=>(
+            <button key={value} type="button" disabled={busy}
+              aria-pressed={minutes===value}
+              className={button+(minutes===value?' border-[#1F4D36] bg-[#E9F7EC]':'')}
+              onClick={()=>{setMinutes(value);setConfirmPublish(false);}}>
+              {value} phút
+            </button>
+          ))}
+        </div>
+        <p className={'text-xs '+(validTime?'text-[#4B5B50]':'text-red-700')}
+          role="status">
+          {validTime
+            ? 'Thời gian '+minutes+' phút chỉ áp dụng cho bản nháp DEMO sau khi lưu và xuất bản phiên bản mới. Phiên thi đã bắt đầu không được kéo dài.'
+            : 'Hãy nhập số phút nguyên từ 1 đến 240 trước khi lưu đề DEMO.'}
+        </p>
         {selected&&(
           <>
             <div className="space-y-2">

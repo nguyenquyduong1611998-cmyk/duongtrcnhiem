@@ -121,3 +121,14 @@ Người vận hành chạy phép thử độc lập trên `node:sqlite` trong R
 Kết quả ảnh CMD: `Extend deadline: PASS`; `Delete session: PASS`; `Result: PASS`. Hai thao tác đều bị SQLite từ chối với trigger `PHASE6_SESSION_IMMUTABLE`.
 
 Giới hạn: đây chỉ là thử nghiệm trigger cục bộ trên dữ liệu giả, không chứng minh một client/API bên ngoài không thể khai thác lỗ hổng khác. Không thao tác vào D1 Cloudflare, không áp dụng migration thật hoặc bật flags.
+
+## 11. Bước 142 — Chặn nộp trùng và bảo toàn điểm
+
+Theo ảnh CMD người vận hành cung cấp, phép thử SQLite `:memory:` cục bộ dùng các bảng demo giả và SQL `serverless/d1-phase6d-timed-submissions-draft.sql` đã tạo một bài nộp hợp lệ, rồi thử nộp trùng cùng `session_id`, sửa `score_tenths`, và xóa bài nộp.
+
+- `Duplicate submit: PASS` — ràng buộc duy nhất chặn nộp trùng.
+- `Edit score: PASS` — trigger `PHASE6_SUBMISSION_IMMUTABLE` từ chối sửa.
+- `Delete submission: PASS` — trigger `PHASE6_SUBMISSION_IMMUTABLE` từ chối xóa.
+- `One immutable grade: PASS` — giữ lại đúng một điểm gốc trong thử nghiệm.
+
+Giới hạn: phép thử chỉ trong SQLite RAM với dữ liệu tổng hợp, không kiểm chứng phân quyền HTTP/Firebase hoặc tranh chấp đồng thời trên D1 thực tế. Không cập nhật D1 Cloudflare, flags, deployment hay dữ liệu người dùng.

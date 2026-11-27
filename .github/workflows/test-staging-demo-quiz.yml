@@ -170,6 +170,8 @@ jobs:
         run: node --test tests/phase7e-account-state-isolation.test.mjs
       - name: Phase 7I in-memory same-session refresh without mixing answers between devices (offline)
         run: bun test tests/phase7i-session-refresh.test.ts
+      - name: Phase 7J read-only D1 history first-load and late account response guard (offline)
+        run: bun test tests/phase7j-history-on-open.test.ts
       - name: Phase 7F 30-60-100 synthetic clients, server-owned grades and Admin summaries (OFFLINE, NOT live load)
         run: |
           node --test tests/phase7f-offline-load-30-60-100.test.mjs

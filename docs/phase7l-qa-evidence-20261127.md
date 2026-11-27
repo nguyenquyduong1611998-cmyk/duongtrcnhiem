@@ -74,3 +74,12 @@ Các kết quả dưới đây là quan sát từ ảnh Cloudflare Dashboard/CMD
 - Người vận hành chạy Node.js `node:sqlite` trên máy cục bộ (SQLite 3.54.1). Bản export được nạp vào **SQLite :memory:**; kết quả màn hình: `Restore: SUCCESS`, `Integrity: ok`, `Foreign key errors: 0`, `Tables: 8`. Đây là **LOCAL RESTORE SMOKE PASS**, không chứng minh hàng dữ liệu đầy đủ, phục hồi D1 remote, hoặc backup đúng trạng thái live mới nhất.
 
 **Quyết định:** Gate kiểm thử khôi phục SQLite cục bộ được ghi nhận đã đạt ở mức smoke test; gate Cloudflare Access enforcement, tính khớp dữ liệu live, schema Phase 6, backup/restore D1 remote và phê duyệt vận hành vẫn **BLOCKED / UNVERIFIED**. Không bật `PHASE6_*`, không migration, không merge, không đổi Production.
+
+## 6. Bằng chứng operator cung cấp — Bước 134–136
+
+- Bước 134: `node --test tests/phase6f-offline-recovery-100students.test.mjs` trả `pass 2`, `fail 0`, gồm thử nghiệm 100 học viên giả, migrations additive trên bộ dữ liệu tổng hợp cô lập. Không phải load test D1 thật.
+- Bước 135: Người vận hành tải export D1 Preview (đã kiểm tra cấu trúc) vào SQLite `:memory:`, áp dụng lần lượt 6B, 6C, 6A, 6D; bốn script đều trả PASS. SQLite báo `Tables before: 8 after: 14`, `Integrity: ok`, `Foreign key errors: 0`. Số 14 có thể gồm bảng nội bộ SQLite; không khẳng định 14 bảng ứng dụng.
+- Bước 136: Trên cùng quy trình kiểm thử RAM, người vận hành lấy snapshot số bản ghi và SHA-256 của các dòng cho **8 bảng ứng dụng gốc**, rồi áp dụng bốn SQL dự thảo và so sánh. Cả 8 bảng báo `UNCHANGED`; `Original data preserved: YES`; `Integrity: ok`; `Foreign key errors: 0`.
+- Các bằng chứng là ảnh CMD do operator cung cấp, không phải kết quả thực thi trực tiếp của trợ lý. Chưa kiểm chứng tình trạng dữ liệu D1 live hiện tại, test restore D1 remote, Cloudflare Access enforcement, hoặc phê duyệt migration.
+
+**Quyết định:** đánh dấu PASS cho kiểm thử bảo toàn 8 bảng của **bản sao SQLite RAM**. Giữ `deploymentAllowed:false`, PR Draft, mọi cờ Phase 6 OFF; không thực thi draft SQL trên Cloudflare khi chưa có phê duyệt và review chuyên biệt.

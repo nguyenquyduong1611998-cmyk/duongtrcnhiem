@@ -173,3 +173,13 @@ Kết quả ảnh CMD:
 **Chưa được xác minh hoặc chưa hoàn tất:** ràng buộc Cloudflare Access thực thi trên đường dẫn Preview thật; Preview deployment commit và runtime D1 đúng phiên bản; snapshot mới nhất và phục hồi D1 độc lập/so sánh dòng; phê duyệt riêng cho SQL draft 6A–6D và kế hoạch rollback; kiểm thử signed Firebase A/B/Admin trên D1 Preview; kiểm thử thiết bị PC/iPhone với mạng gián đoạn; đo tải thực tế 30–100 người và hạn mức; review quyền dữ liệu thật.
 
 **Không được suy ra từ các PASS cục bộ rằng hệ thống đã an toàn để bật API.** Giữ PR Draft, không merge, không chạy D1 migration Cloudflare, không đổi `PHASE6_*` hoặc `main`/Production. Bước kế tiếp nên kiểm tra **hiệu lực Cloudflare Access trong cửa sổ ẩn danh** mà không gửi token hay dữ liệu, sau đó đối chiếu Preview deployment SHA (chỉ đọc).
+
+## 16. Bước 146 — Quan sát Cloudflare Access trên Preview trong cửa sổ ẩn danh
+
+Theo ảnh trình duyệt do người vận hành cung cấp ngày 27/11/2026, khi mở hostname Preview của nhánh Staging trong cửa sổ Chrome ẩn danh **chưa đăng nhập**, người dùng nhận trang `Cloudflare Access` với tiêu đề `Log in to duongtrcnhiem-test - Cloudflare Pages`, ô `Email` và nút `Send login code`.
+
+**Xác nhận qua ảnh:** trang Preview đã bị chặn ở cổng xác thực đối với phiên không đăng nhập (`ANONYMOUS_ACCESS_CHALLENGE_OBSERVED`).
+
+**Chưa xác minh:** danh tính email không nằm trong allowlist có bị từ chối; người đã xác thực có truy cập được ứng dụng; route API có cùng chính sách; Cloudflare Access session timeout; Cloudflare deployment SHA/branch runtime/D1 schema; kiểm thử Phase 6 live. Cấu hình Dashboard trước đó cho thấy policy Allow chỉ gồm một rule Emails xác định, nhưng ảnh hiện tại chưa chứng minh hiệu lực tất cả trường hợp.
+
+**Quyết định:** Gate truy cập ẩn danh có bằng chứng tích cực; vẫn `NO-GO` cho chạy migration, bật `PHASE6_*`, dùng dữ liệu thật, hoặc merge PR. Bước sau kiểm tra đăng nhập bằng email chủ sở hữu được cho phép và so sánh deployment SHA, không gửi OTP hay cookie vào repo/chat.

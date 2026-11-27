@@ -224,3 +224,18 @@ Theo ảnh Cloudflare Pages → All deployments do người vận hành cung c�
 Cảnh báo phạm vi: trạng thái Pages thành công **không** chứng minh Cloudflare Access áp dụng riêng cho URL hash, runtime đang dùng `AUTH_DB_PREVIEW`, migrations Phase 6 đã áp dụng, flags bật, hay API thực thi thành công. Các phép thử signed student/Admin và dữ liệu Preview vẫn chưa được phép tiến hành cho đến khi gate được review.
 
 **Bước kế tiếp:** click `Details` trên chính dòng `feature/stagin... 75f2d81`, kiểm tra đầy đủ Branch/Commit/Status/Deployment URL và ghi lại chỉ thông tin công khai. Không Retry/Promote/Rollback/merge, không SQL trên D1, không bật `PHASE6_*`.
+
+## 21. Bước 151 — Chi tiết deployment Staging tại HEAD PR35
+
+Ảnh người vận hành cung cấp từ Cloudflare Pages deployment details của dự án `duongtrcnhiem-test`:
+- Environment: `Preview`
+- Deployment ID: `bb66501a-f7e8-45d6-b19d-8cdffc69f11e`
+- Deployment URL: `https://bb66501a.duongtrcnhiem-test.pages.dev`
+- Alias: `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`
+- Source branch: `feature/staging-demo-quiz-pilot` (giao diện rút gọn `feature/stagi...`)
+- Commit: `75f2d81`, merge PR35 (HEAD branch đã đối chiếu trên GitHub)
+- Status: `success`, Cloudflare ghi 3:43 PM November 27, 2026; build duration 16s.
+
+**Kết luận:** đúng branch/commit/URL/alias và trạng thái build-deployment thành công theo Dashboard. **Không suy ra** Functions/API đã chạy đúng, D1 binding runtime đã hợp lệ, Access policy áp trên từng URL hash, SQL Phase 6 đã triển khai, hoặc các `PHASE6_*` đã bật.
+
+**Bước kế:** mở tab `Functions` của chính deployment này chỉ để xem các route Functions đã được đóng gói/triển khai, không thực hiện gọi API có quyền ghi, không chạy migration hoặc sửa cấu hình.

@@ -60,9 +60,10 @@ export const Phase6ResultsPanel:React.FC<Props>=({user,role})=>{
           'Phase 6E — Lịch sử điểm thi DEMO của bạn'}
       </h3>
       <p className="text-xs text-[#475569]">
-        Kết quả chỉ đọc từ D1 Preview. Đây là điểm toán học giả để thử hệ thống,
-        không phải kết quả huấn luyện chính thức. Không hiện đáp án đúng hay
-        dữ liệu đăng nhập.
+        Chỉ đọc các điểm thi Phase 6 đã nộp từ D1 Preview. Không bao gồm
+        kết quả Phase 4 một câu hay lịch sử luyện tập lưu riêng trên thiết bị.
+        Đây là điểm toán giả để thử hệ thống, không phải điểm chính thức;
+        không hiện đáp án đúng hay dữ liệu đăng nhập.
       </p>
       <button className={button} disabled={busy} type="button"
         onClick={()=>void run(()=>load(0))}>

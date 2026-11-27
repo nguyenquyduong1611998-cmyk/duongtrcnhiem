@@ -8,6 +8,7 @@ import {readFileSync} from 'node:fs';
 
 const app=readFileSync('src/App.tsx','utf8');
 const exam=readFileSync('src/components/Phase6StudentExamPanel.tsx','utf8');
+const refresh=readFileSync('src/utils/phase7SessionRefresh.ts','utf8');
 const results=readFileSync('src/components/Phase6ResultsPanel.tsx','utf8');
 const sw=readFileSync('public/phase6f-preview-sw.js','utf8');
 const studentApi=readFileSync('src/utils/phase6StudentExam.ts','utf8');
@@ -26,7 +27,12 @@ test('React account boundaries remount all student exam and role-specific score 
   assert.match(results,/\[role,user\?\.uid\]/);
 });
 test('exam clears local answers on new session; no offline durable score or JWT cache',()=>{
-  assert.match(exam,/setState\(next\);setAnswers\(\{\}\);setConfirmSubmit\(false\)/);
+  assert.match(exam,/setAnswers\(current=>retainPhase6LocalSelections\(state,next,current\)\)/);
+  assert.match(exam,/setState\(next\);setConfirmSubmit\(false\)/);
+  assert.match(refresh,/a\.sessionId!==b\.sessionId/);
+  assert.match(refresh,/a\.topicId!==b\.topicId/);
+  assert.match(refresh,/a\.expiresAt!==b\.expiresAt/);
+  assert.match(refresh,/next\.result/);
   assert.match(exam,/setResult\(next\.result\?\?null\)/);
   assert.doesNotMatch(exam,/localStorage\.|sessionStorage\.|indexedDB\./);
   assert.doesNotMatch(results,/localStorage\.|sessionStorage\.|indexedDB\./);

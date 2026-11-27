@@ -194,3 +194,13 @@ Theo ảnh trình duyệt do người vận hành cung cấp ngày 27/11/2026, k
 - `PHASE6_LIVE_TESTED: false` — không có bằng chứng đã triển khai SQL Phase 6 hay bật các flags, không nộp bài thử Phase 6.
 
 Bước tiếp theo: tại Cloudflare Pages test project → Deployments, kiểm tra đúng nhánh `feature/staging-demo-quiz-pilot`, deployment gần nhất, status và commit SHA; **không** deploy lại hoặc merge PR36, không bật `PHASE6_*`.
+
+## 18. Bước 148 — Deployment Preview ghi nhận từ Cloudflare Dashboard
+
+Theo ảnh `Workers & Pages → duongtrcnhiem-test → Deployments` do người vận hành cung cấp ngày 27/11/2026:
+- Cloudflare Pages test **Production** hiển thị nguồn nhánh `fix-firebase-l...` commit `01b59ce` và dấu trạng thái thành công. Đây là Production **của dự án Pages thử nghiệm**, không đồng nghĩa website chính/Main đã được thay đổi.
+- All deployments hiển thị hai **Preview** build thành công với commit `6c5c959` (newer) và `bf605f6` (older). GitHub PR #36 HEAD được đối chiếu đúng `6c5c959b9d4dfecdda11c1995f6e7d7bb5970099`; PR #36 đang `open`, `draft`, `merged:false`, base `feature/staging-demo-quiz-pilot`.
+- Vì hai build trên tương ứng commit nhánh PR #36, kết quả không chứng minh HEAD của **Staging base branch** đã được deploy trên hostname branch alias ổn định `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`.
+- Trạng thái deploy thành công chỉ là bằng chứng build/deploy, không xác minh API Phase 6 đang bật, Phase 6 migrations ở D1, hoặc các kiểm thử live.
+
+**Bước tiếp theo (chỉ đọc):** lọc/tìm đúng deployment từ branch `feature/staging-demo-quiz-pilot` trên Cloudflare Pages và chụp `Branch / Commit SHA / Status / Deployment URL`. Không bấm Retry/Rollback, không đổi branch control, không kích hoạt Phase6, không merge PR.

@@ -157,3 +157,15 @@ Người vận hành gửi ba ảnh D1 Studio sau câu truy vấn metadata chỉ
 **Gate `REMOTE_CLONE_PHASE6C_SCHEMA_PRESENCE: PASS`**. Chưa có bằng chứng từ Bước 183 về counts 8 bảng cũ, `PRAGMA quick_check` hoặc `foreign_key_check` sau 6C. Các ảnh cắt phần kết quả, tên đích suy ra từ chuỗi thao tác trước; không được suy ra hiệu lực runtime trigger hoặc quyền API.
 
 **Bước 184:** trên đúng D1 clone `duongtrcnhiem-restore-20261128`, chỉ đọc 8 bảng cũ với expected `5,0,3,1,1,1,1,2`, `PRAGMA quick_check;` kỳ vọng `ok`, `PRAGMA foreign_key_check;` kỳ vọng 0 row. Nếu sai, STOP, không chạy 6A hoặc tự restore; nếu đạt mới tiến tới Phase6A remote clone. Giữ `duongtrcnhiem-auth-preview` nguyên trạng, `PHASE6_*` server flags chưa cấu hình và PR36 Draft.
+
+## Bước 184 — Phase 6C remote clone hậu kiểm PASS (operator screenshots + explicit confirmation, 28/11/2026)
+
+Người vận hành cung cấp hai ảnh Cloudflare D1 Studio sau khi áp dụng Phase6C trên `duongtrcnhiem-restore-20261128`:
+- `PRAGMA quick_check;`: kết quả `ok` (ảnh).
+- `PRAGMA foreign_key_check;`: kết quả `Query · 4×0`, nghĩa là 0 hàng vi phạm (ảnh).
+- Operator xác nhận riêng bằng lời rằng 8 số dòng trả lại đúng thứ tự `5, 0, 3, 1, 1, 1, 1, 2` (không có ảnh row counts trong lần gửi này).
+- Bước 183 trước đó đã cho thấy 3 bảng và 6 trigger Phase6 qua `sqlite_master`.
+
+**Gate `REMOTE_CLONE_PHASE6C_POSTFLIGHT: PASS`** đối với các phép kiểm đã quan sát/xác nhận; giới hạn của đối chiếu chỉ là **row counts**, không phải hash dữ liệu từng bản ghi. Phase6A **chưa** chạy trong Bước 184.
+
+**Bước 185 tiếp theo:** chỉ trên D1 clone `duongtrcnhiem-restore-20261128` thử một file `serverless/d1-phase6-timed-sessions-draft.sql` bằng Wrangler, kiểm tra prompt target, không `--yes`. Nếu chạy thành công, mới dùng metadata read-only xác minh 4 bảng Phase6 / 9 triggers, rồi hậu kiểm dữ liệu/integrity/FK trước khi chạy Phase6D. Không ghi vào `duongtrcnhiem-auth-preview`, không bật các cờ Phase6, không merge PR36 hoặc thay đổi Production.

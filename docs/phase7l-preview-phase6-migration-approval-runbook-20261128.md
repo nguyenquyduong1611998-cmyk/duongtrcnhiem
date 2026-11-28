@@ -1133,3 +1133,20 @@ Operator gửi ảnh Cloudflare Build log đã phóng rộng, dòng `[phase6d-bu
 - `[p6d-keys] exactKeyFound=... nearMatchCount=...`
 
 Dòng log không in giá trị thực, UID, token, keys, password hay email. **Bước 263:** operator vào PR39 tab Checks sau khi cloud branch build cho commit `4752e4a`, xem CI Cloudflare build success và `View logs` → tìm `[p6d-`, chụp 3 dòng ngắn. **Không gộp PR39**; nhánh riêng đủ để quan sát build env. Nếu không thấy đúng commit, chờ nhánh được cập nhật hoặc kiểm tra xem deployment mới đang chạy, không Retry staging/bản cũ. Không đổi env, D1, Firebase, Production, PR36 Draft.
+
+## Bước 263 — PR39 confirms a single surrounding whitespace in compiled Phase6D Vite flag; PR40 fix prepared (28/11/2026)
+
+Operator gửi ba ảnh Cloudflare PR39 branch Preview `4752e4a` (Cloudflare build PASS, isolated CI PASS) và ba dòng build probe rõ ràng, lúc 2026-11-28T09:24:07Z:
+```text
+[p6d-process] present=true type=string exact=false trimmed=true length=5
+[p6d-vite] present=true type=string exact=false trimmed=true length=5
+[p6d-keys] exactKeyFound=true nearMatchCount=1
+```
+**Kết luận đã xác minh:** Environment process và Vite cùng nhận một chuỗi 5 ký tự, không bằng chính xác `'true'`, nhưng `.trim()==='true'`; có **một ký tự whitespace thừa ở đầu hoặc cuối**. Khóa env đúng và duy nhất. Nguồn tạo whitespace (người nhập/Cloudflare UI/đường truyền) **chưa biết**, không quy lỗi cụ thể. Root cause của **UI gate** bị ẩn: code `src/utils/phase6StudentExam.ts` so sánh nghiêm ngặt `flag==='true'`; bảng chẩn đoán browser `Phase6D` cho 5/6 PASS đúng tương ứng. Server-side API flag chưa thử qua request thực tế, không suy diễn đã enable vì tên biến nhìn thấy trong Cloudflare.
+
+Đã tạo [PR40](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/40) **Draft**, nhánh `feature/phase6d-normalize-vite-ui-flag-20261128`, base `feature/staging-demo-quiz-pilot`, head commit `16208a6485138a079e55859de1cde72dd1a670d3`. Chỉ sửa **2 file frontend**:
+- `src/utils/phase6StudentExam.ts`: thêm helper `isPhase6StudentTimedUiFlagEnabled(flag)` trả true **chỉ với string `flag.trim()==='true'`**; `isPhase6StudentExamUiEnabled` vẫn đòi Firebase staging và đúng pinned host. Không nới quyền server/API.
+- `src/App.tsx`: bảng diagnostic Preview `?phase6_debug=1` dùng chung helper normalized, tránh báo sai; các guard app student role, Firebase UID, pinned host không đổi.
+- Không sửa server `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, không chạm D1/answers, không enable Phase6E, không đổi Production/main. PR39 build probe vẫn **Draft chưa merge**; PR36 Draft.
+
+**Bước 264:** operator mở PR40 → tab **Checks**, chờ hai job `demo-quiz-ci` và Cloudflare Pages PASS, kiểm merge gate/no conflicts trước Ready for review. Không merge ngay; chỉ sau kiểm tra gộp vào staging (không main) và verify deployment commit mới trên pinned alias mới mở Edge InPrivate `/?phase6_debug=1` để mong đợi 6/6 PASS và Phase6D panel. Sau khi UI hiện, hành động đầu tiên chỉ **`Tải danh sách đề thi DEMO`**, kiểm danh sách (30 phút, revision3, 1 câu) và nếu lỗi server flag thì chẩn đoán riêng; không bấm `Bắt đầu làm bài` trước gate. Không Retry PR39/staging bừa.

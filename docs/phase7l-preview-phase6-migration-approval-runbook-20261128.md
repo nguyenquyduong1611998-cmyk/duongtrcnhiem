@@ -1051,3 +1051,17 @@ Operator gửi Deployment details Cloudflare cho `duongtrcnhiem-test`:
 - Deployment ID **`be377e3a-bed0-4dc1-8b71-c0c4de3b23d5`**, hashed URL `be377e3a.duongtrcnhiem-test.pages.dev` không được dùng cho signed student API. Build settings có 20 dòng nhưng không cần thêm flags theo Bước249.
 
 **Gate `PR38_PINNED_PREVIEW_DEPLOY: PASS (operator screenshot)`; `PHASE6D_DIAGNOSTIC_BOOLEAN_RESULTS: PENDING`**. Hướng dẫn bước 256: vào đúng Edge InPrivate với học viên DEMO đang đăng nhập, mở **`https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1`** trong cùng tab, tab `Mục Chuyên Đề`, kéo dưới ba cards, chụp khung `Phase 6D — Chẩn đoán hiển thị (chỉ Preview DEMO)`; kiểm từng giá trị ĐẠT/CHƯA ĐẠT cho app role student, Firebase session present, internal/Firebase UID equal, compiled Vite 6D flag, Firebase staging env, pinned host. Chỉ booleans, không gửi UID/token/password. Nếu khung không hiện, xác nhận query `phase6_debug=1` còn trong URL, chưa login account khác; chụp address bar và cuối trang. Không bấm Start/Submit, không Retry/build mới, không sửa DB/Production, PR36 Draft.
+
+## Bước 256 — Diagnostic xác định duy nhất Vite UI flag bị false trong browser JS (operator screenshot, 28/11/2026)
+
+Operator đã mở pinned Preview `?phase6_debug=1` trong Edge InPrivate với học viên DEMO và gửi screenshot panel mới (sau PR38 merge commit `431d7a0`):
+- **`Vai trò nội bộ là học viên: ĐẠT`**
+- **`Có phiên Firebase: ĐẠT`**
+- **`UID nội bộ khớp phiên Firebase: ĐẠT`**
+- **`Đúng môi trường Firebase staging: ĐẠT`**
+- **`Đúng địa chỉ Preview cố định: ĐẠT`**
+- **`Cờ Vite giao diện 6D trong JavaScript: CHƯA ĐẠT`**.
+
+Diagnostic code in `src/App.tsx` compares `import.meta.env.VITE_PHASE6_STUDENT_TIMED_UI === 'true'`; therefore **effective compiled client value is not the exact string `'true'`**, and UI render guard `isPhase6StudentExamUiEnabled(host,flag)` likewise rejects the value. **Gate `PHASE6D_BLOCKER_IS_COMPILED_CLIENT_FLAG: CONFIRMED`**, while the origin of incorrect compile value **still unknown**. Already ruled out auth UID/role/staging/host. Cloudflare deployment Build settings screenshots show key `VITE_PHASE6_STUDENT_TIMED_UI` with rendered value `true`, but they do **not expose invisible spaces/characters or the actual value injected by Vite during build**; no grounds to blame Firebase or D1. Vite official docs: `VITE_` vars are **statically replaced at build time**, and require rebuilding to change client JS (https://vite.dev/guide/env-and-mode).
+
+**Bước 257 (targeted, no code change):** in Cloudflare Pages `duongtrcnhiem-test` → Settings → **Preview** → Variables and secrets, locate **existing** `VITE_PHASE6_STUDENT_TIMED_UI` (do not add duplicate), retype Value manually using Ctrl+A `true` as four ASCII letters, without quotes, newline or spaces, Save. Do not touch `PHASE6_STUDENT_TIMED_EXAM_ENABLED` or other flags. This tests possible hidden whitespace/encoding but **is not yet proof that was the cause**. After confirmed Save, perform **a new Preview build** from correct staging commit; verify diagnostic again. If still `CHƯA ĐẠT`, build a sanitized compile-time logging/assertion PR (no secrets) instead of blindly repeating retries. Do not bypass UI/auth gate, no changes to D1/Production or Phase6E, PR36 Draft.

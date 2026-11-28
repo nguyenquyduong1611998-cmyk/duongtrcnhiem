@@ -1073,3 +1073,14 @@ Operator phản hồi **"đã lưu lại vite 6D"** sau hướng dẫn mở Clou
 [PR38](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/38) đã merged vào staging, merge SHA **`431d7a0090ba2ee88804e56947bbfb09bc23e4a6`**. Bản Preview đã triển khai commit này tại Bước255, nhưng cần **build mới sau khi Save biến**, vì Vite thay cờ vào JS lúc build.
 
 **Bước 258:** Cloudflare Pages `duongtrcnhiem-test` → Deployments → chọn **Preview** của `feature/staging-demo-quiz-pilot` commit `431d7a0` (Merge PR38) → menu `...` → `Retry deployment` (không Retry bản cũ `1182512`, không Production). Sau khi success, kiểm đúng alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`. Rồi mở Edge InPrivate đã đăng nhập học viên DEMO: `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1`, tab Mục Chuyên Đề, diagnostic phải có **6/6 ĐẠT** và khung thi Phase6D. **Chưa bấm Bắt đầu/Nộp**. Nếu vẫn Vite CHƯA ĐẠT, **dừng retry**, rà lại cách Vite build xác định value tại compile-time bằng kiểm thử sạch trước khi thay đổi code. Không sửa D1, Firebase, Phase6E, PR36 Draft hay Production.
+
+## Bước 258 — Preview rebuild sau retype VITE Phase6D thành công (operator screenshot, 28/11/2026)
+
+Operator gửi ảnh Cloudflare Pages `duongtrcnhiem-test` deployment mới **Preview** sau khi lưu lại `VITE_PHASE6_STUDENT_TIMED_UI=true` ở Settings Preview:
+- Deployment ID `3eb3f2bf-e53f-4f3d-b6bf-c64b219b46d2`, hashed URL `3eb3f2bf.duongtrcnhiem-test.pages.dev` (không dùng để gọi API).
+- Alias đúng `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`.
+- Branch staging commit **`431d7a0`**, merged PR38.
+- Status **success**, **4:05 PM November 28, 2026**, Duration **12s**.
+- Build settings ghi **20**, ảnh chưa mở rộng để xác nhận giá trị build riêng của lần retry này.
+
+**Gate `PHASE6D_PREVIEW_BUILD_AFTER_ENV_RETYPE: PASS (operator screenshot)`; `PHASE6D_COMPILED_FLAG_AFTER_REBUILD: PENDING`**. Bước259: trên Edge InPrivate học viên DEMO, mở đúng pinned alias `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1`, tab `Mục Chuyên Đề`, xem 6 boolean. Nếu 6/6 ĐẠT và Phase6D panel hiện, chỉ bấm `Tải danh sách đề thi DEMO` (read-only), không Bắt đầu làm bài. Nếu `Cờ Vite giao diện 6D trong JavaScript: CHƯA ĐẠT`, không Retry lại; nghiên cứu build-time variable substitution của Vite bằng diagnostic an toàn, không bật bừa cờ hay bỏ guard auth. PR36 Draft, Phase6E OFF, Production nguyên trạng.

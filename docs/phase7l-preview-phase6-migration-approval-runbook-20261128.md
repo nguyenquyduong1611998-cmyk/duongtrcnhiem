@@ -1250,3 +1250,16 @@ Sau Bước271 start thành công tại `29:47`, operator bấm `Đồng bộ ph
 **Gate `PHASE6D_STUDENT_SYNC_D1_CONTINUING_CLOCK: PASS (operator screenshot)`**. Kết quả hỗ trợ tính giờ theo trạng thái máy chủ sau khi gọi read, nhưng chưa chứng minh reload/recovery cross-device/submit. Không được suy diễn đã chấm điểm.
 
 **Bước 273 — read-only reload/recovery khi phiên DEMO còn hiệu lực:** trong cùng Edge InPrivate, F5, tab `Mục Chuyên Đề` → `Tải danh sách đề thi DEMO` → `Mở đề` của revision 3. Đây là action read, **không bấm Bắt đầu thêm lần nào**. Mong đợi server trả phiên đang chạy với cùng deadline, câu hỏi được khôi phục, đồng hồ ít hơn thời gian trước và không reset về 30:00. Đáp án chưa nộp không giữ qua reload, nhưng ở Bước272 chưa chọn đáp án. Nếu session hết hạn thì UI có thể hiện 0:00; không thử reset. Chụp ảnh và không nộp bài ở Bước273. Phase6E OFF, PR36/PR39 Draft, Production không thay đổi.
+
+## Bước 273 — Student Phase6D F5/reopen restored active session from D1 without resetting 30-minute clock (operator screenshot, 28/11/2026)
+
+Operator thử reload trang trong Edge InPrivate rồi quay về `Mục Chuyên Đề` → `Tải danh sách đề thi DEMO` → `Mở đề` của `Toán học DEMO - Cơ bản` revision 3. Screenshot phần Phase6D cho thấy:
+- `Toán học DEMO - Cơ bản · phiên bản 3`;
+- **`Còn lại: 23:44`**, giảm từ 27:00 sau đồng bộ Bước272, không reset về 30:00;
+- một câu `2 + 2 = ?`, bốn phương án A.3, B.4, C.5, D.6;
+- chưa chọn đáp án/checkbox, nút nộp vẫn disabled;
+- notice màu xanh **`Đã khôi phục phiên thi từ máy chủ.`**.
+
+**Gate `PHASE6D_STUDENT_SESSION_RECOVER_AFTER_RELOAD: PASS (operator screenshot)`**. Tài khoản học viên DEMO trên pinned Preview đã khôi phục phiên thi D1 đang hoạt động với đồng hồ tiếp tục giảm, không tạo lại phiên 30 phút. Chưa có bằng chứng đã submit/grade/Phase6E results.
+
+**Bước 274 (một lần ghi điểm DEMO có xác nhận, khi còn thời gian):** ở chính phiên DEMO revision 3, chọn **B. 4** cho `2 + 2 = ?`, tick `Xác nhận nộp bài DEMO, không thể chỉnh sửa sau khi máy chủ lưu điểm`, sau đó nhấn `Nộp bài lên máy chủ để chấm điểm` **duy nhất một lần**. Kỳ vọng UI báo **`Đã nộp: 10/10 điểm · 1/1 câu đúng`** cùng `Điểm đã được máy chủ xác nhận và lưu trên D1.` Không thể sửa/nộp lại cùng phiên bản sau khi D1 chấm; **không nhấn lần hai nếu mất phản hồi**, chỉ bấm `Đọc lại kết quả từ D1` để phân biệt commit thành công. Nếu hết hạn trước khi nộp, không cố khởi động lại hoặc sửa D1. Không sửa bản phát hành bất biến, không bật Phase6E/read-only result API, không thay đổi Production/main, PR36 và PR39 vẫn Draft.

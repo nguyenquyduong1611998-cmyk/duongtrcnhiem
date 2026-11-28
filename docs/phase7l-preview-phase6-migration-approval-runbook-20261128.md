@@ -62,3 +62,13 @@ Các file được rà soát tại GitHub: chỉ `CREATE TABLE/INDEX/TRIGGER IF 
 | GO cho thi thật / Production | **NO-GO** |
 
 **Bước tiếp theo duy nhất cần operator:** chạy lệnh `npx wrangler d1 time-travel info duongtrcnhiem-auth-preview` **chỉ đọc**, xác nhận Time Travel hỗ trợ và có bookmark khôi phục. Tuyệt đối không nhầm với `time-travel restore`, không chạy migration hoặc import trên Preview khi chưa phê duyệt. PR36 giữ DRAFT.
+
+## Bước 178 — Đã xác minh D1 Preview Time Travel (ảnh CMD operator 28/11/2026)
+
+Người vận hành chạy **chỉ đọc** `npx wrangler d1 time-travel info duongtrcnhiem-auth-preview` với Wrangler `4.169.0`, công cụ hiển thị `Resource location: remote`, `Time Traveling...`, một **current bookmark** hợp lệ và gợi ý cú pháp `time-travel restore`. **Không thực thi lệnh restore trong ảnh.**
+
+**Gate `D1_PREVIEW_TIME_TRAVEL_BOOKMARK_AVAILABLE: PASS`**. Giữ bookmark này trong hồ sơ vận hành cục bộ, **không chép chuỗi bookmark hoặc command restore vào GitHub/chat**. Cloudflare lưu ý bookmark có thể thay đổi do maintenance không có thay đổi SQL; trước khi migration phải ghi lại **bookmark mới ngay sát thời điểm triển khai** sau khi ngừng ghi/đối chiếu row counts.
+
+**Rủi ro quan trọng:** `time-travel restore` ghi đè database tại chỗ và hủy request đang chạy. Việc có bookmark không tự cho phép restore hoặc migration. Theo Cloudflare Time Travel docs, bookmark chỉ còn khả dụng trong retention window của gói (Free 7 ngày, Paid 30 ngày). Bản export offline đã khôi phục được vào D1 mới là lớp bảo vệ bổ sung.
+
+**Tình trạng tiến hành:** Đã hoàn tất review bốn SQL, kiểm thử backup RAM và D1 remote độc lập, xác minh D1 Preview binding, API Phase6 flags chưa có, current bookmark truy xuất được. **Gate còn chưa đạt: phê duyệt rõ ràng của chủ DB cho việc thực thi bốn SQL draft trên `duongtrcnhiem-auth-preview`**, kiểm tra preflight dữ liệu/đích tại thời điểm chạy và chọn thời gian ngừng sử dụng Preview. PR36 vẫn Draft, không merge; không chạy remote migration/khôi phục hay bật API từ bước 178.

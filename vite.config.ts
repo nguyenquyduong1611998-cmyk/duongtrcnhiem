@@ -14,6 +14,39 @@ base: process.env.VITE_FIREBASE_ENV === 'staging'
     plugins: [
       react(),
       tailwindcss(),
+      // Temporary, non-sensitive build probe for Phase 6D Preview diagnosis.
+      // Logs only boolean checks and string lengths, never raw env values.
+      {
+        name: 'phase6d-build-env-probe',
+        apply: 'build',
+        configResolved(config): void {
+          const key = 'VITE_PHASE6_STUDENT_TIMED_UI';
+          const describe = (value: unknown) => ({
+            present: value !== undefined,
+            type: typeof value,
+            exactTrue: value === 'true',
+            trimmedTrue: typeof value === 'string' && value.trim() === 'true',
+            length: typeof value === 'string' ? value.length : null,
+          });
+          const names = Object.keys(process.env);
+          const nearKeys = names.filter(name =>
+            name.replace(/[\u200B-\u200D\uFEFF]/g, '').trim() === key);
+          // Cloudflare's build-log panel clips long lines and has no horizontal
+          // scrollbar. Emit three short, safe lines without any raw env values.
+          const processFlag = describe(process.env[key]);
+          const viteFlag = describe(config.env[key]);
+          const logFlag = (label: string, info: ReturnType<typeof describe>) => {
+            console.info('[p6d-' + label + '] present=' + info.present +
+              ' type=' + info.type + ' exact=' + info.exactTrue +
+              ' trimmed=' + info.trimmedTrue + ' length=' + info.length);
+          };
+          logFlag('process', processFlag);
+          logFlag('vite', viteFlag);
+          console.info('[p6d-keys] exactKeyFound=' +
+            Object.prototype.hasOwnProperty.call(process.env, key) +
+            ' nearMatchCount=' + nearKeys.length);
+        },
+      },
       // Copies src/assets into dist/ so root-relative URLs like
       // "/src/assets/images/..." (e.g. generate_image output) still resolve
       // in production builds. Do not remove.

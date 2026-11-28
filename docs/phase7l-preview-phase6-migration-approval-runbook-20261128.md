@@ -444,3 +444,11 @@ Không thấy lỗi trong đoạn ảnh được chụp. Đây là thống kê t
 **Bước 204 chỉ đọc:** tại `duongtrcnhiem-auth-preview` (không nhầm restore-test/restore-20261128), truy vấn metadata `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;`, kỳ vọng 5 bảng/12 trigger (17 hàng) và bốn đối tượng Phase6D `phase6_exam_submissions`, `phase6_submission_guard`, `phase6_submission_no_delete`, `phase6_submission_no_update`. Sau đó hậu kiểm 8 bảng baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0 hàng; mới chốt toàn bộ. Nếu bất thường, dừng, không tự chạy lại/restore.
 
 Giữ ba flag API `PHASE6_*` OFF; PR36 Draft, không merge, không thay đổi Production.
+
+## Bước 204 — D1 Preview đã có 17 đối tượng Phase6 theo xác nhận operator (28/11/2026)
+
+Sau hướng dẫn đọc `SELECT type, name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type, name;` trên `duongtrcnhiem-auth-preview`, người vận hành phản hồi **"17 đối tượng đã có"**. Kết quả phù hợp kỳ vọng sau 6B → 6C → 6A → 6D là **5 bảng Phase6 + 12 trigger Phase6**, nhưng chứng cứ ở bước này là số đối tượng do operator báo (chưa có ảnh danh sách/từng loại). Không coi số lượng này là kiểm chứng định nghĩa SQL của từng trigger hoặc dữ liệu bài thi.
+
+**Gate `PREVIEW_PHASE6_SCHEMA_COUNT: PASS (operator-reported)`**. **Gate `PREVIEW_PHASE6D_FINAL_POSTFLIGHT: PENDING`** cho đến khi kiểm tra lại 8 số lượng bản ghi gốc `5,0,3,1,1,1,1,2`, `PRAGMA quick_check` = `ok`, `PRAGMA foreign_key_check` trả 0 hàng trên **chính** D1 Preview. Nếu lỗi hoặc số hàng khác baseline, dừng; không rollback tự động, không chạy lại migration.
+
+Các cờ máy chủ `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED` tiếp tục không cấu hình/OFF; chưa xác minh API thực tế, chưa merge PR36 và chưa đổi Production.

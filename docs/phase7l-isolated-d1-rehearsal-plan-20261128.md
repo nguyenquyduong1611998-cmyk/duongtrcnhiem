@@ -289,3 +289,20 @@ Người vận hành đã chủ động tạo một D1 mới, tên đúng `duong
 **Gate blank separate target: PASS (Dashboard observation)**. Đã tạo D1 rỗng, **chưa** import hay áp dụng SQL; chưa có bằng chứng kết nối với Pages và phải giữ database này không có binding nào. Không đưa bản SQL backup lên GitHub/chat.
 
 **Bước 172 (read-only):** trên CMD máy đã đăng nhập Wrangler, chạy `npx wrangler d1 info duongtrcnhiem-restore-20261128` và so sánh Name/ID với Dashboard (không cần gửi full UUID). Lệnh này chỉ lấy thông tin metadata, không import. Trước khi nhân bản bản backup 28/11 lên Cloudflare D1 mới, người có quyền dữ liệu phải xác nhận 5 account DEMO, các password hashes và 14 dòng đều được phép nhân bản trong cùng tài khoản Cloudflare, không chứa dữ liệu thật/nhạy cảm của đơn vị. Nếu không chắc chắn, ưu tiên nhập schema-only cộng dữ liệu synthetic mới, không nhập nguyên backup.
+
+## Bước 172 — D1 restore target identity check via Wrangler (operator screenshot, 28/11/2026)
+
+Ảnh CMD tại máy người vận hành: `npx wrangler d1 info duongtrcnhiem-restore-20261128` (đọc metadata) trả về:
+- `name: duongtrcnhiem-restore-20261128`
+- `num_tables: 0`
+- `database_size: 12.3 kB`
+- `running_in_region: APAC`
+- `read_replication.mode: disabled`
+- `read_queries_24h: 0`, `write_queries_24h: 0`, `rows_read_24h: 0`, `rows_written_24h: 0`.
+- ID được **operator đối chiếu** với Cloudflare Dashboard Bước 171; hai ảnh cùng ID. **Không ghi UUID vào file GitHub**.
+
+**Gate `TARGET_NAME_AND_ID_VERIFIED: PASS`, `EMPTY_TABLES_OBSERVED: PASS`**. Đừng hiểu `num_tables=0` là D1 chưa có bảng hệ thống; không dùng metadata này để chứng minh quyền import dữ liệu. Database mới không có bằng chứng binding nào; phải giữ không binding với website.
+
+**Gate còn BLOCKED:** D1 backup 28/11 chứa 5 tài khoản DEMO và 14 rows, khả năng có password hashes. Phải được người sở hữu dữ liệu xác nhận toàn bộ chỉ là dữ liệu giả, không có danh tính/mật khẩu/đề thi thật, và được phép nhân bản lên D1 trong cùng tài khoản Cloudflare, trước mọi lệnh `wrangler d1 execute --remote --file=...`. Nếu không xác minh được, dùng schema-only/synthetic data thay cho phục hồi full backup. Cloudflare docs xác nhận `d1 execute --remote --file` thực sự ghi remote: https://developers.cloudflare.com/d1/best-practices/import-export-data/ và https://developers.cloudflare.com/d1/wrangler-commands/.
+
+**Không có import nào được thực hiện tại Bước 172.** Preview, Staging, restore-test, Production và ba cờ API Phase 6 giữ nguyên.

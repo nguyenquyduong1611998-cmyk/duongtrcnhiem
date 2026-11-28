@@ -1084,3 +1084,19 @@ Operator gửi ảnh Cloudflare Pages `duongtrcnhiem-test` deployment mới **Pr
 - Build settings ghi **20**, ảnh chưa mở rộng để xác nhận giá trị build riêng của lần retry này.
 
 **Gate `PHASE6D_PREVIEW_BUILD_AFTER_ENV_RETYPE: PASS (operator screenshot)`; `PHASE6D_COMPILED_FLAG_AFTER_REBUILD: PENDING`**. Bước259: trên Edge InPrivate học viên DEMO, mở đúng pinned alias `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1`, tab `Mục Chuyên Đề`, xem 6 boolean. Nếu 6/6 ĐẠT và Phase6D panel hiện, chỉ bấm `Tải danh sách đề thi DEMO` (read-only), không Bắt đầu làm bài. Nếu `Cờ Vite giao diện 6D trong JavaScript: CHƯA ĐẠT`, không Retry lại; nghiên cứu build-time variable substitution của Vite bằng diagnostic an toàn, không bật bừa cờ hay bỏ guard auth. PR36 Draft, Phase6E OFF, Production nguyên trạng.
+
+## Bước 259 — Rebuild sau retype env vẫn 5/6 PASS; tạo PR39 build-probe nhánh riêng (28/11/2026)
+
+Operator gửi ảnh chẩn đoán `?phase6_debug=1` trên pinned Preview sau retry commit `431d7a0` lúc 16:05:
+- `Vai trò nội bộ là học viên: ĐẠT`
+- `Có phiên Firebase: ĐẠT`
+- `UID nội bộ khớp phiên Firebase: ĐẠT`
+- `Đúng môi trường Firebase staging: ĐẠT`
+- `Đúng địa chỉ Preview cố định: ĐẠT`
+- **`Cờ Vite giao diện 6D trong JavaScript: CHƯA ĐẠT`**.
+
+**Gate `PHASE6D_COMPILED_VITE_UI_FLAG_AFTER_ENV_RETYPE: FAIL`**. Không tiếp tục Retry, không sửa auth/D1 hay bỏ guard. Theo Vite official docs, `import.meta.env.VITE_...` là các biến build-time dạng string (https://vite.dev/guide/env-and-mode); Cloudflare Pages docs cho biết Variables and Secrets có trong môi trường build (https://developers.cloudflare.com/pages/configuration/build-configuration/). Dù deployment Build settings hiện đúng tên và `true`, chưa có dữ liệu phân biệt process.env khi build, Vite resolved env hay bundle output.
+
+Đã tạo [PR39](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/39) **Draft** nhánh `feature/phase6d-vite-env-build-probe-20261128`, base `feature/staging-demo-quiz-pilot`, latest commit `c115ee273bd04e80164c960237117465d17919a2`. Chỉ sửa `vite.config.ts` để thêm plugin `configResolved` in **một dòng diagnostic** nhãn `[phase6d-build-probe]`, không in raw env values/secrets, chỉ in booleans (`present,type,exactTrue,trimmedTrue,length`) so sánh `processEnv` và `viteEnv`, `exactKeyFound` và `nearMatchKeyCount`. Branch riêng Preview có thể build và in log ngay, **không cần merge PR39 vào staging để điều tra**. Không đổi flag thực tế hoặc thành phần Auth/UI; không thử endpoint qua branch hashed host.
+
+**Bước 260:** operator mở PR39 tab Checks → Cloudflare Pages / View logs (hoặc Cloudflare Pages `duongtrcnhiem-test` → deployment Preview của **nhánh PR39, commit `c115ee2`**). Mở Build log, tìm `[phase6d-build-probe]`; chụp **duy nhất dòng này** cùng trạng thái build, không chụp Firebase secret. Nếu processEnv.exactTrue=false, kiểm tra tên biến sai/Env Preview; nếu true nhưng viteEnv=false, xem resolution; nếu cả true mà runtime trên staging false, kiểm tra khác biệt nhánh/asset, không đoán trước. **PR39 Draft chưa merged, PR36 Draft, pinned staging và Production không đổi**.

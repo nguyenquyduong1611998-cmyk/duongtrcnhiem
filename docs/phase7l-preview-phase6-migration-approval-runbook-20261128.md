@@ -941,3 +941,18 @@ Người vận hành phản hồi `đã thêm vite 6D` theo hướng dẫn Cloud
 **Gate `PHASE6D_FRONTEND_UI_FLAG_OPERATOR_REPORTED: YES`**, `PHASE6D_NEW_PREVIEW_BUILD: PENDING`, `PHASE6D_STUDENT_READ_ONLY_LIST: PENDING`. Mã tại `feature/staging-demo-quiz-pilot` render `Phase6StudentExamPanel` trên tab topics khi `currentUser.role==='student'`, Firebase student UID trùng app UID và Vite cờ UI đúng `true`, hostname pinned Preview. Bản build mới cần thiết để nhận `VITE_` flag.
 
 **Bước 246**: operator mở Cloudflare Pages `duongtrcnhiem-test` → Deployments, chọn Preview đúng nhánh `feature/staging-demo-quiz-pilot` với commit merge PR37 `1182512` (nếu vẫn là latest staging) và chọn **Retry deployment**, không Delete hay chạm Production; xác nhận deployment thành công + pinned alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` và hai cờ có trong build env. Sau đó chỉ đăng nhập học viên DEMO được ủy quyền để tải danh sách đề thi đã xuất bản (`action:'list'`), kỳ vọng revision 3, 30 phút, 1 câu. **Không nhấn `Bắt đầu làm bài` ở bước kiểm tra này**: sẽ tạo phiên thi D1, bắt đầu tính giờ ngay theo server. Cờ Phase6E lịch sử/điểm OFF; PR36 Draft, Production nguyên trạng.
+
+## Bước 246 — Cloudflare Preview Phase6D UI flag rollout deployed successfully (operator screenshot, 28/11/2026)
+
+Operator sau khi xác nhận thêm `PHASE6_STUDENT_TIMED_EXAM_ENABLED=true` và `VITE_PHASE6_STUDENT_TIMED_UI=true` ở Pages `duongtrcnhiem-test` Preview đã thực hiện retry deployment và gửi ảnh **Deployment details**:
+- **Preview**, success, **3:21 PM November 28, 2026**, 14s.
+- Commit **`1182512`** (`Merge pull request #37`), source branch card hiển thị rút gọn `feature/stagi...`.
+- Deployment ID **`a64d3328-604b-491f-a12f-6a73d5d27e8f`**; hashed URL `a64d3328.duongtrcnhiem-test.pages.dev` không dùng cho API auth.
+- **Aliases** chính xác `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`.
+- Build settings hiện **20** mục, không mở rộng trong ảnh nên **chưa trực tiếp xác minh tên/giá trị hai cờ 6D trong build environment**.
+
+**Gate `PHASE6D_PINNED_PREVIEW_RETRY_SUCCESS: PASS (operator screenshot)`; `PHASE6D_STUDENT_UI_VISIBLE: PENDING`; `PHASE6D_STUDENT_API_READONLY_LIST: PENDING`.** Deployment success không chứng minh student UI hoặc API đã hoạt động.
+
+**Bước 247**: mở đúng pinned alias bằng tài khoản học viên DEMO hợp lệ đã dùng trong thử nghiệm (không dùng Google Admin để tìm student UI), vào tab `Mục Chuyên Đề` / `topics` và tìm section `Phase 6D — Thi toán học DEMO có thời hạn` (trong code `src/App.tsx` chỉ render nếu `currentUser.role==='student'`, Firebase UID khớp app UID, đúng staging preview host và cờ `VITE_PHASE6_STUDENT_TIMED_UI==='true'`). Nếu thấy, chỉ nhấn **`Tải danh sách đề thi DEMO`**, kỳ vọng đúng bản phát hành `Toán học DEMO - Cơ bản`, **version 3 / 1 câu / 30 phút**; chụp ảnh. Nếu chưa thấy, chụp ảnh tab topics và tình trạng đăng nhập; không thêm cờ hay retry bừa.
+
+**CỰC KỲ QUAN TRỌNG:** Không bấm `Bắt đầu làm bài (máy chủ tính giờ)` tại Bước247, vì sẽ tạo phiên D1 mới và bắt đầu đồng hồ 1800 giây ngay; không bấm submit, chưa bật Phase6E results flags. PR36 Draft, Production và main không thay đổi.

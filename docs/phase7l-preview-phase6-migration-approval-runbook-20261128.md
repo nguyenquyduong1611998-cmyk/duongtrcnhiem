@@ -763,3 +763,14 @@ Operator trong Admin Phase6B đã mở bản nháp hiện có (`Toán học DEMO
 Điều này xác minh **`PHASE6B_POST_PR37_SAVE_UI_RESPONSE: PASS`** trên pinned staging Preview, cho thấy API update không còn báo lỗi kiểu đếm trigger như trước. Ảnh **chưa đủ xác nhận dữ liệu đã tồn tại qua một yêu cầu đọc mới độc lập**; cần làm thêm Bước233 read-only bằng `Tải danh sách bản nháp` rồi `Chỉnh sửa` lại bản nháp hiện có, kỳ vọng **version 2, 30 phút, 0 câu**. Không bấm tạo nháp mới hoặc lưu nhiều lần, không thêm câu hỏi/publish trước khi readback PASS.
 
 PR37 đã merged vào staging và pinned Preview đã deploy commit `1182512`; PR36 Draft, API publish/student/results OFF, Production không thay đổi.
+
+## Bước 233 — Phase6B read-after-write list confirms 30 minutes persisted (operator screenshot, 28/11/2026)
+
+Sau Bước232 lưu thành công một lần, operator bấm `Tải danh sách bản nháp` và gửi ảnh phần danh sách UI:
+- `Bản nháp DEMO: 1`.
+- `Toán học DEMO - Cơ bản`.
+- `30 phút · 0 câu · bản sửa 2`.
+
+**Gate `PHASE6B_30MIN_LIST_READBACK: PASS (operator screenshot)`**: bản nháp hiện có được API list trả về với đúng thời gian 30 phút và version 2 sau khi thay đổi từ 15 phút v1. Bước233 đã yêu cầu bấm `Chỉnh sửa` thêm để thực hiện `get` độc lập; **ảnh lần này chỉ chứng minh list, chưa có ảnh editor get mới**. Không tuyên bố đã nghiệm thu create API sau sửa PR37 chỉ từ save/list; lỗi tạo báo 503 trước đó đã được phân tích và mã đã chỉnh.
+
+**Bước 234 (một thao tác sửa DEMO có kiểm soát):** Trong pinned Preview, Admin 6B chọn `Chỉnh sửa` bản nháp duy nhất, xác nhận editor đang ở version 2 / 30 phút, chọn câu toán học giả `2 + 2 = ?`, bấm `Thêm câu mẫu` **một lần** (UI local, chưa ghi D1), sau đó `Lưu thay đổi vào D1 Preview` **một lần duy nhất**. Mong đợi version 3, 30 phút, 1 câu và thông báo lưu thành công. Nếu lỗi/timeout, STOP, không retry save; chỉ list lại để phân biệt commit/response. Không tạo bản nháp mới, không publish, không bật cờ publish/student/results, PR36 Draft, Production không đổi. Sau save PASS cần list/get readback để xác minh đủ trường và không rò khóa đáp án.

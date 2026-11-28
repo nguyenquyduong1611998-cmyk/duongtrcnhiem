@@ -814,3 +814,16 @@ Người vận hành báo **"đã thêm VITE Publish"** sau hướng dẫn thêm
 Đối chiếu mã `feature/staging-demo-quiz-pilot`: `src/App.tsx` cung cấp `canPublish={import.meta.env.VITE_PHASE6_ADMIN_PUBLISH_UI === 'true'}` cho Phase6AdminDraftsPanel. Cờ `VITE_` **bắt buộc build Preview mới** mới làm panel 6C xuất hiện. Endpoint server `functions/api/phase6/admin/publish.js` kiểm `PHASE6_ADMIN_PUBLISH_ENABLED` cùng `PHASE6_ADMIN_DRAFTS_ENABLED`, pinned Preview host, Google Admin signed và Preview D1 binding.
 
 **Gate `PREVIEW_PHASE6C_PUBLISH_UI_FLAG_OPERATOR_REPORTED: YES`**; `NEW_PREVIEW_BUILD_WITH_UI_FLAG: PENDING`; `PHASE6C_PUBLISHED_DEMO: NO`. **Bước 238**: Cloudflare Pages `duongtrcnhiem-test` → Deployments → chọn **Preview** nhánh `feature/staging-demo-quiz-pilot`, commit merge PR37 `1182512` → dấu `...` → `Retry deployment` (không Delete, không Production). Sau retry verify **success** và `Aliases: feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`, build env có `VITE_PHASE6_ADMIN_PUBLISH_UI=true` và `PHASE6_ADMIN_PUBLISH_ENABLED=true` (nếu có thể xem mà không lộ secrets), sau đó vào Admin kiểm tra có khung 6C, **chưa bấm Xuất bản**. Không cần sửa DB, không tạo thêm draft, không bật student/results flags, PR36 Draft, Production nguyên trạng.
+
+## Bước 238 — Cloudflare Preview Retry sau khi thêm cờ giao diện Phase6C Success (operator screenshot, 28/11/2026)
+
+Sau khi operator báo đã thêm `PHASE6_ADMIN_PUBLISH_ENABLED=true` và `VITE_PHASE6_ADMIN_PUBLISH_UI=true` vào môi trường Preview, operator chạy Retry đúng deployment Preview commit PR37 `1182512` và gửi ảnh **Deployment details**:
+- Environment `Preview`, Status `success`, thời điểm **3:04 PM November 28, 2026**, Duration `14s`.
+- Deployment ID `6ebc2107-040f-4187-8c32-0468c815ff55`, hashed URL `6ebc2107.duongtrcnhiem-test.pages.dev`.
+- **Aliases:** `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`, đúng pinned staging Preview alias.
+- Branch card viết rút gọn `feature/stagi...`, commit `1182512` (merge PR37).
+- `Build settings` có **18** dòng cấu hình, nhưng ảnh **chưa mở ra** để xác nhận từng giá trị biến mới.
+
+**Gate `PHASE6C_PINNED_PREVIEW_RETRY_SUCCESS: PASS (operator screenshot)`**, **`PHASE6C_PUBLISH_UI_VISIBLE: PENDING`**, **`PHASE6C_PUBLICATION_EXISTS: NOT YET CONFIRMED`**. Không suy ra đã xuất bản đề chỉ từ deployment thành công; không thử API ghi trước UI gate.
+
+**Bước 239 read-only:** mở `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` (không dùng hash URL), Google Admin → Quản Trị → Giai đoạn 6B → `Tải danh sách bản nháp` → **Chỉnh sửa** bản nháp sẵn có `Toán học DEMO - Cơ bản` (30 phút, 1 câu, revision 3). Cuộn trong editor để tìm khung **`6C — Duyệt xuất bản bản toán học DEMO`**, chụp ảnh khung nếu có; **chưa đánh dấu checkbox xác nhận, chưa bấm Xuất bản**. Nếu không thấy, chụp ảnh và sau đó kiểm tra Build settings/environment variables cho Preview; không thêm/sửa/cài lại gì theo phỏng đoán. Cờ student exam/results OFF, PR36 Draft, Production không đổi.

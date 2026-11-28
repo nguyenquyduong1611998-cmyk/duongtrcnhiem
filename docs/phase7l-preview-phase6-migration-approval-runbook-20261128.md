@@ -751,3 +751,15 @@ Người vận hành gửi ảnh **Deployment details** Cloudflare Pages với:
 Operator chọn **Chỉnh sửa** với bản nháp đã tồn tại trên pinned Preview sau khi PR37 merge/build thành công. Screenshot Admin Phase6B hiển thị **`Chỉnh sửa bản nháp · phiên bản 1`**, `Toán học DEMO - Cơ bản`, `Thời gian làm bài: 15`, `Câu hỏi toán học giả (0/12)`; có các preset 15/30/45/60, `Thêm câu mẫu`, `Lưu thay đổi vào D1 Preview`. Dòng trạng thái `Đang chỉnh sửa bản nháp DEMO đã chọn.`. Không có lỗi hiện trong hình. **Gate `PHASE6B_EXISTING_DRAFT_READBACK_AFTER_FIX: PASS`**, chỉ read-only; `PHASE6B_WRITE_AFTER_FIX: PENDING`.
 
 **Bước 232 (một lần ghi DEMO trên đúng pinned Preview, dùng bản nháp hiện tại, không tạo mới):** đổi preset thời gian **15→30 phút**; không thêm câu mẫu, giữ title; chỉ bấm **`Lưu thay đổi vào D1 Preview` đúng 1 lần**. Code server cho phép `templates=[]`; `save` sẽ UPDATE 1 row có optimistic `version=1` và trigger audit ghi thêm 1 row, fix `meta.changes<=2` hỗ trợ D1. Kỳ vọng UI báo `Đã lưu bản nháp Toán học DEMO - Cơ bản. Chưa xuất bản.`, version→2, minutes→30, question count 0. Nếu UI báo lỗi, **không retry**, chạy read-only list / get để xác định write đã commit chưa. Chưa publish, xóa, tạo thêm đề, chạy migration hay đổi Cloudflare settings; PR36 còn Draft, Production vẫn không thay đổi.
+
+## Bước 232 — Phase6B save time 15→30 phút PASS trên pinned Preview sau PR37 (operator screenshot, 28/11/2026)
+
+Operator trong Admin Phase6B đã mở bản nháp hiện có (`Toán học DEMO - Cơ bản`, trước đó 15 phút, 0 câu, version 1) và bấm `30 phút` rồi `Lưu thay đổi vào D1 Preview` đúng một lần. Screenshot trả về:
+- Tiêu đề editor **`Chỉnh sửa bản nháp · phiên bản 2`**.
+- `Thời gian làm bài` hiện **30**.
+- `Câu hỏi toán học giả (0/12)`.
+- Thông báo màu xanh **`Đã lưu bản nháp Toán học DEMO - Cơ bản. Chưa xuất bản.`**.
+
+Điều này xác minh **`PHASE6B_POST_PR37_SAVE_UI_RESPONSE: PASS`** trên pinned staging Preview, cho thấy API update không còn báo lỗi kiểu đếm trigger như trước. Ảnh **chưa đủ xác nhận dữ liệu đã tồn tại qua một yêu cầu đọc mới độc lập**; cần làm thêm Bước233 read-only bằng `Tải danh sách bản nháp` rồi `Chỉnh sửa` lại bản nháp hiện có, kỳ vọng **version 2, 30 phút, 0 câu**. Không bấm tạo nháp mới hoặc lưu nhiều lần, không thêm câu hỏi/publish trước khi readback PASS.
+
+PR37 đã merged vào staging và pinned Preview đã deploy commit `1182512`; PR36 Draft, API publish/student/results OFF, Production không thay đổi.

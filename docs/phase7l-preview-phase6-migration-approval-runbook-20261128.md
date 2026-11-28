@@ -680,3 +680,16 @@ Tài liệu Cloudflare D1 `meta.changes` dựa trên `sqlite3_total_changes()` (
 **PR sửa riêng:** [PR37](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/37) Draft, nhánh `feature/phase6b-d1-audit-change-count-fix-20261128`, base `feature/staging-demo-quiz-pilot`. Thay đổi helper `changed()` để chấp nhận `meta.changes` bằng 1 hoặc 2 (vẫn chặn 0, invalid và >2); cập nhật test Phase6B/6C để mock `meta.changes` bằng chênh lệch `total_changes()` và test tạo/lưu/xóa đều đúng 2 thay đổi. **PR37 chưa merge, chưa deploy và CI chưa xác nhận PASS khi ghi phần này.**
 
 **Bước 225 read-only:** operator vào tab Admin trên pinned Preview, bấm `Tải danh sách bản nháp` **một lần**, kỳ vọng `Bản nháp DEMO: 1`; xem tiêu đề, thời gian 15 phút. Không bấm Tạo đề, không bấm Xóa, không chỉnh thời gian/lưu cho đến khi PR37 CI/review và deployment Preview mới được xác minh. Không đụng Production, D1 schema hay API publish/student/results; PR36 vẫn Draft.
+
+## Bước 225 — Đã xác minh API list đọc lại bản nháp DEMO có thật sau lỗi create (operator screenshot, 28/11/2026)
+
+Sau khi D1 Studio Bước224 trả `drafts=1`, `events=1`, `creates=1`, người vận hành quay lại pinned Preview Admin và bấm `Tải danh sách bản nháp`. Screenshot hiển thị:
+- `Bản nháp DEMO: 1`.
+- `Toán học DEMO - Cơ bản`.
+- `15 phút · 0 câu · bản sửa 1`.
+
+Đây là xác nhận hồi đọc (read-after-write) qua **UI/API signed Google Admin**, khớp với SQL D1. **Gate `PREVIEW_PHASE6B_DRAFT_PERSISTED_AND_READBACK: PASS`**; **gate `PREVIEW_PHASE6B_CREATE_API_RESPONSE_SUCCESS: FAIL`**, vì client báo lỗi trước đó dù ghi thành công. Không bấm tạo lần nữa, không tự xóa/sửa cho tới khi kiểm thử bản fix.
+
+Kiểm tra [PR37](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/37): nhánh sửa `feature/phase6b-d1-audit-change-count-fix-20261128`, base `feature/staging-demo-quiz-pilot`, **Draft**, chưa merge, tại commit `f2a0afdbc9962ffeddb7968e1dc107cd214f3d0c`. Có ba file changed: backend helper và test Phase6B/6C. GitHub tool không trả CI statuses hay PR-triggered Actions runs ở thời điểm truy vấn, vì vậy **không được tuyên bố test PASS**; cần operator mở tab Checks/Actions để xác minh và nếu thiếu check, chạy test an toàn trên nhánh sửa trước merge.
+
+**Bước 226:** mở PR37, chụp tình trạng checks/merge gate, tuyệt đối không merge/deploy trước khi test khẳng định. Không cần chạy SQL migration hay thử Create lại. Giữ publish/student/results flags OFF, Production và PR36 Draft không thay đổi.

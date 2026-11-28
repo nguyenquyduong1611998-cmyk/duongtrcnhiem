@@ -848,3 +848,22 @@ FROM phase6_admin_drafts;
 Kỳ vọng `publications=0, drafts=1, title_code=basic, minutes=30, version=3, questions=1`. Bảng Phase6C đang trống ở Bước206 nhưng **chưa có pre-publish baseline mới**, nên không giả định 0 nếu SQL chưa chạy. Nếu không khớp: STOP, không xuất bản hoặc thêm dữ liệu.
 
 Sau gate preflight đạt và có chỉ dẫn riêng thì mới đánh dấu checkbox DEMO và bấm publish **đúng một lần**. Không chia sẻ JWT/secret/đáp án riêng tư, không enable student timed-exam/results, không chạm Production, PR36 Draft.
+
+## Bước 240 — Phase6C prepublication D1 Preview read-only baseline PASS (operator screenshot, 28/11/2026)
+
+Operator chạy đúng truy vấn SELECT prepublish gate tại `duongtrcnhiem-auth-preview`:
+```sql
+SELECT
+ (SELECT COUNT(*) FROM phase6_admin_publications) AS publications,
+ COUNT(*) AS drafts,
+ MIN(title_code) AS title_code,
+ MIN(minutes) AS minutes,
+ MIN(version) AS version,
+ MIN(json_array_length(templates_json)) AS questions
+FROM phase6_admin_drafts;
+```
+Ảnh D1 Studio `phase6_admin_publications · 6×1` trả **`publications=0`, `drafts=1`, `title_code=basic`, `minutes=30`, `version=3`, `questions=1`**. Các giá trị khớp kỳ vọng và nội dung readback Bước235 (một câu toán học mẫu `2 + 2 = ?`). Gate **`PHASE6C_PREPUBLICATION_READONLY_BASELINE: PASS (operator screenshot)`**. Ở thời điểm ảnh, **chưa xuất bản**.
+
+**Bước 241 (operator-controlled single write, Preview DEMO only):** trên pinned Preview alias `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` → Google Admin → Quản Trị → Phase6B, tải danh sách và mở **bản nháp duy nhất**, đảm bảo đúng `Toán học DEMO - Cơ bản`, 30 phút, 1 câu, revision 3. Không thay đổi dữ liệu, không bấm Lưu. Tại `6C — Duyệt xuất bản bản toán học DEMO`, tick **chỉ** checkbox `Tôi xác nhận đây chỉ là đề toán DEMO và đã kiểm tra nội dung`; bấm `Xuất bản phiên bản toán học DEMO` **chỉ một lần**. Sau đó chụp thông báo/receipt; mong đợi `Đã xuất bản revision 3 vào D1 Preview.` và publication metadata `revision=3`, `questionCount=1`, `timeLimitSeconds=1800`. Nếu timeout/lỗi, **không bấm lại**, kiểm tra database read-only vì transaction có thể đã commit. Không bật student API/results trước khi publication được xác nhận. Publish tạo metadata và bản snapshot Phase5 bất biến; không có thao tác thu hồi trong UI hiện tại.
+
+**Bước 242 sau đó (chỉ đọc)** kiểm `phase6_admin_publications`, `phase5_content_versions` và `phase5_content_questions` cho draft id hiện tại (tránh hiển thị đáp án/khoá trong screenshot), `PRAGMA quick_check`, `PRAGMA foreign_key_check` trước khi bật student timed exam. Giữ Production và PR36 Draft nguyên trạng.

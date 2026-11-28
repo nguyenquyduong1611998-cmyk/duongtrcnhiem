@@ -1237,3 +1237,16 @@ Operator trên pinned Cloudflare Preview với học viên DEMO đã bấm `Bắ
 **Gate `PHASE6D_STUDENT_START_API_UI_ACK: PASS (operator screenshot)`**. UI cho thấy server báo start success và countdown tương ứng 1800s; **chưa kiểm tra độc lập D1 session timestamps hoặc server time after sync**, không khẳng định recovery/submission/score PASS.
 
 **Bước 272 (read-only while active session):** operator **không chọn đáp án hay nộp**. Trong cùng tab thi, bấm `Đồng bộ phiên thi` một lần để gọi `readPhase6Exam` (action read, không tạo session). Mong đợi dòng `Đã cập nhật phiên và thời gian từ D1. Đáp án chưa nộp chỉ giữ trên thiết bị này khi phiên không đổi.`, countdown **tiếp tục giảm**, không đặt lại 30:00, vẫn 1 câu và đúng revision 3. Screenshot ngay sau sync. Nếu API lỗi, không restart/start lại, gửi ảnh lỗi. Đồng hồ **vẫn đang chạy** và deadline server không dừng; cần giữ nhịp kiểm thử, không trì hoãn vì thao tác ghi hồ sơ. Chưa bật Phase6E, không ảnh hưởng Production, PR36 Draft/PR39 Draft.
+
+## Bước 272 — Student Phase6D timer sync read-back from D1 successful (operator screenshot, 28/11/2026)
+
+Sau Bước271 start thành công tại `29:47`, operator bấm `Đồng bộ phiên thi` trên đúng tab Edge InPrivate của học viên DEMO. Screenshot Phase6D:
+- `Toán học DEMO - Cơ bản · phiên bản 3`;
+- `Còn lại: 27:00`, đã giảm (không quay lại 30:00);
+- Một câu `2 + 2 = ?` cùng A.3/B.4/C.5/D.6, chưa chọn đáp án;
+- Checkbox xác nhận nộp chưa tick và nút nộp disabled;
+- Dòng thành công **`Đã cập nhật phiên và thời gian từ D1. Đáp án chưa nộp chỉ giữ trên thiết bị này khi phiên không đổi.`**.
+
+**Gate `PHASE6D_STUDENT_SYNC_D1_CONTINUING_CLOCK: PASS (operator screenshot)`**. Kết quả hỗ trợ tính giờ theo trạng thái máy chủ sau khi gọi read, nhưng chưa chứng minh reload/recovery cross-device/submit. Không được suy diễn đã chấm điểm.
+
+**Bước 273 — read-only reload/recovery khi phiên DEMO còn hiệu lực:** trong cùng Edge InPrivate, F5, tab `Mục Chuyên Đề` → `Tải danh sách đề thi DEMO` → `Mở đề` của revision 3. Đây là action read, **không bấm Bắt đầu thêm lần nào**. Mong đợi server trả phiên đang chạy với cùng deadline, câu hỏi được khôi phục, đồng hồ ít hơn thời gian trước và không reset về 30:00. Đáp án chưa nộp không giữ qua reload, nhưng ở Bước272 chưa chọn đáp án. Nếu session hết hạn thì UI có thể hiện 0:00; không thử reset. Chụp ảnh và không nộp bài ở Bước273. Phase6E OFF, PR36/PR39 Draft, Production không thay đổi.

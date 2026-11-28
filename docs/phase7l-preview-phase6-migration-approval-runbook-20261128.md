@@ -909,3 +909,21 @@ Operator chạy read-only SELECT nối `phase6_admin_publications` với `phase5
 **Gate `PHASE6C_PUBLICATION_D1_READBACK: PASS (operator screenshot)`**. Đã xác minh phiên bản published có đủ 1 câu và 1 private answer key, không đưa giá trị đáp án đúng ra log. Bước241 loss-of-response retry hiển thị publication đã có, không tạo thêm bản sao.
 
 **Bước 243 (chỉ đọc)** kiểm tra `PRAGMA quick_check;` mong đợi một hàng `ok`, và `PRAGMA foreign_key_check;` mong đợi **0 hàng**, đúng **D1 Preview** sau xuất bản. Chạy từng câu riêng biệt trong D1 Studio; không chạy sửa schema, không lặp publish. Nếu toàn vẹn PASS, mới xem xét lần lượt bật API Phase6D Student timed-exam trong Preview với auth/host isolation; giữ ba cờ student/results OFF cho đến bước chuẩn bị riêng. PR36 Draft và Production không đổi.
+
+## Bước 243 — D1 Preview sau Phase6C publish quick_check và FK check PASS (operator-confirmed, 28/11/2026)
+
+Sau Bước242 đã thấy `revision=3`, `state=published`, `time_limit_seconds=1800`, 1 câu, 1 answer key, 1 publication trên `duongtrcnhiem-auth-preview`, operator làm hai phép kiểm tra read-only theo hướng dẫn Bước243:
+- `PRAGMA quick_check;` — operator phản hồi **PASS**, hiểu là `ok`.
+- `PRAGMA foreign_key_check;` — operator phản hồi **PASS**, hiểu là **0 hàng lỗi**.
+
+**Gate `PHASE6C_POST_PUBLISH_DB_INTEGRITY: PASS (operator reported)`**, chưa có ảnh mới cho hai câu PRAGMA. Chỉ xác nhận phạm vi nghiệm thu D1 xuất bản và API Admin; chưa xác nhận Phase6D student runtime, deadline/submit, multi-device, Phase6E results.
+
+### Gate để mở Phase6D từ mã hiện tại
+
+Đối chiếu trực tiếp tại `feature/staging-demo-quiz-pilot`:
+- `functions/api/phase6/exam.js` yêu cầu server-side `PHASE6_STUDENT_TIMED_EXAM_ENABLED === 'true'` và host pinned Preview, `PHASE4_PREVIEW_HOST_OPT_IN`, `PHASE4_STAGING_HOSTNAME`, D1 `AUTH_DB_PREVIEW`, signed DEMO Firebase student đang active; mặc định OFF.
+- `src/App.tsx` trong tab `topics` chỉ hiển thị `Phase6StudentExamPanel` cho app `currentUser.role==='student'`, Firebase user với UID khớp `currentUser.id`, và `VITE_PHASE6_STUDENT_TIMED_UI === 'true'`; `src/utils/phase6StudentExam.ts` còn kiểm đúng staging/pinned hostname. Flag UI `VITE_` là build-time.
+- Student panel có nút `Tải danh sách đề thi DEMO` (read-only `action:list`) trước nút `Mở đề` (read-only) và `Bắt đầu làm bài` (ghi phiên 30 phút bằng đồng hồ server). **Không bấm bắt đầu hoặc submit** trước khi phân biệt quyền A/B và list.
+- `functions/_shared/staging-db-binding.mjs`: yêu cầu đúng pinned alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`; hashed URL không được bind Preview D1. Schema Phase6D và publication đã vượt qua các bước migration/hậu kiểm trước.
+
+**Bước 244 riêng biệt:** trên Cloudflare Pages `duongtrcnhiem-test` → **Settings → Preview → Variables and secrets**, kiểm tra chưa có biến trùng; chỉ Add `PHASE6_STUDENT_TIMED_EXAM_ENABLED=true` kiểu Text (server API). **Không thêm `VITE_PHASE6_STUDENT_TIMED_UI` lúc này** và chưa retry/rebuild, chưa gọi API bằng student; cờ Phase6E `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED`, UI history/results vẫn OFF/chưa cấu hình. Hạn chế thử nghiệm tài khoản DEMO được ủy quyền, không dùng đề thật. Không gộp PR36, không chạm Production/main, không chạy SQL mới.

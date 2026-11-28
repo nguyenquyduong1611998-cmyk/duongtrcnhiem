@@ -401,3 +401,9 @@ WHERE type IN ('table','trigger') AND name LIKE 'phase6_%'
 ORDER BY type,name;
 ```
 Kỳ vọng 4 bảng Phase6/9 triggers, tổng 13 đối tượng. Trước khi chạy 6D, bắt buộc kiểm tra số dòng 8 bảng cũ theo baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check;` → `ok`, `PRAGMA foreign_key_check;` → 0 hàng. Nếu có bất thường, STOP, không tự chạy lại 6A hoặc thực hiện restore. Giữ ba flag API Phase6 chưa cấu hình, PR36 Draft, Production không thay đổi.
+
+## Bước 201 — Operator báo 13 đối tượng Phase6 trên D1 Preview sau 6A (28/11/2026)
+
+Người vận hành đã chạy truy vấn metadata được hướng dẫn ở Bước 201 trên `duongtrcnhiem-auth-preview`, trả lời **"có 13 đối tượng"**. Truy vấn đã yêu cầu `type IN ('table','trigger')`, `name LIKE 'phase6_%'`; 13 đối tượng phù hợp với kỳ vọng **4 bảng/9 trigger** sau migration 6B→6C→6A. **Chứng cứ: operator-reported count**; chưa có ảnh/danh sách 13 tên trong chính lần báo này, nên không được coi là đã kiểm chứng độc lập toàn bộ tên và định nghĩa trigger.
+
+**Gate `PREVIEW_PHASE6A_SCHEMA_COUNT: PASS (operator reported)`**, **gate `PREVIEW_PHASE6A_FULL_POSTFLIGHT: PENDING`**. Trước khi chạy 6D, bắt buộc so sánh 8 bảng gốc với baseline `5,0,3,1,1,1,1,2`, thực hiện `PRAGMA quick_check;` (kỳ vọng `ok`) và `PRAGMA foreign_key_check;` (kỳ vọng 0 hàng) trên đúng `duongtrcnhiem-auth-preview`; tất cả read-only. Nếu bất kỳ giá trị nào sai, STOP, không tự retry/restore hoặc chạy Phase6D. Giữ cờ API `PHASE6_*` chưa cấu hình, PR36 Draft, không đụng Production.

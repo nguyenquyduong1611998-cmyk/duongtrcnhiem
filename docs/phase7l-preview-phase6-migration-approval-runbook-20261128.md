@@ -1178,3 +1178,16 @@ Operator gửi screenshot GitHub `Pull request successfully merged and closed` c
 **Gate `PR40_MERGED_TO_STAGING: PASS`; `PR40_FIX_PRESENT_ON_STAGING_BRANCH: PASS`; `PR40_PINNED_PREVIEW_DEPLOY: PENDING`; `PHASE6D_STUDENT_UI_RECOVERY: PENDING`.**
 
 **Bước 267:** Cloudflare Pages `duongtrcnhiem-test` → Deployments → bản Preview nhánh `feature/staging-demo-quiz-pilot` commit **`ded0b22`** (Merge PR40), Status **success**, mở Details và xác nhận alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`. Nếu chưa có commit mới, không Retry bản cũ hoặc dùng PR hashed URL để kiểm tra student API; đánh dấu deployment PENDING. Sau gate này, trên Edge InPrivate với học viên DEMO mở pinned alias `/?phase6_debug=1`, kỳ vọng **6/6 ĐẠT** và khung `Phase 6D — Thi toán học DEMO có thời hạn`; chỉ bấm `Tải danh sách đề thi DEMO` (read-only), không `Bắt đầu làm bài` hay Submit. Giữ Phase6E OFF, PR36 Draft, main và Production nguyên trạng.
+
+## Bước 267 — PR40 UI fix deployed to pinned Cloudflare Preview (operator screenshot, 28/11/2026)
+
+Operator gửi ảnh Cloudflare Pages `duongtrcnhiem-test` **Deployment details** sau PR40:
+- **Preview**, Status **success**, **7:20 PM November 28, 2026**, Duration 18s.
+- Branch `feature/stagi...` commit **`ded0b22`** (`Merge pull request #40`), khớp GitHub merge SHA `ded0b2290f4b859af38e6d6f57d5287ee7d43845`.
+- Deployment ID `fb68c1e3-d3f1-4bc2-8002-b961d898d1ad`, hashed URL `fb68c1e3.duongtrcnhiem-test.pages.dev` (không dùng cho student signed API).
+- **Aliases:** `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` đúng pinned staging Preview.
+- Build settings 20 mục (không mở rộng trong ảnh).
+
+**Gate `PR40_PINNED_PREVIEW_DEPLOY_SUCCESS: PASS (operator screenshot)`.** Mã đã merged trên staging chuẩn hoá duy nhất client UI flag bằng `typeof flag==='string'&&flag.trim()==='true'`; các guard student role, Firebase UID, staging và exact hostname giữ nguyên. **`PHASE6D_STUDENT_UI_6_OF_6: PENDING`, `PHASE6D_READONLY_STUDENT_LIST: PENDING`.**
+
+**Bước 268:** trên Edge InPrivate với tài khoản học viên DEMO đã đăng nhập, mở `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1`, tab Mục Chuyên Đề. Chụp khung diagnostic 6 booleans; mong đợi cờ Vite **`ĐẠT`** (sau trim) và toàn bộ **6/6 ĐẠT**, đồng thời thấy panel `Phase 6D — Thi toán học DEMO có thời hạn`. Không bấm `Bắt đầu làm bài` hoặc `Nộp bài` trước khi UI gate PASS. Khi có đủ bằng chứng mới tiến hành `Tải danh sách đề thi DEMO` (read-only). Không thêm biến, Retry, đổi DB/Production, gộp PR36/PR39.

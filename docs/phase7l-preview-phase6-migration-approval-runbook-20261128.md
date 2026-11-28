@@ -72,3 +72,18 @@ Người vận hành chạy **chỉ đọc** `npx wrangler d1 time-travel info d
 **Rủi ro quan trọng:** `time-travel restore` ghi đè database tại chỗ và hủy request đang chạy. Việc có bookmark không tự cho phép restore hoặc migration. Theo Cloudflare Time Travel docs, bookmark chỉ còn khả dụng trong retention window của gói (Free 7 ngày, Paid 30 ngày). Bản export offline đã khôi phục được vào D1 mới là lớp bảo vệ bổ sung.
 
 **Tình trạng tiến hành:** Đã hoàn tất review bốn SQL, kiểm thử backup RAM và D1 remote độc lập, xác minh D1 Preview binding, API Phase6 flags chưa có, current bookmark truy xuất được. **Gate còn chưa đạt: phê duyệt rõ ràng của chủ DB cho việc thực thi bốn SQL draft trên `duongtrcnhiem-auth-preview`**, kiểm tra preflight dữ liệu/đích tại thời điểm chạy và chọn thời gian ngừng sử dụng Preview. PR36 vẫn Draft, không merge; không chạy remote migration/khôi phục hay bật API từ bước 178.
+
+## Bước 179 — Chọn thử migration trên D1 bản sao khôi phục trước (28/11/2026)
+
+Người vận hành ủy quyền lựa chọn phương án phù hợp thay vì xác nhận riêng việc chạy trên Preview. Quyết định kỹ thuật ưu tiên **thử remote migration trên database D1 bản sao đã khôi phục** `duongtrcnhiem-restore-20261128` trước; **không** chạy trên D1 Preview trong bước này. Đây là D1 đã kiểm tra 8 bảng, 14 hàng, `quick_check: ok`, `foreign_key_check: 0`, và không xuất hiện trong hai Pages bindings đang được sử dụng. Khác với `duongtrcnhiem-restore-test` (đã có 5 bảng Phase6), database `duongtrcnhiem-restore-20261128` là bản mới import, chưa migration Phase6.
+
+**Lý do:** PASS SQLite RAM và bảng/trigger ở D1 lab cũ chưa thay thế thử nghiệm migration với **chính backup mới** trên engine D1 remote. Việc thử ở bản sao này có rủi ro thấp hơn nhiều so với Preview đang kết nối ứng dụng.
+
+**Trình tự bảo đảm (người vận hành thao tác thủ công, không chạy từ ChatGPT):**
+1. Xác minh một lần nữa chính xác tên đích `duongtrcnhiem-restore-20261128` trước mỗi lệnh Wrangler. Nếu có bất kỳ dấu hiệu binding vào app hoặc database không còn 8 bảng ban đầu, dừng.
+2. **Chỉ áp dụng 6B trước:** `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6b-synthetic-admin-drafts-draft.sql` (chỉ trên lab, không chạy Preview). Đây là **lệnh ghi remote**; đọc tên database và prompt trước xác nhận, không dùng `--yes`.
+3. Nếu Wrangler báo thành công, dùng D1 Studio (read-only) kiểm tra tên bảng `phase6_admin_drafts`, `phase6_admin_draft_events` và ba trigger `phase6_admin_draft_created`, `phase6_admin_draft_saved`, `phase6_admin_draft_deleted`; kỳ vọng tổng bảng ứng dụng tăng từ 8 lên 10. Đồng thời `PRAGMA quick_check` và `PRAGMA foreign_key_check` vẫn đạt, row counts gốc giữ nguyên.
+4. Nếu có lỗi hoặc kết quả khác kỳ vọng, dừng, không chạy lại file hoặc chuyển sang 6C. Điều tra trạng thái tạo dở; không tự time-travel restore, DELETE hoặc DROP.
+5. Sau khi 6B PASS trên clone, xem xét tiếp từng file 6C → 6A → 6D với postflight riêng, **chỉ trên clone** trước khi lập phê duyệt cuối cho Preview.
+
+**Giới hạn và STOP:** không ghi vào `duongtrcnhiem-auth-preview`, `duongtrcnhiem-auth-staging`, `duongtrcnhiem-restore-test`, hoặc Production; không bật `PHASE6_*`; không gộp PR36. Đây là bài rehearsal D1 remote với **dữ liệu DEMO đã được người vận hành xác nhận quyền sao chép**. Chưa coi migration Preview được phê duyệt chỉ từ sự ủy quyền chung.

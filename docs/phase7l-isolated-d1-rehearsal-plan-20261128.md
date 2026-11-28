@@ -1,0 +1,359 @@
+# Phase 7L / Bước 156 — Kế hoạch thử nghiệm D1 độc lập, chưa thực hiện trên Cloudflare
+
+Ngày: 28/11/2026. PR #36 (Draft) chỉ bổ sung tài liệu; base `feature/staging-demo-quiz-pilot` (PR35 merged, commit `75f2d81`).
+
+## Phạm vi và quyết định
+
+**NO-GO cho thi thật, migration live và bật Phase 6 flags.** Mục tiêu của bước này là chuẩn bị bài kiểm tra môi trường D1 **riêng**, có khả năng bỏ đi khi xong, không binding với bất kỳ Pages/Worker/Production nào, không chứa đề thật hoặc dữ liệu tài khoản/kết quả thật.
+
+Người vận hành đã chứng minh **trên máy cục bộ**:
+- Bản export `preview-backup-20261127.sql` (12,145 byte) đã import vào SQLite RAM, integrity ok, foreign key errors 0.
+- 8 bảng Preview gốc không đổi theo snapshot số hàng và SHA-256 trước/sau áp dụng draft 6B → 6C → 6A → 6D.
+- 5 bảng `phase6_*`, 12 trigger Phase 6 tạo thành công; kiểm thử 100 học viên giả, quyền sở hữu và deadline, nộp trùng, khóa tài khoản đều đạt trong mô phỏng.
+- Cloudflare Access thử không đăng nhập trả challenge, đăng nhập hợp lệ tải được trang; Staging Preview commit `75f2d81` deployed success; `/api/auth/status` trả ready=true, d1Connected=true, tablesReady=true (chỉ hai bảng đăng nhập cơ bản).
+- Trên Preview, người vận hành xác nhận **không có** ba biến API `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED`; tiếp tục để thiếu/OFF.
+
+Những điều trên **không phải** chứng cứ remote migration hay Phase 6 Cloudflare live đã được nghiệm thu.
+
+## Gate A — Kiểm tra hạn mức trước tạo database (CHƯA XONG)
+
+1. Cloudflare → Storage & databases → D1 SQL database → chỉ xem **danh sách và tổng số database hiện có**. Không gửi account ID, database UUID, secret hoặc toàn bộ nội dung database lên GitHub.
+2. Đối chiếu với giới hạn Cloudflare D1 **Free: tối đa 10 database/tài khoản**, tổng dung lượng tối đa **5 GB** (tài liệu cập nhật 20/11/2026). Nếu đang có 10 database, **không tạo thêm**. Không nâng cấp trả phí để tiếp tục.
+3. Người quản trị xác nhận tách biệt tài khoản/môi trường dữ liệu; chọn tên rõ chức năng, ví dụ `duongtrcnhiem-phase6-lab`, khác hẳn `duongtrcnhiem-auth-preview` và `duongtrcnhiem-auth-staging`.
+4. **Chưa tạo database hoặc chạy lệnh từ tài liệu này**; phải có chấp thuận riêng sau khi Gate A đạt.
+
+Tham khảo: https://developers.cloudflare.com/d1/platform/limits/ và https://developers.cloudflare.com/d1/wrangler-commands/
+
+## Gate B — Thiết kế lab hoàn toàn cô lập (CHƯA XONG)
+
+- Database D1 mới phải **trống**, không gắn binding `AUTH_DB` hoặc `AUTH_DB_PREVIEW` vào ứng dụng đang chạy; không copy biến Firebase, cookie, ID token, hash mật khẩu thật.
+- Không import `preview-backup-20261127.sql` lên remote lab tự động: file là bản xuất có thể chứa bản ghi tài khoản, hash mật khẩu và dữ liệu nội bộ. Chỉ giữ file offline có quyền truy cập hạn chế. Muốn kiểm tra **remote restore bản gốc** cần đánh giá phân loại dữ liệu, quyền xử lý, biện pháp bảo vệ và phê duyệt **riêng**.
+- Với thử nghiệm cấu trúc trên lab mới: chỉ chuẩn bị schema không có dữ liệu thật, và **câu hỏi toán giả**. Có sẵn trong repository:
+  1. `serverless/d1-staging-schema.sql` — baseline `demo_students`, `login_attempts` (không có account seed).
+  2. `serverless/d1-phase4-synthetic-graded-quiz.sql` — synthetic graded table.
+  3. `serverless/d1-phase5-preview-additive-schema.sql` — năm bảng `phase5_content_*`.
+  4. `serverless/d1-phase5-preview-synthetic-math-seed.sql` — nội dung toán giả (chỉ chạy một lần, trên DB mới trống và sau review).
+  5. Phase 6 dự thảo **6B → 6C → 6A → 6D**, xem danh sách file ở phần sau.
+- **Lưu ý:** nhiều file schema/seed được ghi rõ `DO NOT EXECUTE` cho Cloudflare khi chưa review. Kế hoạch này **không** thay thế duyệt SQL/phê duyệt vận hành; không chạy chỉ vì database là lab.
+- SQLite/D1 có thể tạo thêm bảng nội bộ `sqlite_sequence` và bảng hệ thống khác. Nghiệm thu dựa trên **tên bảng/trigger mục tiêu**, không chỉ số bảng tổng.
+
+## Gate C — Review SQL và kế hoạch rollback (CHƯA XONG)
+
+| Thứ tự sau schema baseline | File draft | Thành phần | Trạng thái |
+| --- | --- | --- | --- |
+| 1 | `serverless/d1-phase6b-synthetic-admin-drafts-draft.sql` | `phase6_admin_drafts`, `phase6_admin_draft_events`, 3 trigger | Review required |
+| 2 | `serverless/d1-phase6c-publication-metadata-draft.sql` | `phase6_admin_publications`, 3 trigger | Review required |
+| 3 | `serverless/d1-phase6-timed-sessions-draft.sql` | `phase6_exam_sessions`, 3 trigger | Review required |
+| 4 | `serverless/d1-phase6d-timed-submissions-draft.sql` | `phase6_exam_submissions`, 3 trigger | Review required |
+
+- Review ngoại khóa Phase 5, kiểm tra `CHECK`, UID của dữ liệu giả, trigger, thời gian DB, quyền Admin, trường hợp nộp trùng, thứ tự chạy và hành vi chạy lại sau lỗi một phần. Các file `CREATE ... IF NOT EXISTS` **không bảo đảm** một migration bị lỗi giữa chừng sẽ tự rollback toàn bộ.
+- Đối chiếu chính xác **database ID** trước mỗi thao tác remote; tên database gần giống dễ gây chạy nhầm. Không dùng tài liệu này như script triển khai.
+- Chỉ sau khi người quản trị phê duyệt, chuẩn bị quy trình tạo snapshot lab, kiểm thử restore **riêng lên lab thứ hai**, xác nhận schema, row counts synthetic, foreign keys/integrity, bằng chứng và phương án bỏ lab.
+- Không dùng `wrangler d1 execute --remote` hoặc `wrangler d1 migrations apply --remote` trước khi được duyệt rõ đối tượng D1. Lệnh Cloudflare `execute --file` thực sự **ghi lên remote** nếu có `--remote`.
+- Nghiệm thu remote chỉ sử dụng dữ liệu toán/UID giả, không thử tải 30–100 người thật trước khi có bài kiểm tra bảo mật và hạn mức riêng.
+
+## Gate D — Kết quả chứng cứ và STOP conditions (CHƯA XONG)
+
+Dừng nếu: đã dùng hết hạn mức Free; tên/ID DB không rõ; export có dữ liệu nhạy cảm chưa phân loại; schema lỗi/khác kỳ vọng; retry sau lỗi chưa được duyệt; rủi ro lẫn với Preview/Production; đòi nâng cấp thanh toán; không có quyền vận hành.
+
+Chỉ lưu vào hồ sơ: `PASS/FAIL/BLOCKED`, ngày giờ, tên lab (không UUID bắt buộc), commit SQL được duyệt, số lượng bảng/trigger/row synthetic và mô tả lỗi đã làm sạch. **Không** lưu SQL backup thật, thông tin học viên, hashes, secrets, access tokens, cookie hay OTP.
+
+Tình trạng hiện tại: **Gate A/B/C/D BLOCKED để chờ xác minh và phê duyệt; không có remote D1 nào được tạo hoặc sửa bởi PR #36**. Không mở `PHASE6_*`, không merge PR, không sửa main/Production.
+
+## Bước 157 — Bằng chứng danh sách D1 (ảnh operator ngày 28/11/2026)
+
+Ảnh trang Cloudflare `D1 Database` hiển thị `Showing 1-3 of 3`, với đúng ba tên:
+1. `duongtrcnhiem-restore-test`
+2. `duongtrcnhiem-auth-preview`
+3. `duongtrcnhiem-auth-staging`
+
+**Gate A / kiểm tra số lượng:** `COUNT_OBSERVED=3`; dưới ngưỡng 10 database của tài khoản D1 Free theo tài liệu đã đối chiếu. Chưa xác minh loại plan, quota/storage còn lại hay quyền sở hữu chi tiết; không coi các cột Queries/Rows Read/Rows ở cửa sổ thống kê bằng 0 là bằng chứng các database trống. Không lưu Database IDs trong tài liệu.
+
+**Phát hiện:** Đã tồn tại database `duongtrcnhiem-restore-test`, tên gợi ý từng dùng để restore/test nhưng **chưa có bằng chứng** về nội dung, người tạo, binding, mục đích, quyền truy cập hoặc khả năng tái sử dụng. Tuyệt đối không nhập dữ liệu mới/xóa/khôi phục đè lên DB này chỉ vì tên của nó.
+
+**Bước kế tiếp (chỉ đọc):** mở `duongtrcnhiem-restore-test` → Overview; xem Number of Tables / Storage used. Sau đó cần đối chiếu có binding ứng dụng hay không và có được phép tái sử dụng hay phải tạo lab mới với dữ liệu tổng hợp, sau khi được chủ DB chấp thuận. Giữ nguyên ba cờ API Phase 6 chưa cấu hình. Gate B–D NO-GO.
+
+## Bước 158 — Overview restore-test (ảnh operator ngày 28/11/2026)
+
+Ảnh Cloudflare D1 Overview của `duongtrcnhiem-restore-test` hiển thị: `Number of Tables: 13`, `Storage used (current): 197 KB`; các bộ đếm `Total queries`, `Rows read`, `Rows written` đều bằng 0 trong phạm vi `Last 24 hours`. Database rõ ràng có schema; không được coi các bộ đếm 24 giờ bằng 0 là bằng chứng database rỗng hoặc được phép tái sử dụng.
+
+So với `duongtrcnhiem-auth-preview` từng quan sát có 8 bảng, restore-test có nhiều hơn 5 bảng. Chưa có bằng chứng các bảng tăng thêm là Phase 6; không phỏng đoán dựa vào tổng số bảng hay dung lượng, và không sao chép UUID database vào tài liệu.
+
+**Bước 159, chỉ đọc:** từ database restore-test mở `Explore Data`, chụp **danh sách tên bảng** ở menu bên trái mà không nhấp mở nội dung bảng. Cần kiểm tra tiếp DB có binding với Pages/Worker hay có dữ liệu tài khoản trước khi xem xét dùng lại. Không DELETE/RESTORE, không SQL và không di chuyển bản export dữ liệu sang remote.
+
+## Bước 159 — Danh sách bảng D1 restore-test (ảnh operator ngày 28/11/2026)
+
+Ảnh Cloudflare D1 Studio → Explore Data của `duongtrcnhiem-restore-test` hiển thị 14 tên trong sidebar: 13 bảng ứng dụng cộng 1 bảng SQLite nội bộ `sqlite_sequence`.
+
+**13 bảng ứng dụng quan sát được:**
+- Phase 4/DEMO: `demo_students`, `login_attempts`, `synthetic_graded_attempts` (3)
+- Phase 5: `phase5_content_answer_keys`, `phase5_content_attempts`, `phase5_content_questions`, `phase5_content_topics`, `phase5_content_versions` (5)
+- Phase 6: `phase6_admin_draft_events`, `phase6_admin_drafts`, `phase6_admin_publications`, `phase6_exam_sessions`, `phase6_exam_submissions` (5)
+
+Các nhóm tên bảng khớp dự thảo SQL Phase 6 trong repo và chỉ số Overview `Number of Tables: 13` (không tính `sqlite_sequence`). Đây là bằng chứng **schema table-name presence trên D1 remote**; không phải xác nhận đủ 12 trigger, đúng cấu trúc cột, tính toàn vẹn/foreign keys, bản ghi thực tế, quyền truy cập hay trạng thái bind vào ứng dụng.
+
+**Bước 160 đề nghị (metadata-only, đọc):** ở **đúng** database `duongtrcnhiem-restore-test`, dùng Console SQL với `SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'phase6_%' ORDER BY name;` để liệt kê trigger; không query dữ liệu bảng, không chạy DDL/DML, không gửi secrets/UID/token. Chưa dùng DB này để nộp bài/khôi phục đè; cần kiểm chứng không có binding và cho phép tái sử dụng trước mọi ghi từ xa.
+
+## Bước 160 — Trigger Phase 6 trên D1 restore-test và rà soát tiến độ
+
+Ngày xác minh: 28/11/2026. Ảnh D1 Studio Query do operator cung cấp trả kết quả `sqlite_master · 1×12`, gồm **đúng 12 tên trigger** `phase6_*`:
+- Admin: `phase6_admin_draft_created`, `phase6_admin_draft_deleted`, `phase6_admin_draft_saved`.
+- Publication: `phase6_publication_no_delete`, `phase6_publication_no_update`, `phase6_publication_requires_published`.
+- Session: `phase6_session_no_delete`, `phase6_session_no_update`, `phase6_session_start_guard`.
+- Submission: `phase6_submission_guard`, `phase6_submission_no_delete`, `phase6_submission_no_update`.
+
+**Gate hiện diện schema/trigger trên D1 restore-test: PASS (13 bảng ứng dụng, 5 bảng Phase 6, 12 trigger Phase 6).** Đã quan sát một bảng nội bộ `sqlite_sequence` không tính trong 13 bảng ứng dụng.
+
+### Đính chính tiến độ từ lịch sử trước
+
+Trong hội thoại ngày **26/11/2026**, người vận hành đã phê duyệt bài thử migration Phase 6 trên **duongtrcnhiem-restore-test** và chạy `wrangler d1 execute ... --remote --file` vào **database thử nghiệm độc lập này**. Các kiểm tra sau đó được báo cáo: 13 bảng ứng dụng, 45 đối tượng SQLite, `quick_check: ok`, foreign key errors 0, 24 định nghĩa cũ không đổi, các bảng trống (dữ liệu 0). Phần kế hoạch phía trên mô tả `Gate B–D` là CHƯA XONG đối với **tạo lab mới hoặc quy trình remote restore dữ liệu thật**, không nên hiểu nhầm rằng Phase 6 schema chưa từng được thử trên D1 remote. Không chạy lại migration chỉ để tái chứng minh bằng chứng đã có.
+
+**Giới hạn:** ảnh hiện tại chỉ xác nhận danh sách trigger; không đối chiếu SQL `sqlite_master.sql` với GitHub tại cùng SHA, không lặp lại kiểm tra 45 đối tượng, không chứng minh D1 Preview có schema Phase 6, không chứng minh các Pages routes Phase 6 hoạt động, không chứng minh quyền truy cập hay khôi phục live D1.
+
+### Trạng thái dự án sau Bước 160
+
+- GitHub: PR12–35 đã merged vào `feature/staging-demo-quiz-pilot`; HEAD Staging `75f2d81` đã có Preview deployment success, PR36 vẫn Draft.
+- Cloudflare Access Preview: anonymous challenge và login hợp lệ quan sát PASS; `/api/auth/status` báo `ready:true`, `d1Connected:true`, `tablesReady:true` (chỉ baseline D1 auth).
+- D1: `duongtrcnhiem-auth-preview` đã quan sát 8 bảng, khác biệt rõ với `duongtrcnhiem-restore-test` đã có 13 bảng ứng dụng. Không được nhầm hai database hoặc gắn restore-test vào Pages mà chưa review.
+- Các API Phase 6 tại Preview: operator xác nhận chưa cấu hình `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED`. API mặc định OFF theo mã nguồn.
+- Trên máy: export D1 Preview đã nạp được vào SQLite RAM, schema Phase 6 additive và 8/8 bảng cũ không đổi, mô phỏng nhiều tình huống chấm/khóa thời gian/100 học viên PASS. Trên PC/iPhone đã có các thử nghiệm đăng nhập/đồng bộ DEMO và PWA, **nhưng chưa hoàn tất quy trình nghiệm thu Phase 6 live trên hai thiết bị**.
+
+**Next decisions:** (1) Đánh dấu gate schema remote restore-test PASS, không tạo database mới không cần thiết; (2) rà soát binding/nguồn dữ liệu và trạng thái 8 bảng Preview một lần trước phê duyệt migration riêng; (3) bảo vệ bản backup đủ mới và nghiệm thu restore trên D1 thứ hai chỉ với dữ liệu được phép; (4) review SQL/rollback cùng quyền dữ liệu rồi mới cho phép migration 6B→6C→6A→6D trên Preview; (5) mở flag từng bước chỉ cho DEMO và thử signed A/B/Admin, PC/iPhone; (6) test thực tế tải 30–100 người và phê duyệt trước thi thật. **Không chuyển dữ liệu thật, không bật flags/migration/merge Production khi chưa qua các gate.**
+
+## Bước 161 — Kiểm tra khóa ngoại D1 restore-test (operator screenshot, 28/11/2026)
+
+Ảnh Cloudflare D1 Studio cho database `duongtrcnhiem-restore-test` hiển thị câu lệnh read-only `PRAGMA foreign_key_check;` và bảng kết quả `Query · 4×0` với 4 cột `table`, `rowid`, `parent`, `fkid` nhưng **0 hàng kết quả**. Kết luận riêng phép thử này: `FOREIGN_KEY_CHECK: PASS`, không phát hiện bản ghi vi phạm tại thời điểm kiểm tra.
+
+**Chưa có ảnh kết quả `PRAGMA quick_check;` trong Bước 161 hiện tại.** Dù lịch sử trước có ghi nhận `quick_check: ok`, không đánh dấu kiểm tra hiện tại PASS cho đến khi người vận hành cung cấp kết quả. Không thực hiện bất cứ thao tác ghi, import, migration, hoặc thay đổi binding/flags nào từ phép kiểm này.
+
+### Bước 161 hoàn tất — người vận hành xác nhận quick_check đạt
+
+Sau ảnh `PRAGMA foreign_key_check` 0 lỗi, người vận hành xác nhận đã chạy `PRAGMA quick_check;` ngay trước câu lệnh khóa ngoại và nhận `ok`. Kết luận `quick_check=ok` dựa trên **lời xác nhận**, chưa có ảnh độc lập cho chính lệnh này tại Bước 161. Hai phép kiểm cùng đủ điều kiện đi tiếp xem bindings; không yêu cầu người vận hành chạy lại.
+
+**Bước 162 đề nghị, chỉ đọc:** kiểm tra Pages `duongtrcnhiem-test` → Settings → chọn `Preview` → `Bindings`, đối chiếu D1 binding `AUTH_DB_PREVIEW` trỏ `duongtrcnhiem-auth-preview`, không phải `duongtrcnhiem-restore-test`. Sau đó kiểm tra `Production` bindings; việc không thấy `restore-test` ở một dự án Pages **không chứng minh** database này không được bất kỳ Worker/Pages nào khác sử dụng. Không Add/Edit/Delete/Save.
+
+## Bước 162 — Pages Preview binding phân tách khỏi restore-test (ảnh operator 28/11/2026)
+
+Ảnh Cloudflare Pages `duongtrcnhiem-test` → Settings → `Bindings` (theo ngữ cảnh đang chọn **Preview** từ Bước 162) cho thấy đúng một dòng:
+- Type `D1 database`
+- Name `AUTH_DB_PREVIEW`
+- Value `duongtrcnhiem-auth-preview`
+
+Không thấy `duongtrcnhiem-restore-test` trong danh sách binding hiển thị. **Bước 162 PASS cho cấu hình Pages Preview đã quan sát**. Ảnh chỉ cắt phần Bindings, không có environment selector nên phép suy luận môi trường Preview phụ thuộc ngữ cảnh thao tác người vận hành. Bằng chứng `/api/auth/status` ở bước trước hỗ trợ rằng API cơ bản đã truy cập D1 trên alias Preview.
+
+Giới hạn: chỉ một cấu hình Pages Preview được kiểm tra, chưa chứng minh database `restore-test` không bị một Worker/Pages project khác sử dụng; chưa khớp UUID database với binding runtime thực tế, chưa xác nhận Production binding, chưa chứng minh các bảng Phase 6 đã có trong `auth-preview`.
+
+**Bước kế tiếp (163, chỉ đọc):** mở Settings → chọn environment Production → Bindings của `duongtrcnhiem-test`; chụp các dòng Type/Name/Value nhưng không thay đổi cấu hình, bấm Reveal, hoặc chia sẻ secret. Không bắt đầu migration/bật cờ Phase 6.
+
+## Bước 163 — Production bindings của Pages test project (ảnh operator 28/11/2026)
+
+Ảnh Cloudflare Pages `duongtrcnhiem-test → Settings`, selector môi trường bên phải hiển thị **Production**, phần Bindings có một hàng:
+- Type: `D1 database`
+- Name: `AUTH_DB`
+- Value: `duongtrcnhiem-auth-staging`
+
+**PASS — trong hai môi trường của dự án Pages thử nghiệm đã xem:**
+- Preview: `AUTH_DB_PREVIEW → duongtrcnhiem-auth-preview` (Bước 162).
+- Production: `AUTH_DB → duongtrcnhiem-auth-staging` (Bước 163).
+- Không môi trường nào hiển thị binding trỏ `duongtrcnhiem-restore-test`.
+
+Lưu ý: `Production` ở đây là Production của **Pages project thử nghiệm** `duongtrcnhiem-test`, không đồng nghĩa website đơn vị/main đã triển khai Phase 6. Hai ảnh không chứng minh `restore-test` không được một Worker hoặc Pages project **khác** bind; cũng chưa đối chiếu UUID của D1 với effective deployment runtime. Không sửa cấu hình, chạy migration hoặc bật API flags.
+
+**Bước 164 đề nghị (chỉ đọc):** đối chiếu `duongtrcnhiem-restore-test` có binding tới Pages/Workers **khác** không. Nếu Dashboard không có danh sách đối tượng đã bind từ DB Overview, vào `Workers & Pages` xem các project đang dùng, chỉ kiểm tra binding của những project liên quan. Chưa tái sử dụng hay ghi vào `restore-test` cho tới khi rõ nguồn dữ liệu và chủ sở hữu.
+
+## Bước 164 — Workers & Pages account inventory (ảnh operator 28/11/2026)
+
+Ảnh Cloudflare `Workers & Pages` cho thấy bộ lọc `Show all` và `Showing 1-1 of 1`, liệt kê **duy nhất** một dự án `duongtrcnhiem-test`. Không sao chép ID tài khoản/subdomain riêng tư từ Dashboard vào tài liệu này.
+
+Kết hợp với hai ảnh Bindings:
+- Pages Preview `AUTH_DB_PREVIEW → duongtrcnhiem-auth-preview`.
+- Pages Production thử nghiệm `AUTH_DB → duongtrcnhiem-auth-staging`.
+- `duongtrcnhiem-restore-test` **không hiển thị** trong binding của dự án Pages đang liệt kê.
+
+**Kết luận phạm vi:** `ACCOUNT_WORKERS_PAGES_INVENTORY_REVIEW: PASS` đối với danh sách hiển thị và binding của Pages project hiện tại. Không chứng minh loại trừ hoàn toàn truy cập D1 qua CLI/REST API/khóa quản trị, các account khác, hoặc dữ liệu nhạy cảm có/không tồn tại trong restore-test. Không mở flag Phase 6, không ghi DB, không merge.
+
+**Bước 165 chỉ đọc:** vào `D1 → duongtrcnhiem-auth-preview → Studio/Explore Data` thực hiện truy vấn metadata `SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'phase6_%' ORDER BY name;` để xác nhận Phase 6 schema trên **đúng DB Preview thực sự**, không suy luận từ restore-test. Không chạy file draft SQL hay câu lệnh ghi. Khi kết quả rõ, tiếp tục phân loại và bảo đảm bản backup Preview đủ mới, phê duyệt kế hoạch rollback trước khi xem xét migration.
+
+## Bước 165 — Preview chưa có bảng Phase 6 (ảnh operator 28/11/2026)
+
+Người vận hành đã chạy câu truy vấn metadata read-only trên `duongtrcnhiem-auth-preview` theo Bước 165:
+
+```sql
+SELECT name
+FROM sqlite_master
+WHERE type = 'table'
+  AND name LIKE 'phase6_%'
+ORDER BY name;
+```
+
+Ảnh chụp kết quả Cloudflare Studio hiển thị `sqlite_master · 1×0`: **0 hàng tên bảng `phase6_%`**. Theo ngữ cảnh Bước 165, kết quả này được quy về DB Preview; ảnh kết quả được cắt nên không độc lập hiển thị header tên database. Trước đó Overview đã ghi nhận 8 bảng ứng dụng.
+
+**Kết luận:** Không có bằng chứng bảng Phase 6 đã được áp dụng trên D1 Preview; đối chiếu với `restore-test` nơi 5 bảng/12 trigger đã được xác minh. Không chạy migration ngay; cần làm mới bản export D1 Preview vì bản snapshot được kiểm thử là `preview-backup-20261127.sql`, còn hiện ngày 28/11, dữ liệu có thể đã thay đổi.
+
+**Bước 166 (chỉ đọc):** kiểm tra tình trạng dữ liệu Preview bằng thống kê số dòng trên các bảng cần bảo toàn (không lấy bản ghi, username, hash, token hay câu hỏi), hoặc xác định D1 Preview có thay đổi từ bản export ngày 27/11. Sau đó lập kế hoạch xuất backup *mới* và thử restore độc lập được phê duyệt trước khi đưa SQL draft lên Preview. Giữ `PHASE6_*` server OFF, không merge Production.
+
+## Bước 166 — Snapshot số lượng bản ghi trên D1 Preview (operator screenshot 28/11/2026)
+
+Operator chạy một lệnh `SELECT` có 8 scalar subquery `COUNT(*)` (đọc, không ghi), sau khi biến thể `UNION ALL` trước đó trả `too many terms in compound SELECT`. Hai ảnh Cloudflare Query cùng một hàng đã chụp đủ tám giá trị:
+
+| Table | Count |
+|---|---:|
+| `demo_students` | 5 |
+| `login_attempts` | 0 |
+| `synthetic_graded_attempts` | 3 |
+| `phase5_content_topics` | 1 |
+| `phase5_content_versions` | 1 |
+| `phase5_content_questions` | 1 |
+| `phase5_content_answer_keys` | 1 |
+| `phase5_content_attempts` | 2 |
+| **Tổng số hàng** | **14** |
+
+**Gate snapshot baseline row counts: PASS** — số bản ghi được ghi nhận từ ảnh Dashboard cho tám bảng. Dữ liệu có thể thay đổi sau khi chụp; đây không phải bằng chứng export mới hoặc dữ liệu backup đã khớp.
+
+**Bước kế tiếp:** trên máy cá nhân có Wrangler đã đăng nhập, tạo bản `d1 export` **mới** của **chính tên database** `duongtrcnhiem-auth-preview` tới file trong `%USERPROFILE%\Documents\D1-Backup\`, dùng tên khác file `preview-backup-20261127.sql`. Chỉ export đọc; không chạy `d1 execute`, không import, không bật `PHASE6_*`. Tài liệu Cloudflare chính thức: https://developers.cloudflare.com/d1/wrangler-commands/ và https://developers.cloudflare.com/d1/best-practices/import-export-data/. Cần kiểm tra file và phép restore độc lập trước bất kỳ quyết định migration.
+
+**Bảo mật:** bản SQL có thể chứa dữ liệu đăng nhập giả, salted hashes và nội dung nội bộ. Chỉ giữ tại máy có quyền truy cập, tránh đưa vào GitHub, chat, email hay kho công cộng; báo trạng thái/byte/hash nếu cần. Thao tác export trên Cloudflare có thể tạm chặn các request D1 khác, vì vậy cân nhắc thời điểm sử dụng khi không có người thi đang hoạt động.
+
+## Bước 167 — Xuất backup D1 Preview mới (operator screenshot, 28/11/2026)
+
+Người vận hành chạy `npx wrangler d1 export duongtrcnhiem-auth-preview --remote --output="%USERPROFILE%\Documents\D1-Backup\preview-backup-20261128-prephase6.sql"` tại CMD Windows. Ảnh cho thấy Wrangler thông báo tải file SQL mới về `Documents\D1-Backup\preview-backup-20261128-prephase6.sql` thành công.
+
+**Trạng thái:** `D1_PREVIEW_EXPORT_COMMAND_SUCCESS: PASS` theo output do người vận hành cung cấp. Bản ngày 27/11 vẫn là file riêng; chưa kiểm tra kích thước, SHA-256, SQL contents, schema/row counts thực tế trong bản 28/11 hoặc thực nghiệm restore. **Không** tải file SQL lên GitHub, chat hoặc CI vì có thể chứa account data/hash mật khẩu. Bản backup mới cũng chưa thay thế yêu cầu phê duyệt khôi phục remote hoặc migration.
+
+Bước tiếp theo an toàn: dùng `node -e` chỉ đọc `fs.statSync` và `crypto.createHash('sha256')` trên file mới tại chính máy người vận hành; không tiết lộ nội dung SQL. Sau đó có thể thử khôi phục trong `SQLite :memory:` riêng và đối chiếu row counts baseline 8 bảng `5,0,3,1,1,1,1,2` nếu được cho phép; không dùng `--remote` để restore.
+
+## Bước 168 — Kiểm tra metadata của file export 28/11 (operator screenshot)
+
+Ảnh CMD của người vận hành ngày 28/11/2026 cho thấy lệnh Node `fs.readFileSync` + SHA-256 đã chạy thành công trên file cục bộ `preview-backup-20261128-prephase6.sql`:
+- `Bytes: 12145` (12.145 byte)
+- `SHA256` đã được tính và in ra; hash không cần đưa vào hồ sơ GitHub vì chỉ làm định danh file trên máy.
+
+Bản export ngày 27/11 cũng từng báo 12.145 byte, nhưng **kích thước bằng nhau không chứng minh hai file giống nhau**. Kiểm thử restore cục bộ, đếm 8 bảng gốc và `integrity_check/foreign_key_check` cho bản 28/11 **chưa được thực hiện ở Bước 168**.
+
+**Bước 169 (chỉ tại RAM cục bộ):** Node.js `node:sqlite` import file do operator tự xuất D1 vào `:memory:`, kiểm tra 8 bảng ứng dụng, 8 row counts baseline trước migration `5,0,3,1,1,1,1,2`, `integrity_check=ok`, `foreign_key_check=0`. Chỉ ghi kết quả PASS/FAIL vào hồ sơ, không đưa file backup, password hashes, nội dung đề, hay bản ghi người dùng lên repo/chat. Nếu số dòng khác baseline, không tự ghi đè/khôi phục; có thể là dữ liệu thay đổi giữa các thời điểm, cần điều tra.
+
+## Bước 169 — Backup mới đã restore và khớp snapshot cục bộ (ảnh operator 28/11/2026)
+
+Người vận hành chạy Node.js `node:sqlite` với file cục bộ `Documents/D1-Backup/preview-backup-20261128-prephase6.sql`; thực thi export D1 do operator tự tải vào `:memory:`. Ảnh CMD trả `Restore: SUCCESS`, `Tables: 8`, `Integrity: ok`, `Foreign key errors: 0`, `Result: PASS`.
+
+Số dòng trong bản restore:
+- `demo_students=5`, `login_attempts=0`, `synthetic_graded_attempts=3`.
+- `phase5_content_topics=1`, `phase5_content_versions=1`, `phase5_content_questions=1`, `phase5_content_answer_keys=1`, `phase5_content_attempts=2`.
+- Tổng 14 hàng, **trùng số lượng chụp trực tiếp** ở Bước 166.
+
+**Đã đạt:** `FRESH_PREVIEW_EXPORT_LOCAL_RESTORE_SMOKE: PASS`, `8_TABLE_COUNTS_MATCH_OBSERVED_BASELINE: PASS`, `SQLITE_INTEGRITY: PASS`, `SQLITE_FOREIGN_KEYS: PASS`.
+
+**Chưa đạt/không thể suy ra:** SQL backup giống mọi byte của D1 live sau thời điểm export; hồi phục bản backup lên D1 Cloudflare thứ hai; migration 6B/6C/6A/6D áp dụng thành công với **file backup 28/11**; không bị lộ data hash/password khi upload; hoặc phê duyệt vận hành remote.
+
+### Rà soát mã các bản draft trước bước thử tiếp
+
+Đã đọc bốn file `serverless/d1-phase6*-draft.sql` tại commit Staging `75f2d81`:
+- 6B tạo `phase6_admin_drafts` và `phase6_admin_draft_events`, log create/save/delete.
+- 6C tạo `phase6_admin_publications`, liên kết Phase5 published revision.
+- 6A tạo `phase6_exam_sessions`, khóa deadline và ghi nhận thời gian theo DB.
+- 6D tạo `phase6_exam_submissions`, kiểm tra phiên/sở hữu/thời hạn và chống sửa/xóa/nộp trùng.
+- Các file có `CREATE ... IF NOT EXISTS` cho schema bổ sung, không chứa DML xóa dữ liệu cũ trong đoạn mã được rà soát. **Tuy nhiên**, vì SQL draft vẫn ghi rõ không triển khai lên Cloudflare khi chưa review/phê duyệt, việc pass trên SQLite RAM không thay thế review tác động D1 thực tế, kế hoạch xử lý migration lỗi một phần và rollback.
+
+**Bước 170 đề nghị:** test lại *duy nhất một lần* migration 6B→6C→6A→6D trên backup **28/11** trong SQLite `:memory:` với kiểm tra row counts trước/sau và integrity/foreign keys. Giữ `PHASE6_*` API OFF. Sau đó chuyển sang phê duyệt remote restore để xác minh recovery trước khi triển khai Preview, không tiếp tục lặp lại các thử nghiệm 100 học viên đã PASS.
+
+## Bước 170 — Thử migration Phase 6 trên backup mới trong RAM (operator screenshot)
+
+Ảnh CMD ngày 28/11/2026 cho thấy operator sử dụng `node:sqlite` `:memory:`, nạp export D1 Preview `preview-backup-20261128-prephase6.sql`, so sánh SHA-256 của toàn bộ dữ liệu tám bảng ứng dụng trước/sau, rồi áp dụng dự thảo 6B → 6C → 6A → 6D:
+- `Original tables: 8`
+- `Original data: UNCHANGED`
+- `Phase6 tables: 5`
+- `Phase6 triggers: 12`
+- `Integrity: ok`
+- `Foreign key errors: 0`
+- `Result: PASS`
+
+**Gate `FRESH_PREVIEW_BACKUP_LOCAL_MIGRATION: PASS`**. Bằng chứng chỉ xác nhận thử nghiệm SQLite cục bộ; chưa chứng minh tính tương thích tuyệt đối trên Cloudflare remote hoặc rằng D1 Preview đã được migrate.
+
+### Bước 171 — Chuẩn bị nghiệm thu phục hồi remote độc lập (chưa thực hiện)
+
+- D1 `duongtrcnhiem-restore-test` đã có 13 bảng ứng dụng và 12 triggers; **không được dùng để import đè bản backup mới** nếu chưa có quyết định rõ ràng vì sẽ đụng cấu trúc/dữ liệu hiện tại.
+- Theo ảnh Dashboard, tài khoản có 3 D1. Nếu vẫn đang ở gói Free và trong hạn mức hiện hành, có thể tạo **một D1 mới, rỗng và chưa có binding** để làm target phục hồi, tên riêng khác ba DB hiện tại. Không chọn DB này làm `AUTH_DB` hoặc `AUTH_DB_PREVIEW`. Xác minh mục đích và việc được phép xử lý bản export trước khi copy lên remote.
+- **Không thực hiện `wrangler d1 execute --remote --file=preview-backup-20261128-prephase6.sql` chỉ vì file đã PASS trong RAM**. Bản export có năm hàng `demo_students`, có thể có hash mật khẩu, và 14 bản ghi tổng cộng; chưa phân loại/duyệt đưa bản sao lên D1 mới. Nếu chỉ thử schema-only trước, dùng dữ liệu tổng hợp không có credential hash.
+- Cloudflare hỗ trợ export SQL và import vào D1 qua Wrangler `d1 execute --file`. Tài liệu: https://developers.cloudflare.com/d1/best-practices/import-export-data/ (cập nhật 20/11/2026); remote `execute` thật sự ghi lên DB remote. Không phát lệnh ghi khi chưa xác minh DB ID, quyền sở hữu, quota và bản export.
+- Điều kiện dừng: yêu cầu nâng cấp trả phí; không kiểm chứng rõ DB ID/mục tiêu; file chứa dữ liệu chưa được phép nhân bản; bất kỳ lỗi SQL/foreign key nào; không có người chịu trách nhiệm phục hồi/rollback.
+- Trước khi bấm Create database, cần kiểm tra lại tình trạng D1 Free/Quota và chọn tên lab tách biệt. Đây là **chuẩn bị**, không phải phê duyệt migration Phase 6 trên `duongtrcnhiem-auth-preview`, vốn tiếp tục giữ 0 bảng Phase6 và các API flags OFF.
+
+## Bước 171 — D1 target khôi phục độc lập được tạo (ảnh operator 28/11/2026)
+
+Người vận hành đã chủ động tạo một D1 mới, tên đúng `duongtrcnhiem-restore-20261128`. Ảnh Cloudflare D1 Overview:
+- `Number of Tables: 0`
+- `Storage used (current): 12.29 KB` — dung lượng hạ tầng/SQLite của DB mới, **không suy ra đã import**.
+- Các bộ đếm truy vấn/rows trong 24 giờ là 0.
+- Database ID hiển thị trong Cloudflare UI nhưng **không sao chép UUID vào tài liệu GitHub**.
+
+**Gate blank separate target: PASS (Dashboard observation)**. Đã tạo D1 rỗng, **chưa** import hay áp dụng SQL; chưa có bằng chứng kết nối với Pages và phải giữ database này không có binding nào. Không đưa bản SQL backup lên GitHub/chat.
+
+**Bước 172 (read-only):** trên CMD máy đã đăng nhập Wrangler, chạy `npx wrangler d1 info duongtrcnhiem-restore-20261128` và so sánh Name/ID với Dashboard (không cần gửi full UUID). Lệnh này chỉ lấy thông tin metadata, không import. Trước khi nhân bản bản backup 28/11 lên Cloudflare D1 mới, người có quyền dữ liệu phải xác nhận 5 account DEMO, các password hashes và 14 dòng đều được phép nhân bản trong cùng tài khoản Cloudflare, không chứa dữ liệu thật/nhạy cảm của đơn vị. Nếu không chắc chắn, ưu tiên nhập schema-only cộng dữ liệu synthetic mới, không nhập nguyên backup.
+
+## Bước 172 — D1 restore target identity check via Wrangler (operator screenshot, 28/11/2026)
+
+Ảnh CMD tại máy người vận hành: `npx wrangler d1 info duongtrcnhiem-restore-20261128` (đọc metadata) trả về:
+- `name: duongtrcnhiem-restore-20261128`
+- `num_tables: 0`
+- `database_size: 12.3 kB`
+- `running_in_region: APAC`
+- `read_replication.mode: disabled`
+- `read_queries_24h: 0`, `write_queries_24h: 0`, `rows_read_24h: 0`, `rows_written_24h: 0`.
+- ID được **operator đối chiếu** với Cloudflare Dashboard Bước 171; hai ảnh cùng ID. **Không ghi UUID vào file GitHub**.
+
+**Gate `TARGET_NAME_AND_ID_VERIFIED: PASS`, `EMPTY_TABLES_OBSERVED: PASS`**. Đừng hiểu `num_tables=0` là D1 chưa có bảng hệ thống; không dùng metadata này để chứng minh quyền import dữ liệu. Database mới không có bằng chứng binding nào; phải giữ không binding với website.
+
+**Gate còn BLOCKED:** D1 backup 28/11 chứa 5 tài khoản DEMO và 14 rows, khả năng có password hashes. Phải được người sở hữu dữ liệu xác nhận toàn bộ chỉ là dữ liệu giả, không có danh tính/mật khẩu/đề thi thật, và được phép nhân bản lên D1 trong cùng tài khoản Cloudflare, trước mọi lệnh `wrangler d1 execute --remote --file=...`. Nếu không xác minh được, dùng schema-only/synthetic data thay cho phục hồi full backup. Cloudflare docs xác nhận `d1 execute --remote --file` thực sự ghi remote: https://developers.cloudflare.com/d1/best-practices/import-export-data/ và https://developers.cloudflare.com/d1/wrangler-commands/.
+
+**Không có import nào được thực hiện tại Bước 172.** Preview, Staging, restore-test, Production và ba cờ API Phase 6 giữ nguyên.
+
+## Bước 173 — Người vận hành xác nhận quyền sao chép dữ liệu DEMO (28/11/2026)
+
+Người vận hành **đã xác nhận rõ bằng lời trong hội thoại**: cả năm tài khoản và 14 bản ghi trong `preview-backup-20261128-prephase6.sql` đều là dữ liệu DEMO giả, không chứa danh tính, mật khẩu hoặc đề thi thật của đơn vị, và họ có quyền sao chép sang D1 thử nghiệm. Đây là xác nhận của người có quyền theo lời họ, **không phải việc trợ lý tự kiểm chứng từng bản ghi**, và không bao gồm phê duyệt cho dữ liệu thật hoặc Production.
+
+**Bước 174 — Mở gate remote restore chỉ cho database cô lập:** operator có thể nhập file backup 28/11 vào **duy nhất** database mới `duongtrcnhiem-restore-20261128` bằng `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file="%USERPROFILE%\Documents\D1-Backup\preview-backup-20261128-prephase6.sql"`. Không dùng `--yes`, chỉ xác nhận nếu prompt hiển thị **chính xác** database đích. Nếu thấy lỗi không chạy lại ngay; xem trạng thái DB và điều tra. Lệnh remote ghi dữ liệu và cần người vận hành chủ động chạy. Cloudflare docs: https://developers.cloudflare.com/d1/best-practices/import-export-data/ và https://developers.cloudflare.com/d1/wrangler-commands/.
+
+**Chưa có kết quả import ở thời điểm cập nhật tài liệu.** Sau đó cần truy vấn metadata 8 bảng, đối chiếu 14 row counts, `PRAGMA quick_check` và `PRAGMA foreign_key_check`, không query dữ liệu mật, không bật API Phase6, chưa migration trên `auth-preview` hoặc merge PR.
+
+## Bước 174 — Wrangler remote import trả thống kê (operator screenshot 28/11/2026)
+
+Người vận hành chạy quy trình import backup 28/11 vào **duy nhất** D1 restore đích `duongtrcnhiem-restore-20261128` theo hướng dẫn và gửi ảnh phần cuối CMD. Ảnh cho thấy Cloudflare Wrangler đã trả về bookmark và:
+- `Total queries executed: 39`
+- `Rows read: 28`
+- `Rows written: 86`
+- `Database size (MB): 0.11`
+- CMD đã trở về prompt, không thấy thông báo lỗi trong phần ảnh.
+
+**Trạng thái:** `REMOTE_IMPORT_EXECUTION_STATISTICS_OBSERVED`; chưa khẳng định **restore verification PASS** do chưa truy vấn trực tiếp tên bảng, 8 row counts, integrity, foreign keys trên database đích. `Rows written=86` là số liệu vận hành, không thay thế `COUNT(*)` của 14 hàng dữ liệu ứng dụng. Chưa ghi nhận dữ liệu thật nào, file export không được upload lên GitHub/chat.
+
+**Bước 175:** chỉ đọc metadata và số hàng của `duongtrcnhiem-restore-20261128` trực tiếp từ D1 Studio; kỳ vọng 8 bảng và row counts `5,0,3,1,1,1,1,2`. Sau đó chạy `PRAGMA quick_check;` và `PRAGMA foreign_key_check;` nếu row counts khớp. **Không import lại**, không chạy Phase 6 draft SQL, không thay đổi `auth-preview`, binding, flags hay Production.
+
+## Bước 175 — D1 remote restore row counts match full 8-table baseline (operator screenshot 28/11/2026)
+
+Sau khi import export D1 Preview ngày 28/11 vào `duongtrcnhiem-restore-20261128`, người vận hành chạy câu `SELECT` dùng 8 scalar `COUNT(*)` trong Cloudflare D1 Studio. Hai ảnh do người vận hành cung cấp hiển thị đủ 8 cột:
+- `demo_students: 5`
+- `login_attempts: 0`
+- `synthetic_graded_attempts: 3`
+- `phase5_content_topics: 1`
+- `phase5_content_versions: 1`
+- `phase5_content_questions: 1`
+- `phase5_content_answer_keys: 1`
+- `phase5_content_attempts: 2`
+
+**Tổng: 14 bản ghi, đúng 8/8 row counts baseline** đã đo trên `duongtrcnhiem-auth-preview` (Bước 166) và bản SQLite RAM từ backup (Bước 169).
+
+**Gate `REMOTE_RESTORE_EIGHT_TABLE_COUNTS_MATCH: PASS`**. Đây không phải chứng minh giống nhau từng byte hoặc chính xác nội dung từng bản ghi; chưa có bằng chứng hoàn tất `PRAGMA quick_check` và `PRAGMA foreign_key_check` trên D1 restore mới. Không nhập lại SQL, không gắn database vào Pages, không chạy SQL Phase 6 trên Preview, không mở 3 cờ API Phase6.
+
+**Bước 176 (read-only):** tại đúng D1 `duongtrcnhiem-restore-20261128`, chạy tách biệt `PRAGMA quick_check;` (kỳ vọng `ok`) và `PRAGMA foreign_key_check;` (kỳ vọng 0 dòng lỗi); gửi ảnh kết quả, không lộ dữ liệu/tài khoản. Nếu kiểm tra thất bại, dừng để phân tích. Sau PASS mới lập bước phê duyệt migration Phase 6 Preview.
+
+## Bước 176 — Hoàn tất kiểm tra tính toàn vẹn restore D1 độc lập (operator screenshots ngày 28/11/2026)
+
+Sau import backup 28/11 vào **duongtrcnhiem-restore-20261128** và xác minh 8 bảng / 14 dòng theo Bước 175, operator chạy hai truy vấn chỉ đọc trên Cloudflare D1 Studio:
+- `PRAGMA quick_check;` → trả `quick_check = ok` (ảnh thứ nhất).
+- `PRAGMA foreign_key_check;` → trả tập kết quả `4×0` (bốn cột, **0 dòng vi phạm**) (ảnh thứ hai).
+
+**Gate `INDEPENDENT_REMOTE_D1_RESTORE_BASIC_VALIDATION: PASS`**, bao gồm import export 28/11 sang database **mới và tách biệt**, 8/8 row counts khớp baseline, `quick_check=ok`, `foreign_key_check=0`. Đây không phải kiểm thử sao lưu/khôi phục toàn bộ từng byte hoặc cutover ứng dụng; chưa kiểm chứng mọi hàng bằng hash hay mọi hành vi trigger/Cloudflare runtime.
+
+**Trạng thái Phase 6 Preview vẫn NO-GO**: `duongtrcnhiem-auth-preview` chưa có bảng Phase6; 3 flags máy chủ `PHASE6_*` vẫn chưa cấu hình; không khởi chạy migration hoặc API Phase 6, không đụng `duongtrcnhiem-auth-staging`, `main` hoặc Production, không merge PR36.
+
+**Bước 177 đề nghị (chỉ đọc):** rà soát file draft và sự phụ thuộc/schema hiện có tại commit Staging PR35, đối chiếu chính xác binding/target trước khi lập phiếu cấp phép riêng cho migration Preview 6B→6C→6A→6D; cần kế hoạch triển khai từng lần, kiểm tra sau chạy, xử lý lỗi một phần, sao lưu và rollback an toàn. Không chạy SQL remote chỉ vì gate restore đã PASS.

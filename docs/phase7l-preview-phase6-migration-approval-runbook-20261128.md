@@ -182,3 +182,11 @@ Kết quả 5 câu lệnh phù hợp cấu trúc dự thảo 6A tại GitHub: 1 
 **Trạng thái: `REMOTE_CLONE_PHASE6A_EXECUTION_REPORTED_SUCCESS`, POSTFLIGHT CHƯA ĐẠT** cho tới khi xác minh bằng read-only metadata. Bước 186: dùng D1 Studio trên **duongtrcnhiem-restore-20261128** chạy `SELECT type, name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;` kỳ vọng **4 bảng + 9 triggers = 13 hàng**. Sau đó, trước Phase6D, kiểm tra 8 counts baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0 dòng. Nếu bất thường, STOP, không retry migration.
 
 Không thực hiện trên D1 `duongtrcnhiem-auth-preview`, không bật ba cờ API Phase 6, không merge PR36 hoặc thay đổi Production.
+
+## Bước 186 — Operator xác nhận 13 đối tượng Phase 6 sau migration 6A (28/11/2026)
+
+Người vận hành **xác nhận bằng lời** `có đủ 13 đối tượng` khi thực hiện Bước 186 truy vấn metadata `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;` tại database clone `duongtrcnhiem-restore-20261128`. Theo kết quả mong đợi đã hướng dẫn, tổng 13 đối tượng gồm 4 bảng và 9 trigger. Chưa có ảnh liệt kê từng hàng từ Bước 186 nên kết quả `REMOTE_CLONE_PHASE6A_SCHEMA_PRESENCE: PASS (operator-reported)`, chưa được xác minh độc lập qua danh sách tên trong lần này.
+
+**Postflight Phase6A CHƯA hoàn tất:** operator cần kiểm tra 8 row counts của baseline `5,0,3,1,1,1,1,2`; `PRAGMA quick_check;` = `ok`; `PRAGMA foreign_key_check;` = 0 dòng; chỉ thực hiện trên **clone**, không chạy migration 6D trước khi các bước trên PASS.
+
+Giữ nguyên `duongtrcnhiem-auth-preview` (Phase6 chưa được triển khai), ba server flags Phase6 chưa cấu hình, PR36 vẫn Draft, không thay đổi Production.

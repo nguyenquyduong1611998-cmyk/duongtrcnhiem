@@ -314,3 +314,16 @@ Người vận hành **đã xác nhận rõ bằng lời trong hội thoại**: 
 **Bước 174 — Mở gate remote restore chỉ cho database cô lập:** operator có thể nhập file backup 28/11 vào **duy nhất** database mới `duongtrcnhiem-restore-20261128` bằng `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file="%USERPROFILE%\Documents\D1-Backup\preview-backup-20261128-prephase6.sql"`. Không dùng `--yes`, chỉ xác nhận nếu prompt hiển thị **chính xác** database đích. Nếu thấy lỗi không chạy lại ngay; xem trạng thái DB và điều tra. Lệnh remote ghi dữ liệu và cần người vận hành chủ động chạy. Cloudflare docs: https://developers.cloudflare.com/d1/best-practices/import-export-data/ và https://developers.cloudflare.com/d1/wrangler-commands/.
 
 **Chưa có kết quả import ở thời điểm cập nhật tài liệu.** Sau đó cần truy vấn metadata 8 bảng, đối chiếu 14 row counts, `PRAGMA quick_check` và `PRAGMA foreign_key_check`, không query dữ liệu mật, không bật API Phase6, chưa migration trên `auth-preview` hoặc merge PR.
+
+## Bước 174 — Wrangler remote import trả thống kê (operator screenshot 28/11/2026)
+
+Người vận hành chạy quy trình import backup 28/11 vào **duy nhất** D1 restore đích `duongtrcnhiem-restore-20261128` theo hướng dẫn và gửi ảnh phần cuối CMD. Ảnh cho thấy Cloudflare Wrangler đã trả về bookmark và:
+- `Total queries executed: 39`
+- `Rows read: 28`
+- `Rows written: 86`
+- `Database size (MB): 0.11`
+- CMD đã trở về prompt, không thấy thông báo lỗi trong phần ảnh.
+
+**Trạng thái:** `REMOTE_IMPORT_EXECUTION_STATISTICS_OBSERVED`; chưa khẳng định **restore verification PASS** do chưa truy vấn trực tiếp tên bảng, 8 row counts, integrity, foreign keys trên database đích. `Rows written=86` là số liệu vận hành, không thay thế `COUNT(*)` của 14 hàng dữ liệu ứng dụng. Chưa ghi nhận dữ liệu thật nào, file export không được upload lên GitHub/chat.
+
+**Bước 175:** chỉ đọc metadata và số hàng của `duongtrcnhiem-restore-20261128` trực tiếp từ D1 Studio; kỳ vọng 8 bảng và row counts `5,0,3,1,1,1,1,2`. Sau đó chạy `PRAGMA quick_check;` và `PRAGMA foreign_key_check;` nếu row counts khớp. **Không import lại**, không chạy Phase 6 draft SQL, không thay đổi `auth-preview`, binding, flags hay Production.

@@ -571,3 +571,13 @@ Người vận hành đã dùng cửa sổ ẩn danh, qua Access, đăng nhập 
 **Diagnosis: `UI_COMPONENT_PRESENT_AT_DEPLOYED_COMMIT: PASS`, `BROWSER_CACHE_ONLY_CAUSE: UNLIKELY`, `BUILT_VITE_FLAG_EFFECTIVE: UNKNOWN`; nguyên nhân còn cần điều tra là flag lưu sai/missing trong Preview, flag không đi vào build, hoặc quyền Admin UI chưa đúng.** Không tuyên bố root cause đã chắc chắn.
 
 **Bước 215 nên ưu tiên chỉ đọc:** Operator mở Cloudflare Pages project `duongtrcnhiem-test` → Settings → đúng **Preview** → **Variables and secrets** và chụp/chỉ đọc đúng hai hàng plain-text `PHASE6_ADMIN_DRAFTS_ENABLED` và `VITE_PHASE6_ADMIN_DRAFTS_UI` (value cần là `true`, không có ngoặc kép/khoảng trắng); che mọi secrets. Nếu hai biến đúng, xem Deployment details của bản **10:37 28/11 commit 75f2d81** → Build log (chỉ chụp phần bước build và các dòng env variable **tên public**, tuyệt đối không chia sẻ giá trị secret hoặc dump toàn bộ env), để biết build có thực sự lấy biến Preview. Chưa sửa các cờ, chưa retry thêm, không test POST API, không merge PR36 hay đụng Production.
+
+## Bước 215 — Hai biến Admin Drafts hiển thị true trong Preview (ảnh operator 28/11/2026)
+
+Operator gửi hai ảnh chụp **Variables and secrets** chỉ có các hàng Text:
+- Tên hiển thị bị cắt `PHASE6_ADMIN_DRAFTS_ENA...`, value hiện `true`.
+- Tên hiển thị bị cắt `VITE_PHASE6_ADMIN_DRAFTS...`, value hiện `true`.
+
+Ảnh xác nhận hai giá trị `true`, nhưng **tên đầy đủ chưa hiển thị** vì giới hạn chiều rộng input; không thể loại trừ lỗi ký tự/thiếu hậu tố `_ENABLED` hoặc `_UI`. Hai tên mã nguồn yêu cầu chính xác là `PHASE6_ADMIN_DRAFTS_ENABLED` (server) và `VITE_PHASE6_ADMIN_DRAFTS_UI` (build-time). Trước khi chỉnh biến/Retry, cần xác nhận **nguyên văn full-name** bằng copy Name field (không gửi secrets) hoặc click vào ô rồi bấm End và chụp phần cuối. Nếu khớp, chuyển sang kiểm tra logs từ **deployment Preview 28/11 lúc 10:37 (75f2d81)**; không suy ra flag Vite đã được biên dịch chỉ từ Settings hiển thị giá trị, và không dùng console in `process.env` hoặc keys Firebase.
+
+**Gate `PREVIEW_ADMIN_DRAFT_FLAG_VALUES_VISIBLE_TRUE`: PASS; `FULL_VAR_NAMES_VERIFIED`: PENDING; `BUILT_UI_FLAG_EFFECTIVE`: PENDING.** Không sửa code, không thêm cờ khác, chưa thử POST hay thay đổi Production; PR36 Draft.

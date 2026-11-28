@@ -327,3 +327,21 @@ Người vận hành chạy quy trình import backup 28/11 vào **duy nhất** D
 **Trạng thái:** `REMOTE_IMPORT_EXECUTION_STATISTICS_OBSERVED`; chưa khẳng định **restore verification PASS** do chưa truy vấn trực tiếp tên bảng, 8 row counts, integrity, foreign keys trên database đích. `Rows written=86` là số liệu vận hành, không thay thế `COUNT(*)` của 14 hàng dữ liệu ứng dụng. Chưa ghi nhận dữ liệu thật nào, file export không được upload lên GitHub/chat.
 
 **Bước 175:** chỉ đọc metadata và số hàng của `duongtrcnhiem-restore-20261128` trực tiếp từ D1 Studio; kỳ vọng 8 bảng và row counts `5,0,3,1,1,1,1,2`. Sau đó chạy `PRAGMA quick_check;` và `PRAGMA foreign_key_check;` nếu row counts khớp. **Không import lại**, không chạy Phase 6 draft SQL, không thay đổi `auth-preview`, binding, flags hay Production.
+
+## Bước 175 — D1 remote restore row counts match full 8-table baseline (operator screenshot 28/11/2026)
+
+Sau khi import export D1 Preview ngày 28/11 vào `duongtrcnhiem-restore-20261128`, người vận hành chạy câu `SELECT` dùng 8 scalar `COUNT(*)` trong Cloudflare D1 Studio. Hai ảnh do người vận hành cung cấp hiển thị đủ 8 cột:
+- `demo_students: 5`
+- `login_attempts: 0`
+- `synthetic_graded_attempts: 3`
+- `phase5_content_topics: 1`
+- `phase5_content_versions: 1`
+- `phase5_content_questions: 1`
+- `phase5_content_answer_keys: 1`
+- `phase5_content_attempts: 2`
+
+**Tổng: 14 bản ghi, đúng 8/8 row counts baseline** đã đo trên `duongtrcnhiem-auth-preview` (Bước 166) và bản SQLite RAM từ backup (Bước 169).
+
+**Gate `REMOTE_RESTORE_EIGHT_TABLE_COUNTS_MATCH: PASS`**. Đây không phải chứng minh giống nhau từng byte hoặc chính xác nội dung từng bản ghi; chưa có bằng chứng hoàn tất `PRAGMA quick_check` và `PRAGMA foreign_key_check` trên D1 restore mới. Không nhập lại SQL, không gắn database vào Pages, không chạy SQL Phase 6 trên Preview, không mở 3 cờ API Phase6.
+
+**Bước 176 (read-only):** tại đúng D1 `duongtrcnhiem-restore-20261128`, chạy tách biệt `PRAGMA quick_check;` (kỳ vọng `ok`) và `PRAGMA foreign_key_check;` (kỳ vọng 0 dòng lỗi); gửi ảnh kết quả, không lộ dữ liệu/tài khoản. Nếu kiểm tra thất bại, dừng để phân tích. Sau PASS mới lập bước phê duyệt migration Phase 6 Preview.

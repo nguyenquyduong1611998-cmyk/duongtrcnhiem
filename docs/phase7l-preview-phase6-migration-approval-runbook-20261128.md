@@ -1041,3 +1041,13 @@ Operator gửi screenshot GitHub `Pull request successfully merged and closed` c
 **Bước 255:** vào Cloudflare Workers & Pages `duongtrcnhiem-test` → Deployments; tìm bản **Preview** nhánh `feature/staging-demo-quiz-pilot`, commit **`431d7a0`** (Merge PR38), trạng thái `success`; mở Details xác nhận alias **`feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`**. Nếu chưa có đúng SHA/alias, STOP chứ không Retry bản cũ. Không dùng hashed/branch PR38 URL để test signed student API.
 
 Sau khi gate 255 PASS, mở pinned URL `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1` trong Edge InPrivate có tài khoản học viên DEMO, vào Mục Chuyên Đề, xem panel `Phase 6D — Chẩn đoán hiển thị (chỉ Preview DEMO)`, chụp **6 trạng thái ĐẠT/CHƯA ĐẠT** không cần username/UID/email/token. **Không bấm `Bắt đầu làm bài` hoặc Nộp bài**, không sửa D1, Phase6E OFF, PR36 Draft, Production/main không đổi.
+
+## Bước 255 — Cloudflare pinned Preview đã triển khai PR38 diagnostic merge (operator screenshot, 28/11/2026)
+
+Operator gửi Deployment details Cloudflare cho `duongtrcnhiem-test`:
+- Environment **Preview**, `Status: success`, **3:51 PM November 28, 2026**, Duration 17s.
+- Commit **`431d7a0`** (`Merge pull request #38`) đúng GitHub merge SHA `431d7a0090ba2ee88804e56947bbfb09bc23e4a6`.
+- Alias **`feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`** chính xác.
+- Deployment ID **`be377e3a-bed0-4dc1-8b71-c0c4de3b23d5`**, hashed URL `be377e3a.duongtrcnhiem-test.pages.dev` không được dùng cho signed student API. Build settings có 20 dòng nhưng không cần thêm flags theo Bước249.
+
+**Gate `PR38_PINNED_PREVIEW_DEPLOY: PASS (operator screenshot)`; `PHASE6D_DIAGNOSTIC_BOOLEAN_RESULTS: PENDING`**. Hướng dẫn bước 256: vào đúng Edge InPrivate với học viên DEMO đang đăng nhập, mở **`https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1`** trong cùng tab, tab `Mục Chuyên Đề`, kéo dưới ba cards, chụp khung `Phase 6D — Chẩn đoán hiển thị (chỉ Preview DEMO)`; kiểm từng giá trị ĐẠT/CHƯA ĐẠT cho app role student, Firebase session present, internal/Firebase UID equal, compiled Vite 6D flag, Firebase staging env, pinned host. Chỉ booleans, không gửi UID/token/password. Nếu khung không hiện, xác nhận query `phase6_debug=1` còn trong URL, chưa login account khác; chụp address bar và cuối trang. Không bấm Start/Submit, không Retry/build mới, không sửa DB/Production, PR36 Draft.

@@ -255,3 +255,25 @@ Số dòng trong bản restore:
 - Các file có `CREATE ... IF NOT EXISTS` cho schema bổ sung, không chứa DML xóa dữ liệu cũ trong đoạn mã được rà soát. **Tuy nhiên**, vì SQL draft vẫn ghi rõ không triển khai lên Cloudflare khi chưa review/phê duyệt, việc pass trên SQLite RAM không thay thế review tác động D1 thực tế, kế hoạch xử lý migration lỗi một phần và rollback.
 
 **Bước 170 đề nghị:** test lại *duy nhất một lần* migration 6B→6C→6A→6D trên backup **28/11** trong SQLite `:memory:` với kiểm tra row counts trước/sau và integrity/foreign keys. Giữ `PHASE6_*` API OFF. Sau đó chuyển sang phê duyệt remote restore để xác minh recovery trước khi triển khai Preview, không tiếp tục lặp lại các thử nghiệm 100 học viên đã PASS.
+
+## Bước 170 — Thử migration Phase 6 trên backup mới trong RAM (operator screenshot)
+
+Ảnh CMD ngày 28/11/2026 cho thấy operator sử dụng `node:sqlite` `:memory:`, nạp export D1 Preview `preview-backup-20261128-prephase6.sql`, so sánh SHA-256 của toàn bộ dữ liệu tám bảng ứng dụng trước/sau, rồi áp dụng dự thảo 6B → 6C → 6A → 6D:
+- `Original tables: 8`
+- `Original data: UNCHANGED`
+- `Phase6 tables: 5`
+- `Phase6 triggers: 12`
+- `Integrity: ok`
+- `Foreign key errors: 0`
+- `Result: PASS`
+
+**Gate `FRESH_PREVIEW_BACKUP_LOCAL_MIGRATION: PASS`**. Bằng chứng chỉ xác nhận thử nghiệm SQLite cục bộ; chưa chứng minh tính tương thích tuyệt đối trên Cloudflare remote hoặc rằng D1 Preview đã được migrate.
+
+### Bước 171 — Chuẩn bị nghiệm thu phục hồi remote độc lập (chưa thực hiện)
+
+- D1 `duongtrcnhiem-restore-test` đã có 13 bảng ứng dụng và 12 triggers; **không được dùng để import đè bản backup mới** nếu chưa có quyết định rõ ràng vì sẽ đụng cấu trúc/dữ liệu hiện tại.
+- Theo ảnh Dashboard, tài khoản có 3 D1. Nếu vẫn đang ở gói Free và trong hạn mức hiện hành, có thể tạo **một D1 mới, rỗng và chưa có binding** để làm target phục hồi, tên riêng khác ba DB hiện tại. Không chọn DB này làm `AUTH_DB` hoặc `AUTH_DB_PREVIEW`. Xác minh mục đích và việc được phép xử lý bản export trước khi copy lên remote.
+- **Không thực hiện `wrangler d1 execute --remote --file=preview-backup-20261128-prephase6.sql` chỉ vì file đã PASS trong RAM**. Bản export có năm hàng `demo_students`, có thể có hash mật khẩu, và 14 bản ghi tổng cộng; chưa phân loại/duyệt đưa bản sao lên D1 mới. Nếu chỉ thử schema-only trước, dùng dữ liệu tổng hợp không có credential hash.
+- Cloudflare hỗ trợ export SQL và import vào D1 qua Wrangler `d1 execute --file`. Tài liệu: https://developers.cloudflare.com/d1/best-practices/import-export-data/ (cập nhật 20/11/2026); remote `execute` thật sự ghi lên DB remote. Không phát lệnh ghi khi chưa xác minh DB ID, quyền sở hữu, quota và bản export.
+- Điều kiện dừng: yêu cầu nâng cấp trả phí; không kiểm chứng rõ DB ID/mục tiêu; file chứa dữ liệu chưa được phép nhân bản; bất kỳ lỗi SQL/foreign key nào; không có người chịu trách nhiệm phục hồi/rollback.
+- Trước khi bấm Create database, cần kiểm tra lại tình trạng D1 Free/Quota và chọn tên lab tách biệt. Đây là **chuẩn bị**, không phải phê duyệt migration Phase 6 trên `duongtrcnhiem-auth-preview`, vốn tiếp tục giữ 0 bảng Phase6 và các API flags OFF.

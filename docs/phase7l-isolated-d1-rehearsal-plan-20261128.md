@@ -345,3 +345,15 @@ Sau khi import export D1 Preview ngày 28/11 vào `duongtrcnhiem-restore-2026112
 **Gate `REMOTE_RESTORE_EIGHT_TABLE_COUNTS_MATCH: PASS`**. Đây không phải chứng minh giống nhau từng byte hoặc chính xác nội dung từng bản ghi; chưa có bằng chứng hoàn tất `PRAGMA quick_check` và `PRAGMA foreign_key_check` trên D1 restore mới. Không nhập lại SQL, không gắn database vào Pages, không chạy SQL Phase 6 trên Preview, không mở 3 cờ API Phase6.
 
 **Bước 176 (read-only):** tại đúng D1 `duongtrcnhiem-restore-20261128`, chạy tách biệt `PRAGMA quick_check;` (kỳ vọng `ok`) và `PRAGMA foreign_key_check;` (kỳ vọng 0 dòng lỗi); gửi ảnh kết quả, không lộ dữ liệu/tài khoản. Nếu kiểm tra thất bại, dừng để phân tích. Sau PASS mới lập bước phê duyệt migration Phase 6 Preview.
+
+## Bước 176 — Hoàn tất kiểm tra tính toàn vẹn restore D1 độc lập (operator screenshots ngày 28/11/2026)
+
+Sau import backup 28/11 vào **duongtrcnhiem-restore-20261128** và xác minh 8 bảng / 14 dòng theo Bước 175, operator chạy hai truy vấn chỉ đọc trên Cloudflare D1 Studio:
+- `PRAGMA quick_check;` → trả `quick_check = ok` (ảnh thứ nhất).
+- `PRAGMA foreign_key_check;` → trả tập kết quả `4×0` (bốn cột, **0 dòng vi phạm**) (ảnh thứ hai).
+
+**Gate `INDEPENDENT_REMOTE_D1_RESTORE_BASIC_VALIDATION: PASS`**, bao gồm import export 28/11 sang database **mới và tách biệt**, 8/8 row counts khớp baseline, `quick_check=ok`, `foreign_key_check=0`. Đây không phải kiểm thử sao lưu/khôi phục toàn bộ từng byte hoặc cutover ứng dụng; chưa kiểm chứng mọi hàng bằng hash hay mọi hành vi trigger/Cloudflare runtime.
+
+**Trạng thái Phase 6 Preview vẫn NO-GO**: `duongtrcnhiem-auth-preview` chưa có bảng Phase6; 3 flags máy chủ `PHASE6_*` vẫn chưa cấu hình; không khởi chạy migration hoặc API Phase 6, không đụng `duongtrcnhiem-auth-staging`, `main` hoặc Production, không merge PR36.
+
+**Bước 177 đề nghị (chỉ đọc):** rà soát file draft và sự phụ thuộc/schema hiện có tại commit Staging PR35, đối chiếu chính xác binding/target trước khi lập phiếu cấp phép riêng cho migration Preview 6B→6C→6A→6D; cần kế hoạch triển khai từng lần, kiểm tra sau chạy, xử lý lỗi một phần, sao lưu và rollback an toàn. Không chạy SQL remote chỉ vì gate restore đã PASS.

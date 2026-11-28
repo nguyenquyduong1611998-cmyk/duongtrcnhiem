@@ -601,3 +601,17 @@ Operator gửi ảnh thẻ **Build log** từ Deployment details. Ảnh hiển t
 **Gate `PREVIEW_BUILD_PIPELINE_STAGES: PASS (operator screenshot)`; `VITE_PHASE6_ADMIN_DRAFTS_UI_COMPILED: UNKNOWN`**. Không quy kết lỗi API/backend hay kết luận cache; cửa sổ ẩn danh cũng không hiện khung Admin 6B. Khả năng còn gồm build-time Vite flag không nhận, build artifact không lấy biến, hoặc Admin app-state guard.
 
 **Bước 218 read-only:** operator nhấp vào hàng **build** (mở accordion) trong Build log của Preview deploy commit `75f2d81`, alias pinned; chụp đoạn hiện lệnh build `vite build`, warnings và kết quả cuối. Không chụp/copy JWT, Firebase key, Cloudflare Access cookie, nội dung .env đầy đủ; không nhấn Retry, không thêm biến, không chạy migration. Build log thành công cũng chưa đủ để xác nhận Vite flag; nếu log không có thông tin biến, chuyển sang chẩn đoán artifact `assets` hoặc UI auth guard trước khi sửa hệ thống.
+
+## Bước 218 — Cloudflare Preview actual build log and env listing reviewed (screenshots, 28/11/2026)
+
+Operator expanded **Build log** for Preview retry deployment. Three screenshots show:
+- User command `bun install && bun run build`; `$ vite build` with **Vite v8.3.8**; 2371 modules transformed; produced `dist/index.html`, CSS and JS assets.
+- Warning: Vite config uses an unsupported feature with native `configLoader` at `vite.config.ts:27:40`, suggestion `import.meta.dirname`; warning was suppressed by `VITE_CONFIG_NATIVE_IGNORE_WARNING=true`. No build-fatal error visible in screenshot, and deployment overall marked success.
+- **Environment variables list for this build** includes exactly `PHASE6_ADMIN_DRAFTS_ENABLED = true` and `VITE_PHASE6_ADMIN_DRAFTS_UI = true`; also `VITE_FIREBASE_ENV = staging` and existing Phase4/Phase5 flags. This is stronger than Settings screenshot; variables were present in *deployment's displayed build environment*.
+- Images display Firebase related variable names and public staging project identifier; **do not duplicate account/email/secret in this repo**.
+
+**New gate:** `PREVIEW_BUILD_HAS_ADMIN_DRAFT_FLAGS: PASS (deployment env screenshot)`; `VITE_BUILD_SUCCEEDED: PASS`. **UI remains missing after incognito**. Native config warning cannot be blamed without evidence; no signs build failed. Next checks focus on actual client `App.tsx` condition:
+`activeTab==='admin' && currentUser.role==='admin' && adminAccessAllowed && firebaseUser && isPhase6AdminDraftsUiEnabled(hostname,import.meta.env.VITE_PHASE6_ADMIN_DRAFTS_UI)`.
+Staging `adminAccessAllowed` requires Cloud connected, Cloud Admin permission and Firebase UID exactly staging Admin. At correct pinned Preview host, `IS_FIREBASE_STAGING` is true by hostname. Vite flag is present in build environment but actual bundle's emitted value is still unverified.
+
+**Bước 219 (no write, no secret):** operator opens pinned Preview alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`, enters Admin, captures screenshot that includes **URL and actual contents of Admin page** (including whether ordinary AdminPanel is shown), plus cloud connected status but obscures all private data. If AdminPanel is visible, `adminAccessAllowed` appears to be met and next investigation should inspect emitted JS asset in the browser (not repeat refresh/Retry). If only Admin tab without AdminPanel, investigate Google Firebase Admin connection / role rather than compile flags. Do not ask for tokens or secrets, change D1, enable publish/student/results, or merge PR36.

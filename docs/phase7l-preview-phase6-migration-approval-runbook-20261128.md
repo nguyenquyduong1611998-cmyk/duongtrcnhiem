@@ -202,3 +202,18 @@ Người vận hành gửi ảnh D1 Studio sau migration 6A tại `duongtrcnhiem
 **Gate `REMOTE_CLONE_PHASE6A_POSTFLIGHT: PASS` theo hai ảnh và xác nhận operator.** Đây là so sánh số lượng chứ không phải kiểm chứng từng bản ghi. Các phần này chưa thực hiện trên D1 Preview đang kết nối website.
 
 **Bước 188 chỉ trên clone `duongtrcnhiem-restore-20261128`:** chạy file cuối cùng `serverless/d1-phase6d-timed-submissions-draft.sql` qua `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6d-timed-submissions-draft.sql` (ghi D1 remote clone). Trước khi xác nhận Wrangler prompt, đối chiếu đúng tên database; nếu lỗi dừng, không tự retry. Sau chạy đọc metadata, dự kiến 5 bảng Phase6, 12 triggers, đủ 8 bảng cũ/14 bản ghi, quick_check ok và foreign_key_check 0. Flags Phase 6 và Preview giữ nguyên, PR36 Draft.
+
+## Bước 188 — Phase 6D remote clone execution (operator screenshot, 28/11/2026)
+
+Người vận hành chạy migration cuối theo hướng dẫn `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6d-timed-submissions-draft.sql` trên D1 **bản sao độc lập**. Ảnh CMD cho thấy bảng thống kê:
+- `Total queries executed: 5`
+- `Rows read: 3`
+- `Rows written: 9`
+- `Database size (MB): 0.20`
+- Đã trở về dấu nhắc CMD và không thấy lỗi ở đoạn hiển thị.
+
+Theo bản draft Phase 6D trên GitHub, 5 DDL dự kiến tạo một bảng `phase6_exam_submissions`, một chỉ mục và 3 trigger `phase6_submission_guard`, `phase6_submission_no_delete`, `phase6_submission_no_update`.
+
+**Trạng thái: `REMOTE_CLONE_PHASE6D_EXECUTION_REPORTED_SUCCESS`; hậu kiểm Phase 6D CHƯA ĐẠT.** Ảnh chỉ hiển thị phần kết quả cuối, nên việc xác nhận đúng database đích dựa trên lệnh hướng dẫn/liên tục hội thoại; không coi số `rows written` là bản ghi của ứng dụng.
+
+**Bước 189 chỉ đọc:** operator mở Cloudflare Studio của đúng `duongtrcnhiem-restore-20261128`, chạy `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;`; mong đợi **5 bảng Phase6 + 12 triggers = 17 hàng**. Sau đó kiểm tra baseline 8 bảng cũ `5,0,3,1,1,1,1,2` và `PRAGMA quick_check;` → `ok`, `PRAGMA foreign_key_check;` → 0 hàng. Nếu sai, STOP, không retry migration. Không bật Phase6 flags, không chạy 6D lên `duongtrcnhiem-auth-preview`, không merge PR36 hoặc triển khai Production.

@@ -1122,3 +1122,14 @@ Phần còn lại của cùng một dòng bị **cắt ngang ở mép phải ả
 **Gate `PR39_BUILD_ENV_PROCESS_FLAG_EXACT_TRUE: FAIL (operator screenshot)`; `PR39_BUILD_ENV_TRIMMED_TRUE: UNKNOWN`; `PR39_RESOLVED_VITE_FLAG: UNKNOWN`.**
 
 **Bước 262:** trong Cloudflare build log, **chỉ** copy toàn bộ dòng `[phase6d-build-probe]` (đã được code giới hạn vào booleans/length, không log giá trị thô hoặc secret) và gửi nguyên dòng, hoặc kéo ngang chụp nửa phải cho thấy `trimmedTrue`, `length`, `viteEnv`, `exactKeyFound`, `nearMatchKeyCount`. Không gửi các dòng chứa secrets/other env values. Nếu `trimmedTrue=true` thì nghi có whitespace thừa ở value; nếu cả `exactTrue=false` lẫn `trimmedTrue=false` cần kiểm tra khác biệt value và cấu hình env overrides không đoán bừa. Nếu `processEnv` true mà `viteEnv` khác thì rà Vite env resolution. Không sửa biến/Retry thêm trước khi lấy đủ dòng. PR39 Draft chưa merge, PR36 Draft; no D1, Firebase, student exam, or Production changes.
+
+## Bước 262 — Cloudflare Build log cắt dòng, PR39 probe được chỉnh thành ba dòng ngắn (operator screenshot, 28/11/2026)
+
+Operator gửi ảnh Cloudflare Build log đã phóng rộng, dòng `[phase6d-build-probe]` vẫn hiển thị **bị cắt tại chiều rộng nội dung**, UI không có thanh kéo ngang. Phần đầu đọc được giữ nguyên Bước261: `processEnv.present=true,type=string,exactTrue=false`; **chưa nhận được `trimmedTrue/length/viteEnv`**. Không yêu cầu operator thao tác kéo ngang hay xuất cả log chứa secret.
+
+Đã chỉnh [PR39](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/39) ở nhánh **`feature/phase6d-vite-env-build-probe-20261128`**, commit **`4752e4a74a0bb866c99d6ccaf851967785e0884d`**, chỉ `vite.config.ts`: thay log JSON dài bằng 3 dòng an toàn, ngắn:
+- `[p6d-process] present=... type=... exact=... trimmed=... length=...`
+- `[p6d-vite] present=... type=... exact=... trimmed=... length=...`
+- `[p6d-keys] exactKeyFound=... nearMatchCount=...`
+
+Dòng log không in giá trị thực, UID, token, keys, password hay email. **Bước 263:** operator vào PR39 tab Checks sau khi cloud branch build cho commit `4752e4a`, xem CI Cloudflare build success và `View logs` → tìm `[p6d-`, chụp 3 dòng ngắn. **Không gộp PR39**; nhánh riêng đủ để quan sát build env. Nếu không thấy đúng commit, chờ nhánh được cập nhật hoặc kiểm tra xem deployment mới đang chạy, không Retry staging/bản cũ. Không đổi env, D1, Firebase, Production, PR36 Draft.

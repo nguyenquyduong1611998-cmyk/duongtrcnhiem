@@ -336,3 +336,25 @@ Theo hai ảnh Cloudflare D1 Studio do operator gửi, khi đang kiểm tra `duo
 npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6c-publication-metadata-draft.sql
 ```
 Git file blob SHA bản staging đã rà soát: `2121265b988342fe601582d0fb4f73ddb43b98c3`; 5 câu DDL tạo 1 bảng `phase6_admin_publications`, 1 index và 3 triggers. Operator phải kiểm tra đúng database trong prompt; nếu lỗi STOP, không retry; sau lệnh phải xác minh **3 bảng và 6 trigger Phase6**, 8 counts baseline, `quick_check=ok`, `foreign_key_check=0` trước bước 6A. Không chạy 6A, 6D trong bước này, không bật flag API, không đổi Production hoặc merge PR36.
+
+## Bước 197 — Phase 6C Preview migration execution report (ảnh operator, 28/11/2026)
+
+Sau khi postflight Phase6B Preview PASS ở Bước 196, operator thực hiện theo kế hoạch `npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6c-publication-metadata-draft.sql`. Ảnh CMD người dùng gửi hiển thị:
+- `Executed 5 queries in 2.43ms (3 rows read, 7 rows written)`.
+- Total queries executed: 5.
+- Rows read: 3.
+- Rows written: 7.
+- Database size (MB): 0.15.
+
+Không có lỗi hiển thị trong ảnh. File đã review gồm 5 DDL (1 bảng `phase6_admin_publications`, 1 index, 3 trigger). Ảnh được cắt không chứa tên database đích, vì thế ngữ cảnh câu lệnh ở Bước 197 là bằng chứng gắn nguồn.
+
+**Trạng thái: `PREVIEW_PHASE6C_EXECUTION_REPORTED_SUCCESS`, postflight còn PENDING.** Chưa suy ra 3 bảng/6 trigger đã thực sự hiện diện hoặc 8 bảng cũ không bị thay đổi.
+
+**Bước 198 (chỉ đọc, trên đúng `duongtrcnhiem-auth-preview`):** 
+```sql
+SELECT type, name
+FROM sqlite_master
+WHERE type IN ('table', 'trigger') AND name LIKE 'phase6_%'
+ORDER BY type, name;
+```
+Kỳ vọng 3 bảng `phase6_admin_draft_events`, `phase6_admin_drafts`, `phase6_admin_publications` và 6 triggers `phase6_admin_draft_created`, `phase6_admin_draft_deleted`, `phase6_admin_draft_saved`, `phase6_publication_no_delete`, `phase6_publication_no_update`, `phase6_publication_requires_published`. Khi đã thấy đủ tên, mới kiểm 8 row counts baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok` và `PRAGMA foreign_key_check` không có lỗi trước khi cho phép 6A. Nếu có bất thường: STOP, không retry hoặc restore. API Phase6 flags OFF; PR36 Draft; không đụng Production.

@@ -108,3 +108,14 @@ WHERE type IN ('table','trigger') AND name LIKE 'phase6_%'
 ORDER BY type,name;
 ```
 Kỳ vọng 5 dòng: 2 bảng (`phase6_admin_drafts`, `phase6_admin_draft_events`) và 3 trigger (`phase6_admin_draft_created`, `phase6_admin_draft_saved`, `phase6_admin_draft_deleted`). **Chưa chạy 6C hoặc migration trên Preview.**
+
+## Bước 180 — Postflight schema Phase 6B trên D1 bản sao (ảnh operator, 28/11/2026)
+
+Người vận hành vào D1 Studio tại `duongtrcnhiem-restore-20261128`, chạy `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;`; hai ảnh kết quả `sqlite_master · 2×5` cho đúng 5 dòng:
+- `table: phase6_admin_draft_events`
+- `table: phase6_admin_drafts`
+- `trigger: phase6_admin_draft_created`
+- `trigger: phase6_admin_draft_deleted`
+- `trigger: phase6_admin_draft_saved`
+
+**Gate `REMOTE_CLONE_PHASE6B_SCHEMA_PRESENCE: PASS`**. Đây là bằng chứng tồn tại đối tượng, **chưa chứng minh dữ liệu gốc không bị thay đổi hoặc DB vẫn toàn vẹn sau migration**. Bước kế tiếp: trên đúng clone, đối chiếu 8 row counts `5,0,3,1,1,1,1,2`, `PRAGMA quick_check` = `ok`, `PRAGMA foreign_key_check` = 0. Nếu tất cả đạt mới xét Phase 6C. Chưa chạy migration trên `duongtrcnhiem-auth-preview`, flags Phase6 vẫn OFF.

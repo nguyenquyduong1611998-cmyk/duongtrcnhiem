@@ -31,12 +31,20 @@ base: process.env.VITE_FIREBASE_ENV === 'staging'
           const names = Object.keys(process.env);
           const nearKeys = names.filter(name =>
             name.replace(/[\u200B-\u200D\uFEFF]/g, '').trim() === key);
-          console.info('[phase6d-build-probe] ' + JSON.stringify({
-            processEnv: describe(process.env[key]),
-            viteEnv: describe(config.env[key]),
-            exactKeyFound: Object.prototype.hasOwnProperty.call(process.env, key),
-            nearMatchKeyCount: nearKeys.length,
-          }));
+          // Cloudflare's build-log panel clips long lines and has no horizontal
+          // scrollbar. Emit three short, safe lines without any raw env values.
+          const processFlag = describe(process.env[key]);
+          const viteFlag = describe(config.env[key]);
+          const logFlag = (label: string, info: ReturnType<typeof describe>) => {
+            console.info('[p6d-' + label + '] present=' + info.present +
+              ' type=' + info.type + ' exact=' + info.exactTrue +
+              ' trimmed=' + info.trimmedTrue + ' length=' + info.length);
+          };
+          logFlag('process', processFlag);
+          logFlag('vite', viteFlag);
+          console.info('[p6d-keys] exactKeyFound=' +
+            Object.prototype.hasOwnProperty.call(process.env, key) +
+            ' nearMatchCount=' + nearKeys.length);
         },
       },
       // Copies src/assets into dist/ so root-relative URLs like

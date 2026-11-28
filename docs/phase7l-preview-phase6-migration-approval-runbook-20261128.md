@@ -284,3 +284,20 @@ npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1
 Trước khi xác nhận prompt, operator phải thấy đúng database Preview; nếu tên DB sai hoặc có câu hỏi lạ, dừng. Đây là lệnh **ghi remote** do operator tự chạy, **không** do GitHub update. Nếu gặp lỗi, không tự retry; đối chiếu schema hiện tại để xử lý trạng thái một phần.
 
 **Postflight bắt buộc trước khi cho 6C:** read-only metadata `phase6_%` dự kiến 2 bảng/3 trigger; 8 counts baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0. Giữ `PHASE6_*` server flags OFF, không gộp PR, không đổi Production. Bookmark phục hồi không được lưu trong tài liệu; không chạy `time-travel restore` trừ khi có quyết định riêng.
+
+## Bước 194 — Phase 6B lần đầu trên D1 Preview: Wrangler execution report (operator screenshot, 28/11/2026)
+
+Sau khi đã phê duyệt ở Bước 194, người vận hành báo chạy lệnh `npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6b-synthetic-admin-drafts-draft.sql`. Ảnh phần kết quả CMD hiển thị:
+- `Processed 6 queries`, `Executed 6 queries in 3.42ms (5 rows read, 11 rows written)`
+- `Total queries executed: 6`; `Rows read: 5`; `Rows written: 11`; `Database size (MB): 0.14`.
+- Có dòng bookmark nhưng **không lưu** bookmark hay toàn bộ chuỗi đó vào GitHub.
+
+**Trạng thái:** `PREVIEW_PHASE6B_REMOTE_EXECUTION_REPORTED_SUCCESS`, **postflight CHƯA PASS**. Ảnh CMD được cắt, không hiển thị tên database trong câu lệnh; đối tượng Preview được xác định theo lệnh ngay trước và trình tự operator, vì thế cần trực tiếp mở đúng DB Preview để xác nhận.
+
+**Bước tiếp theo (chỉ đọc, không chạy 6C):** D1 Studio của `duongtrcnhiem-auth-preview` chạy:
+```sql
+SELECT type, name FROM sqlite_master
+WHERE type IN ('table','trigger') AND name LIKE 'phase6_%'
+ORDER BY type,name;
+```
+Mong đợi `2 tables` (`phase6_admin_drafts`, `phase6_admin_draft_events`) và `3 triggers` (`phase6_admin_draft_created`, `phase6_admin_draft_deleted`, `phase6_admin_draft_saved`). Sau đó xác minh 8 bảng cũ / row counts `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0. Nếu bất thường, **STOP**, không retry SQL hoặc chạy 6C. Giữ API Phase6 flags OFF, không gộp PR36, không sửa Pages Production hoặc D1 staging.

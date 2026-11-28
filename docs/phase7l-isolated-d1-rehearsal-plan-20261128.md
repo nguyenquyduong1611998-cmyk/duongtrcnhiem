@@ -191,3 +191,25 @@ ORDER BY name;
 **Kết luận:** Không có bằng chứng bảng Phase 6 đã được áp dụng trên D1 Preview; đối chiếu với `restore-test` nơi 5 bảng/12 trigger đã được xác minh. Không chạy migration ngay; cần làm mới bản export D1 Preview vì bản snapshot được kiểm thử là `preview-backup-20261127.sql`, còn hiện ngày 28/11, dữ liệu có thể đã thay đổi.
 
 **Bước 166 (chỉ đọc):** kiểm tra tình trạng dữ liệu Preview bằng thống kê số dòng trên các bảng cần bảo toàn (không lấy bản ghi, username, hash, token hay câu hỏi), hoặc xác định D1 Preview có thay đổi từ bản export ngày 27/11. Sau đó lập kế hoạch xuất backup *mới* và thử restore độc lập được phê duyệt trước khi đưa SQL draft lên Preview. Giữ `PHASE6_*` server OFF, không merge Production.
+
+## Bước 166 — Snapshot số lượng bản ghi trên D1 Preview (operator screenshot 28/11/2026)
+
+Operator chạy một lệnh `SELECT` có 8 scalar subquery `COUNT(*)` (đọc, không ghi), sau khi biến thể `UNION ALL` trước đó trả `too many terms in compound SELECT`. Hai ảnh Cloudflare Query cùng một hàng đã chụp đủ tám giá trị:
+
+| Table | Count |
+|---|---:|
+| `demo_students` | 5 |
+| `login_attempts` | 0 |
+| `synthetic_graded_attempts` | 3 |
+| `phase5_content_topics` | 1 |
+| `phase5_content_versions` | 1 |
+| `phase5_content_questions` | 1 |
+| `phase5_content_answer_keys` | 1 |
+| `phase5_content_attempts` | 2 |
+| **Tổng số hàng** | **14** |
+
+**Gate snapshot baseline row counts: PASS** — số bản ghi được ghi nhận từ ảnh Dashboard cho tám bảng. Dữ liệu có thể thay đổi sau khi chụp; đây không phải bằng chứng export mới hoặc dữ liệu backup đã khớp.
+
+**Bước kế tiếp:** trên máy cá nhân có Wrangler đã đăng nhập, tạo bản `d1 export` **mới** của **chính tên database** `duongtrcnhiem-auth-preview` tới file trong `%USERPROFILE%\Documents\D1-Backup\`, dùng tên khác file `preview-backup-20261127.sql`. Chỉ export đọc; không chạy `d1 execute`, không import, không bật `PHASE6_*`. Tài liệu Cloudflare chính thức: https://developers.cloudflare.com/d1/wrangler-commands/ và https://developers.cloudflare.com/d1/best-practices/import-export-data/. Cần kiểm tra file và phép restore độc lập trước bất kỳ quyết định migration.
+
+**Bảo mật:** bản SQL có thể chứa dữ liệu đăng nhập giả, salted hashes và nội dung nội bộ. Chỉ giữ tại máy có quyền truy cập, tránh đưa vào GitHub, chat, email hay kho công cộng; báo trạng thái/byte/hash nếu cần. Thao tác export trên Cloudflare có thể tạm chặn các request D1 khác, vì vậy cân nhắc thời điểm sử dụng khi không có người thi đang hoạt động.

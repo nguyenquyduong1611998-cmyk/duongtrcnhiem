@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "environment": "cloudflare-pages-branch-preview",
+  "project": "duongtrcnhiem-test",
+  "branch": "feature/staging-demo-quiz-pilot",
+  "previewAlias": "feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev",
+  "gitCommitSha": null,
+  "operatorReview": {
+    "cloudflareDashboardDeploymentMatchesHead": "NOT_CHECKED",
+    "previewAliasAccessUnauthenticated": "NOT_CHECKED",
+    "hashedPreviewUrlAccessUnauthenticated": "NOT_CHECKED",
+    "canonicalPagesHostAccessUnauthenticated": "NOT_CHECKED",
+    "customDomainsAndAccessReviewed": "NOT_CHECKED",
+    "previewD1IdComparedPrivately": "NOT_CHECKED",
+    "firebaseStagingBuildAndRuntime": "NOT_CHECKED",
+    "freshD1SqlExportValidatedPrivately": "NOT_CHECKED",
+    "separateRestoreAndIntegrityChecked": "NOT_CHECKED",
+    "phase6MigrationsReviewedAndSeparatelyApproved": "NOT_CHECKED",
+    "phase7aSchemaPreflightApprovedAndReviewed": "NOT_CHECKED",
+    "sameStudentReadsOwnExamOnSecondDevice": "NOT_CHECKED",
+    "differentStudentDeniedCrossAccount": "NOT_CHECKED",
+    "adminGoogleResultsReadOnly": "NOT_CHECKED",
+    "lostResponseSubmitRecoveryAndNoDuplicate": "NOT_CHECKED",
+    "realPwaInstallOfflineAndAccountSwitch": "NOT_CHECKED",
+    "authorizedMeasured30to60to100AndRollback": "NOT_CHECKED"
+  }
+}

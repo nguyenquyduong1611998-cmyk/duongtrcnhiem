@@ -15,6 +15,15 @@ import { CloudStorageState } from '../types';
 import { formatDateTime } from '../utils/grading';
 import { testBackendReady, type DemoStudentCredentials, type SyntheticD1Account, type SyntheticTemporaryCredential } from '../utils/serverlessAuth';
 import { SyntheticD1AccountsPanel } from './SyntheticD1AccountsPanel';
+import { StagingDemoQuizPanel } from './StagingDemoQuizPanel';
+import { Phase5DemoTopicPanel } from './Phase5DemoTopicPanel';
+import { Phase5AdminResultsPanel } from './Phase5AdminResultsPanel';
+import type {Phase5AdminScore} from '../utils/phase5AdminResults';
+import type {Phase5DemoTopic,Phase5DemoTopicSummary} from '../utils/phase5DemoTopics';
+import type {Phase5SyntheticAttempt,Phase5DemoAnswerMap} from '../utils/phase5SyntheticSubmission';
+import type {SyntheticQuizQuestion,SyntheticQuizAttempt,SyntheticQuizAdminAttempt} from '../utils/syntheticGradedQuiz';
+import type {StagingD1PreflightReport} from '../utils/stagingD1Preflight';
+import type {SyntheticQuizReceipt} from '../utils/syntheticQuizSubmissionRecovery';
 
 interface CloudStorageModalProps {
   cloud: CloudStorageState;
@@ -37,6 +46,16 @@ interface CloudStorageModalProps {
   disableBulkSync?: boolean;
   onProvisionDemoStudent?: () => Promise<DemoStudentCredentials>;
   onDeleteDemoStudent?: (username: string) => Promise<void>;
+  onGetSyntheticQuizQuestion?: () => Promise<SyntheticQuizQuestion>;
+  onSubmitSyntheticQuiz?: (answerIndex:number) => Promise<SyntheticQuizReceipt<SyntheticQuizAttempt>>;
+  onReadOwnSyntheticQuiz?: () => Promise<SyntheticQuizAttempt|null>;
+  onListPhase5DemoTopics?: () => Promise<Phase5DemoTopicSummary[]>;
+  onReadPhase5DemoTopic?: (topicId:string,revision:number) => Promise<Phase5DemoTopic>;
+  onSubmitPhase5Demo?: (answers:Phase5DemoAnswerMap,questionIds:readonly string[]) => Promise<SyntheticQuizReceipt<Phase5SyntheticAttempt>>;
+  onReadOwnPhase5Demo?: () => Promise<Phase5SyntheticAttempt|null>;
+  onListSyntheticQuizResults?: () => Promise<SyntheticQuizAdminAttempt[]>;
+  onListPhase5AdminScores?: () => Promise<Phase5AdminScore[]>;
+  onReadStagingD1Preflight?: () => Promise<StagingD1PreflightReport>;
   onCreateDemoResultProbe?: () => Promise<void>;
   onReadDemoResultProbe?: () => Promise<void>;
   onDeleteDemoResultProbe?: () => Promise<void>;
@@ -69,6 +88,16 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
   disableBulkSync = false,
   onProvisionDemoStudent,
   onDeleteDemoStudent,
+  onGetSyntheticQuizQuestion,
+  onSubmitSyntheticQuiz,
+  onReadOwnSyntheticQuiz,
+  onListPhase5DemoTopics,
+  onReadPhase5DemoTopic,
+  onSubmitPhase5Demo,
+  onReadOwnPhase5Demo,
+  onListSyntheticQuizResults,
+  onListPhase5AdminScores,
+  onReadStagingD1Preflight,
   onCreateDemoResultProbe,
   onReadDemoResultProbe,
   onDeleteDemoResultProbe,
@@ -641,6 +670,30 @@ export const CloudStorageModal: React.FC<CloudStorageModalProps> = ({
                 </div>
               )}
             </div>
+          )}
+          {onListPhase5DemoTopics && onReadPhase5DemoTopic && demoStudentUid && (
+            <Phase5DemoTopicPanel
+              key={'phase5-'+demoStudentUid}
+              onList={onListPhase5DemoTopics}
+              onRead={onReadPhase5DemoTopic}
+              onSubmit={onSubmitPhase5Demo}
+              onReadOwn={onReadOwnPhase5Demo}
+            />
+          )}
+          {onListPhase5AdminScores && (
+            <Phase5AdminResultsPanel onList={onListPhase5AdminScores}/>
+          )}
+          {(onGetSyntheticQuizQuestion || onListSyntheticQuizResults || onReadStagingD1Preflight) && (
+            <StagingDemoQuizPanel
+              // Reset local question/answer/score when the verified Firebase
+              // student UID changes while this modal remains mounted.
+              key={demoStudentUid ?? (onListSyntheticQuizResults || onReadStagingD1Preflight ? 'staging-admin' : 'unauthenticated')}
+              onGetQuestion={onGetSyntheticQuizQuestion}
+              onSubmit={onSubmitSyntheticQuiz}
+              onReadOwn={onReadOwnSyntheticQuiz}
+              onAdminList={onListSyntheticQuizResults}
+              onAdminPreflight={onReadStagingD1Preflight}
+            />
           )}
           {onListSyntheticD1Accounts && onCreateSyntheticD1Account &&
             onSetSyntheticD1AccountStatus && onDeleteSyntheticD1Account && onResetSyntheticD1AccountPassword && (

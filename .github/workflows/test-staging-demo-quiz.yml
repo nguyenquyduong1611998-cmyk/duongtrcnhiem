@@ -1,0 +1,195 @@
+name: Staging DEMO Quiz Pilot (isolated)
+
+on:
+  push:
+    branches:
+      - feature/staging-demo-quiz-pilot
+      - 'fix/phase4-*'
+      - 'feature/phase5-*'
+      - 'feature/quiz-*'
+      - 'feature/phase6*'
+      - 'feature/phase7*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  demo-quiz-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout clean feature branch
+        uses: actions/checkout@v4
+      - name: Install Bun (match Cloudflare Pages)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Install exact committed dependencies (Cloudflare-equivalent)
+        run: bun install --frozen-lockfile
+      - name: Verify installation did not modify lockfile
+        run: git diff --exit-code -- bun.lock
+      - name: TypeScript validation
+        run: bun run lint
+      - name: Check Cloudflare Functions syntax
+        run: |
+          node --check functions/_shared/auth.mjs
+          node --check functions/_shared/demo-quiz-token.mjs
+          node --check scripts/phase4-inspect-d1-sql-export.mjs
+          node --check functions/_shared/synthetic-quiz.mjs
+          node --check functions/_shared/phase4-host-guard.mjs
+          node --check functions/_shared/staging-db-binding.mjs
+          node --check scripts/phase4-public-staging-probe.mjs
+          node --check functions/_shared/phase4-staging-preflight.mjs
+          node --check functions/api/demo-quiz/student.js
+          node --check functions/api/demo-quiz/admin.js
+          node --check functions/api/demo-quiz/preflight.js
+          node --check functions/_shared/phase5-readonly-topics.mjs
+          node --check functions/api/phase5/topics.js
+          node --check 'functions/api/phase5/topics/[topicId]/versions/[revision].js'
+          node --check functions/_shared/phase5-synthetic-grading.mjs
+          node --check functions/api/phase5/attempts/student.js
+          node --check functions/_shared/phase5-synthetic-admin.mjs
+          node --check functions/api/phase5/attempts/admin.js
+          node --check functions/_shared/phase6-timed-exam.mjs
+          node --check functions/_shared/phase6-synthetic-admin-drafts.mjs
+          node --check functions/api/phase6/admin/drafts.js
+          node --check functions/_shared/phase6-synthetic-publication.mjs
+          node --check functions/api/phase6/admin/publish.js
+          node --check functions/_shared/phase6-student-timed-exam.mjs
+          node --check functions/api/phase6/exam.js
+          node --check functions/_shared/phase6-results-readonly.mjs
+          node --check functions/api/phase6/results/student.js
+          node --check functions/api/phase6/results/admin.js
+          node --check functions/_shared/phase7-preview-d1-schema-preflight.mjs
+          node --check functions/api/phase7/preflight.js
+          node --check public/phase6f-preview-sw.js
+          node --check scripts/phase6f-ci-readiness-report.mjs
+          node --check scripts/phase7b-backup-evidence.mjs
+          node --check scripts/phase7b-preview-surface-probe.mjs
+          node --check scripts/phase7c-github-deployment-evidence.mjs
+          node --check scripts/phase7c-operator-evidence-gate.mjs
+          node --check scripts/phase7d-verify-restored-sqlite.mjs
+          node --check scripts/phase7f-offline-load-rehearsal.mjs
+          node --check scripts/phase7g-preview-acceptance-gate.mjs
+      - name: Existing DEMO authentication and D1 regressions
+        run: |
+          node --test tests/staging-security.test.mjs
+          node --test tests/serverless-auth.test.mjs
+          node --test tests/d1-unit-accounts.test.mjs
+          node --test tests/d1-unit-verify.test.mjs
+          node --test tests/d1-unit-password-change.test.mjs
+      - name: DEMO quiz token and D1 grading tests
+        run: node --test tests/phase4-synthetic-quiz.test.mjs
+      - name: Browser lost-response recovery, prior scores and no duplicate POST
+        run: bun test tests/phase4-browser-submit-recovery.test.ts
+      - name: Credential-free staging HTTP inspection simulations (NO network)
+        run: node --test tests/phase4-public-staging-probe.test.mjs
+      - name: All test Pages previews must use Firebase staging regardless of build variables
+        run: bun test tests/phase4-firebase-preview-host.test.ts
+      - name: Preview D1 binding isolation, no canonical database fallback
+        run: node --test tests/phase4-preview-d1-binding.test.mjs
+      - name: Pinned test Pages hostname, production-domain denial and flag gates
+        run: node --test tests/phase4-pinned-host.test.mjs
+      - name: Cross-device HTTP A/B and Admin simulation
+        run: node --test tests/phase4-synthetic-quiz-http-e2e.test.mjs
+      - name: Migration rollback and 100-student SQLite rehearsal
+        run: node --test tests/phase4-staging-migration-dry-run.test.mjs
+      - name: Admin read-only D1 preflight tests
+        run: node --test tests/phase4-staging-preflight.test.mjs
+      - name: Verify a local SQLite backup safely, without network or writes
+        run: node --test tests/phase4-local-backup-verify.test.mjs
+      - name: Static SQL export inspection (never execute backup SQL)
+        run: node --test tests/phase4-sql-export-static.test.mjs
+      - name: Phase 4 isolation and flags OFF by default
+        run: node --test tests/phase4-pilot-isolation.test.mjs
+      - name: Phase 5 synthetic-only content model and public-key isolation tests
+        run: node --test tests/phase5-content-model.test.mjs
+      - name: Phase 5B authenticated Preview-only read API, negative auth and answer secrecy
+        run: node --test tests/phase5-readonly-topics-http.test.mjs
+      - name: Phase 5C Preview backup profile and math-only seed are safe (offline)
+        run: node --test tests/phase5-preview-backup-and-seed.test.mjs
+      - name: Phase 5 additive Preview schema preserves existing DEMO data (offline)
+        run: node --test tests/phase5-preview-additive-schema.test.mjs
+      - name: Phase 5 student browser read-only identity, URL and no-key tests
+        run: bun test tests/phase5-browser-readonly.test.ts
+      - name: Phase 5D server-owned scoring, immutable replay, Preview-only disabled POST tests
+        run: node --test tests/phase5-synthetic-grading-http.test.mjs
+      - name: Phase 5E browser submit once, lost-response recovery and Preview UI OFF tests
+        run: bun test tests/phase5-submission-browser.test.ts
+      - name: Phase 5F Google Admin Preview read-only D1 API, isolation and no-secrets tests
+        run: node --test tests/phase5-admin-results-http.test.mjs
+      - name: Phase 5F browser Google Admin only scores, response allowlist and no tokens
+        run: bun test tests/phase5-admin-results-browser.test.ts
+      - name: Pre-start local quiz minute selection and wall-clock timer regression tests
+        run: bun test tests/quiz-adjustable-duration.test.ts
+      - name: Phase 6 Admin minutes presets and monotonic browser countdown (offline)
+        run: bun test tests/phase6-admin-time-ui.test.ts
+      - name: Phase 6A offline trusted exam deadlines, student isolation and D1 draft tests
+        run: node --test tests/phase6-timed-exam.test.mjs
+      - name: Phase 6B Google Admin synthetic draft CRUD, version races, host/auth and existing Phase5 data isolation
+        run: node --test tests/phase6b-admin-drafts-http.test.mjs
+      - name: Phase 6C immutable synthetic publication, private keys, atomic rollback and Admin-only gates
+        run: node --test tests/phase6c-synthetic-publish-http.test.mjs
+      - name: Phase 6D signed student A/B, server DB-clock deadlines, immutable scoring and recovery
+        run: node --test tests/phase6d-student-timed-exam-http.test.mjs
+      - name: Phase 6E signed read-only student histories and Admin paged DEMO score dashboard
+        run: node --test tests/phase6e-results-readonly-http.test.mjs
+      - name: Phase 6E browser read-only role boundaries, strict response projections and no-token leaks
+        run: bun test tests/phase6e-results-browser.test.ts
+      - name: Phase 6F isolated SQLite backup/restore and synthetic 100-student Phase6 rehearsal
+        run: node --test tests/phase6f-offline-recovery-100students.test.mjs
+      - name: Phase 6F PWA service worker cannot cache authenticated APIs, grades or tokens
+        run: node --test tests/phase6f-pwa-sw-security.test.mjs
+      - name: Phase 6F staging Preview PWA registration and default-OFF browser tests
+        run: bun test tests/phase6f-pwa-browser.test.ts
+      - name: Phase 6F code-only audit with explicit live Production NO-GO gates
+        run: |
+          node --test tests/phase6f-readiness-report.test.mjs
+          node scripts/phase6f-ci-readiness-report.mjs
+      - name: Phase 7A Preview D1 schema inventory, blocked partial migrations and signed Admin gate
+        run: node --test tests/phase7a-preview-d1-schema-http.test.mjs
+      - name: Phase 7A Google Admin browser inspect-only and no-leak contract
+        run: bun test tests/phase7a-preview-browser.test.ts
+      - name: Phase 7B offline D1 Preview SQL export copy-integrity and no-secrets checks
+        run: node --test tests/phase7b-backup-evidence.test.mjs
+      - name: Phase 7B credential-free fixed-host HEAD probe simulation (NO network)
+        run: node --test tests/phase7b-preview-surface-probe.test.mjs
+      - name: Phase 7C GitHub Cloudflare Pages check tied to exact staging SHA, offline mocks only
+        run: node --test tests/phase7c-github-deployment-evidence.test.mjs
+      - name: Phase 7C private operator readiness ledger remains NO-GO even if self-reported reviewed
+        run: |
+          node --test tests/phase7c-operator-evidence-gate.test.mjs
+          node scripts/phase7c-operator-evidence-gate.mjs
+      - name: Phase 7D read-only comparison of isolated SQLite snapshots (no Cloudflare, no SQL import)
+        run: node --test tests/phase7d-restored-sqlite-verification.test.mjs
+      - name: Phase 7E independent signed PC/phone/Admin HTTP sessions using one synthetic SQLite file (NO network)
+        run: node --test tests/phase7e-multidevice-shared-d1-http.test.mjs
+      - name: Phase 7E browser token separation, cross-device recovery and no auto re-submit
+        run: bun test tests/phase7e-multidevice-browser-recovery.test.ts
+      - name: Phase 7E Firebase UID keyed UI resets, no-store API and PWA private cache isolation
+        run: node --test tests/phase7e-account-state-isolation.test.mjs
+      - name: Phase 7I in-memory same-session refresh without mixing answers between devices (offline)
+        run: bun test tests/phase7i-session-refresh.test.ts
+      - name: Phase 7J read-only D1 history first-load and late account response guard (offline)
+        run: bun test tests/phase7j-history-on-open.test.ts
+      - name: Phase 7K PC and iPhone lost-start/lost-submit response, D1-only recovery simulation
+        run: bun test tests/phase7k-offline-start-submit-browser.test.ts
+      - name: Phase 7F 30-60-100 synthetic clients, server-owned grades and Admin summaries (OFFLINE, NOT live load)
+        run: |
+          node --test tests/phase7f-offline-load-30-60-100.test.mjs
+          node scripts/phase7f-offline-load-rehearsal.mjs
+      - name: Phase 7F PWA offline, A-to-B account isolation, query cache key denial and SW v2 rotation
+        run: node --test tests/phase7f-pwa-offline-profile-isolation.test.mjs
+      - name: Phase 7G offline Cloudflare Preview operator evidence gate, stale SHA and zero-secrets security regressions
+        run: |
+          node --test tests/phase7g-preview-acceptance-gate.test.mjs
+          node scripts/phase7g-preview-acceptance-gate.mjs
+      - name: Build website
+        run: bun run build
+      - name: Build staging website
+        env:
+          VITE_FIREBASE_ENV: staging
+        run: bun run build
+      - name: Verify Preview PWA static assets copied without advertising install in HTML
+        run: |
+          node -e "const fs=require('fs');for(const x of ['dist/phase6f-preview.webmanifest','dist/phase6f-preview-icon.svg','dist/phase6f-preview-sw.js'])if(!fs.existsSync(x))throw Error('PWA_BUILD_ASSET_MISSING');const html=fs.readFileSync('dist/index.html','utf8');if(html.includes('phase6f-preview.webmanifest')||html.includes('phase6f-preview-sw.js'))throw Error('PWA_DEFAULT_OFF_BROKEN');"

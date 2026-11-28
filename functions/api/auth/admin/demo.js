@@ -1,9 +1,11 @@
+import {bindStagingDatabaseForRequest} from '../../../_shared/staging-db-binding.mjs';
 import {
   requireStaging,json,checkRequest,smallJson,verifiedGoogleAdmin,
   usernameKey,hashPassword,randomPassword,noSecrets
 } from '../../../_shared/auth.mjs';
 
 export async function onRequestPost({request,env}){
+  env=bindStagingDatabaseForRequest(env,request);
   const invalid=checkRequest(request);
   if(invalid)return invalid;
   try{requireStaging(env);}catch{return noSecrets();}

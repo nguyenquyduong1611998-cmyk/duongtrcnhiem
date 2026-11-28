@@ -358,3 +358,9 @@ WHERE type IN ('table', 'trigger') AND name LIKE 'phase6_%'
 ORDER BY type, name;
 ```
 Kỳ vọng 3 bảng `phase6_admin_draft_events`, `phase6_admin_drafts`, `phase6_admin_publications` và 6 triggers `phase6_admin_draft_created`, `phase6_admin_draft_deleted`, `phase6_admin_draft_saved`, `phase6_publication_no_delete`, `phase6_publication_no_update`, `phase6_publication_requires_published`. Khi đã thấy đủ tên, mới kiểm 8 row counts baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok` và `PRAGMA foreign_key_check` không có lỗi trước khi cho phép 6A. Nếu có bất thường: STOP, không retry hoặc restore. API Phase6 flags OFF; PR36 Draft; không đụng Production.
+
+## Bước 198 — Operator xác nhận 9 đối tượng Phase6 trên D1 Preview sau 6C (28/11/2026)
+
+Người vận hành trả lời trực tiếp **"có 9 đối tượng"** sau hướng dẫn chạy read-only `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;` tại `duongtrcnhiem-auth-preview`. Kỳ vọng đã thông báo trong Bước 198 là 3 bảng Phase6 và 6 trigger Phase6. **Mức chứng cứ: operator-reported count, không có ảnh chụp danh sách 9 tên ở bước này**; do đó chỉ đánh dấu `PREVIEW_PHASE6C_SCHEMA_COUNT: PASS (operator-reported)`, chưa xác minh chính xác từng định nghĩa.
+
+**Bước 199 — hậu kiểm bắt buộc, chỉ đọc trên Preview:** truy vấn `COUNT(*)` của 8 bảng gốc (baseline `5,0,3,1,1,1,1,2`, tổng 14), `PRAGMA quick_check;` phải trả `ok`, `PRAGMA foreign_key_check;` phải trả 0 dòng. Nếu sai khác, dừng triển khai; **không** tự chạy lại 6C, chạy 6A, hoặc time-travel restore. Ba server flags Phase6 vẫn OFF, PR36 Draft, Production không thay đổi.

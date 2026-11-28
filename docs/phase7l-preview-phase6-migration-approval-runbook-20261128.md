@@ -407,3 +407,23 @@ Kỳ vọng 4 bảng Phase6/9 triggers, tổng 13 đối tượng. Trước khi 
 Người vận hành đã chạy truy vấn metadata được hướng dẫn ở Bước 201 trên `duongtrcnhiem-auth-preview`, trả lời **"có 13 đối tượng"**. Truy vấn đã yêu cầu `type IN ('table','trigger')`, `name LIKE 'phase6_%'`; 13 đối tượng phù hợp với kỳ vọng **4 bảng/9 trigger** sau migration 6B→6C→6A. **Chứng cứ: operator-reported count**; chưa có ảnh/danh sách 13 tên trong chính lần báo này, nên không được coi là đã kiểm chứng độc lập toàn bộ tên và định nghĩa trigger.
 
 **Gate `PREVIEW_PHASE6A_SCHEMA_COUNT: PASS (operator reported)`**, **gate `PREVIEW_PHASE6A_FULL_POSTFLIGHT: PENDING`**. Trước khi chạy 6D, bắt buộc so sánh 8 bảng gốc với baseline `5,0,3,1,1,1,1,2`, thực hiện `PRAGMA quick_check;` (kỳ vọng `ok`) và `PRAGMA foreign_key_check;` (kỳ vọng 0 hàng) trên đúng `duongtrcnhiem-auth-preview`; tất cả read-only. Nếu bất kỳ giá trị nào sai, STOP, không tự retry/restore hoặc chạy Phase6D. Giữ cờ API `PHASE6_*` chưa cấu hình, PR36 Draft, không đụng Production.
+
+## Bước 202 — Preview Phase 6A postflight PASS do người vận hành xác nhận (28/11/2026)
+
+Người vận hành trả lời **"tất cả đều đạt"** sau khi được hướng dẫn ba phép kiểm ở Bước 202 trên `duongtrcnhiem-auth-preview`. Theo kết quả đã yêu cầu và được xác nhận:
+- Số hàng 8 bảng gốc: `5,0,3,1,1,1,1,2` (tổng 14).
+- `PRAGMA quick_check;` = `ok`.
+- `PRAGMA foreign_key_check;` không trả hàng lỗi.
+- Bước 201 đã được người vận hành xác nhận đủ 13 đối tượng Phase6 (mong đợi 4 bảng, 9 trigger).
+
+**Mức bằng chứng:** người vận hành xác nhận kết quả, **không có ảnh màn hình cho ba truy vấn Bước 202**. Gate `PREVIEW_PHASE6A_POSTFLIGHT: PASS (operator-reported)` trong phạm vi kiểm tra số hàng/quick_check/FK; không xác nhận từng bản ghi byte-for-byte hay hiệu lực thực tế của API Phase6.
+
+## Bước 203 — Phê duyệt có điều kiện, chỉ một file Phase 6D trên D1 Preview
+
+Đã đối chiếu file staging `serverless/d1-phase6d-timed-submissions-draft.sql` (Git blob SHA `92ed95a106e59337f8a76d3f9e97c8630b30ecf9`): chỉ DDL tạo `phase6_exam_submissions`, index `phase6_submissions_uid_time` và ba trigger `phase6_submission_guard`, `phase6_submission_no_update`, `phase6_submission_no_delete`; tham chiếu `phase6_exam_sessions`, `phase6_admin_publications`, `phase5_content_versions`, `demo_students`. Không thấy lệnh SQL cập nhật/xóa bảng gốc trong file. Đã chạy thử remote trên D1 clone `duongtrcnhiem-restore-20261128` và có hậu kiểm PASS. Theo phê duyệt tuần tự trước đó của người vận hành tại Bước 194, bước này chỉ phép chạy **6D** lên đúng `duongtrcnhiem-auth-preview`:
+```cmd
+npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6d-timed-submissions-draft.sql
+```
+Đây là lệnh **ghi remote**. Operator phải kiểm tra đích trong prompt và dừng nếu khác `duongtrcnhiem-auth-preview` hoặc có lỗi, **không** tự retry. Trước khi chạy bảo đảm không có phiên DEMO sử dụng và backup/Time Travel đã xác minh vẫn sẵn sàng. Chưa có bằng chứng Phase6D thực thi trên Preview tại thời điểm ghi phần này.
+
+Sau thực thi, chỉ đọc metadata để xác minh đủ 5 bảng Phase6/12 triggers, kiểm 8 bảng cũ 14 hàng, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0, rồi mới xem xét bật flags API Phase6 qua phê duyệt riêng. Giữ `PHASE6_*` server flags OFF trong suốt bước này, PR36 Draft, Production không bị thay đổi.

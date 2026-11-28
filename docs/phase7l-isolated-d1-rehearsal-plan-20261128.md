@@ -277,3 +277,15 @@ Số dòng trong bản restore:
 - Cloudflare hỗ trợ export SQL và import vào D1 qua Wrangler `d1 execute --file`. Tài liệu: https://developers.cloudflare.com/d1/best-practices/import-export-data/ (cập nhật 20/11/2026); remote `execute` thật sự ghi lên DB remote. Không phát lệnh ghi khi chưa xác minh DB ID, quyền sở hữu, quota và bản export.
 - Điều kiện dừng: yêu cầu nâng cấp trả phí; không kiểm chứng rõ DB ID/mục tiêu; file chứa dữ liệu chưa được phép nhân bản; bất kỳ lỗi SQL/foreign key nào; không có người chịu trách nhiệm phục hồi/rollback.
 - Trước khi bấm Create database, cần kiểm tra lại tình trạng D1 Free/Quota và chọn tên lab tách biệt. Đây là **chuẩn bị**, không phải phê duyệt migration Phase 6 trên `duongtrcnhiem-auth-preview`, vốn tiếp tục giữ 0 bảng Phase6 và các API flags OFF.
+
+## Bước 171 — D1 target khôi phục độc lập được tạo (ảnh operator 28/11/2026)
+
+Người vận hành đã chủ động tạo một D1 mới, tên đúng `duongtrcnhiem-restore-20261128`. Ảnh Cloudflare D1 Overview:
+- `Number of Tables: 0`
+- `Storage used (current): 12.29 KB` — dung lượng hạ tầng/SQLite của DB mới, **không suy ra đã import**.
+- Các bộ đếm truy vấn/rows trong 24 giờ là 0.
+- Database ID hiển thị trong Cloudflare UI nhưng **không sao chép UUID vào tài liệu GitHub**.
+
+**Gate blank separate target: PASS (Dashboard observation)**. Đã tạo D1 rỗng, **chưa** import hay áp dụng SQL; chưa có bằng chứng kết nối với Pages và phải giữ database này không có binding nào. Không đưa bản SQL backup lên GitHub/chat.
+
+**Bước 172 (read-only):** trên CMD máy đã đăng nhập Wrangler, chạy `npx wrangler d1 info duongtrcnhiem-restore-20261128` và so sánh Name/ID với Dashboard (không cần gửi full UUID). Lệnh này chỉ lấy thông tin metadata, không import. Trước khi nhân bản bản backup 28/11 lên Cloudflare D1 mới, người có quyền dữ liệu phải xác nhận 5 account DEMO, các password hashes và 14 dòng đều được phép nhân bản trong cùng tài khoản Cloudflare, không chứa dữ liệu thật/nhạy cảm của đơn vị. Nếu không chắc chắn, ưu tiên nhập schema-only cộng dữ liệu synthetic mới, không nhập nguyên backup.

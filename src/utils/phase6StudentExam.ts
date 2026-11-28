@@ -29,8 +29,14 @@ export interface Phase6ExamState {
   topic?:{title:string;questions:Phase6ExamQuestion[]};
   result?:Phase6ExamResult|null;
 }
+// Cloudflare Text build variables can contain a trailing newline/space.
+// Accept only the literal enabled value after removing surrounding whitespace.
+// All staging, exact-host, Firebase UID and server-side API guards remain intact.
+export const isPhase6StudentTimedUiFlagEnabled=(flag:unknown):boolean=>
+  typeof flag==='string'&&flag.trim()==='true';
+
 export const isPhase6StudentExamUiEnabled=(host:string,flag:unknown):boolean=>
-  IS_FIREBASE_STAGING&&flag==='true'&&isPhase5DemoPreviewHostname(host);
+  IS_FIREBASE_STAGING&&isPhase6StudentTimedUiFlagEnabled(flag)&&isPhase5DemoPreviewHostname(host);
 
 function record(value:unknown):Record<string,unknown>{
   if(!value||typeof value!=='object'||Array.isArray(value))

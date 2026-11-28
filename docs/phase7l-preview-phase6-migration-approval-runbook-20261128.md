@@ -427,3 +427,20 @@ npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1
 Đây là lệnh **ghi remote**. Operator phải kiểm tra đích trong prompt và dừng nếu khác `duongtrcnhiem-auth-preview` hoặc có lỗi, **không** tự retry. Trước khi chạy bảo đảm không có phiên DEMO sử dụng và backup/Time Travel đã xác minh vẫn sẵn sàng. Chưa có bằng chứng Phase6D thực thi trên Preview tại thời điểm ghi phần này.
 
 Sau thực thi, chỉ đọc metadata để xác minh đủ 5 bảng Phase6/12 triggers, kiểm 8 bảng cũ 14 hàng, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0, rồi mới xem xét bật flags API Phase6 qua phê duyệt riêng. Giữ `PHASE6_*` server flags OFF trong suốt bước này, PR36 Draft, Production không bị thay đổi.
+
+## Bước 203 — Phase 6D Preview Wrangler execution statistics (operator screenshot, 28/11/2026)
+
+Người vận hành đã làm theo hướng dẫn Bước 203 chạy `npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6d-timed-submissions-draft.sql`. Ảnh phần cuối kết quả Wrangler hiển thị:
+- `Total queries executed: 5`
+- `Rows read: 3`
+- `Rows written: 9`
+- `Database size (MB): 0.20`
+- Một current bookmark (không sao chép vào GitHub).
+
+Không thấy lỗi trong đoạn ảnh được chụp. Đây là thống kê tương ứng với 5 DDL dự kiến cho 6D: bảng `phase6_exam_submissions`, index và 3 triggers. **Ảnh bị cắt, không hiện tên DB hay câu lệnh**, nên việc gán với Preview dựa trên ngữ cảnh thao tác Bước 203, không phải chứng cứ độc lập của đích.
+
+**Trạng thái `PREVIEW_PHASE6D_EXECUTION_REPORTED_SUCCESS`, `POSTFLIGHT: PENDING`.** Không coi `rows written=9` là số bản ghi bài nộp, không suy ra đủ 5 bảng/12 triggers chỉ từ execution summary.
+
+**Bước 204 chỉ đọc:** tại `duongtrcnhiem-auth-preview` (không nhầm restore-test/restore-20261128), truy vấn metadata `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;`, kỳ vọng 5 bảng/12 trigger (17 hàng) và bốn đối tượng Phase6D `phase6_exam_submissions`, `phase6_submission_guard`, `phase6_submission_no_delete`, `phase6_submission_no_update`. Sau đó hậu kiểm 8 bảng baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0 hàng; mới chốt toàn bộ. Nếu bất thường, dừng, không tự chạy lại/restore.
+
+Giữ ba flag API `PHASE6_*` OFF; PR36 Draft, không merge, không thay đổi Production.

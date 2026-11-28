@@ -217,3 +217,11 @@ Theo bản draft Phase 6D trên GitHub, 5 DDL dự kiến tạo một bảng `ph
 **Trạng thái: `REMOTE_CLONE_PHASE6D_EXECUTION_REPORTED_SUCCESS`; hậu kiểm Phase 6D CHƯA ĐẠT.** Ảnh chỉ hiển thị phần kết quả cuối, nên việc xác nhận đúng database đích dựa trên lệnh hướng dẫn/liên tục hội thoại; không coi số `rows written` là bản ghi của ứng dụng.
 
 **Bước 189 chỉ đọc:** operator mở Cloudflare Studio của đúng `duongtrcnhiem-restore-20261128`, chạy `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;`; mong đợi **5 bảng Phase6 + 12 triggers = 17 hàng**. Sau đó kiểm tra baseline 8 bảng cũ `5,0,3,1,1,1,1,2` và `PRAGMA quick_check;` → `ok`, `PRAGMA foreign_key_check;` → 0 hàng. Nếu sai, STOP, không retry migration. Không bật Phase6 flags, không chạy 6D lên `duongtrcnhiem-auth-preview`, không merge PR36 hoặc triển khai Production.
+
+## Bước 189 — Operator báo đủ 17 đối tượng Phase 6 sau 6D (28/11/2026)
+
+Sau khi chạy truy vấn metadata `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;` trên D1 bản sao `duongtrcnhiem-restore-20261128`, người vận hành phản hồi trực tiếp **"có 17 đối tượng"**.
+
+Theo kết quả mong đợi, 17 đối tượng bao gồm 5 bảng và 12 trigger Phase6. **Mức chứng cứ: OPERATOR-REPORTED tổng số 17; chưa có ảnh đầy đủ từng tên ở lần gửi này**, chưa đối chiếu chi tiết trực tiếp names của Phase6D trong Bước 189. Không đánh đồng số lượng đúng với việc trigger định nghĩa chính xác hay hoạt động đúng trên runtime.
+
+**Trạng thái:** `REMOTE_CLONE_PHASE6D_SCHEMA_COUNT: PASS (operator-reported)`. **Chưa hoàn tất hậu kiểm Phase6D:** yêu cầu 8 row counts `5,0,3,1,1,1,1,2`, `PRAGMA quick_check;` → `ok`, `PRAGMA foreign_key_check;` → 0 hàng trên đúng clone. Nếu không đạt: STOP, không tái chạy migration và không đụng D1 Preview. Nếu đạt, có thể đánh dấu rehearsal bốn SQL D1 clone đầy đủ, nhưng việc chạy trên `duongtrcnhiem-auth-preview` cần phê duyệt riêng và xác minh preflight mới. Ba server flags `PHASE6_*` vẫn chưa cấu hình; PR36 giữ Draft.

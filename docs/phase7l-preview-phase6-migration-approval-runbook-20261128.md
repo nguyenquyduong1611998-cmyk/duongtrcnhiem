@@ -895,3 +895,17 @@ JOIN phase5_content_versions v
 Kỳ vọng **đúng 1 hàng**: `revision=3`, `state=published`, `time_limit_seconds=1800`, `questions=1`, `answer_keys=1`, `total_publications=1`. Nếu khác, STOP, không retry publish. Sau khi pass mới tiếp tục `PRAGMA quick_check` và `PRAGMA foreign_key_check` rồi cân nhắc thử student exam theo phase gate riêng.
 
 Không bật student/results flags, không chạy bất kỳ SQL sửa dữ liệu nào, PR36 còn Draft, Production không đổi.
+
+## Bước 242 — Published Phase6C revision 3 verified in Preview D1 (operator screenshot, 28/11/2026)
+
+Operator chạy read-only SELECT nối `phase6_admin_publications` với `phase5_content_versions` và đếm câu hỏi/answer keys tại `duongtrcnhiem-auth-preview`; ảnh D1 Studio hiển thị **đúng 1 hàng**:
+- `revision=3`
+- `state=published`
+- `time_limit_seconds=1800` (30 phút)
+- `questions=1`
+- `answer_keys=1`
+- `total_publications=1`
+
+**Gate `PHASE6C_PUBLICATION_D1_READBACK: PASS (operator screenshot)`**. Đã xác minh phiên bản published có đủ 1 câu và 1 private answer key, không đưa giá trị đáp án đúng ra log. Bước241 loss-of-response retry hiển thị publication đã có, không tạo thêm bản sao.
+
+**Bước 243 (chỉ đọc)** kiểm tra `PRAGMA quick_check;` mong đợi một hàng `ok`, và `PRAGMA foreign_key_check;` mong đợi **0 hàng**, đúng **D1 Preview** sau xuất bản. Chạy từng câu riêng biệt trong D1 Studio; không chạy sửa schema, không lặp publish. Nếu toàn vẹn PASS, mới xem xét lần lượt bật API Phase6D Student timed-exam trong Preview với auth/host isolation; giữ ba cờ student/results OFF cho đến bước chuẩn bị riêng. PR36 Draft và Production không đổi.

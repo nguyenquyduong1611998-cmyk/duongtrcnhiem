@@ -1031,3 +1031,13 @@ Operator gửi screenshot GitHub tab `Checks` của PR38: `Cloudflare Workers an
 Operator gửi ảnh merge gate của [PR38](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/38): `All checks have passed` (**2 successful checks**), `No conflicts with base branch` và nút `Merge pull request`. Chữ `Convert to draft` cho thấy đã chuyển khỏi Draft. GitHub connector `fetch_pr` xác minh `draft=false`, `state=open`, `merged=false`, `mergeable=true`, head SHA `6ac30e98a06761e4f1a37e9827bb909942529650`, base `feature/staging-demo-quiz-pilot`; một file `src/App.tsx` thay đổi.
 
 **Gate `PR38_READY_TO_MERGE: PASS`, `PR38_MERGED: NOT YET`**. Hướng dẫn operator tự bấm Merge pull request → Confirm merge chỉ vào đúng staging branch; không tự merge qua API, không chạm Production hoặc PR36. Sau khi operator báo thành công, xác minh GitHub merge SHA và pinned Preview alias deployment mới trước khi test dashboard `?phase6_debug=1` chỉ bằng học viên DEMO; không bắt đầu/nộp bài, không log token/UID.
+
+## Bước 254 — PR38 merged vào staging, chờ Cloudflare pinned Preview (operator screenshot và GitHub, 28/11/2026)
+
+Operator gửi screenshot GitHub `Pull request successfully merged and closed` cho [PR38](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/38). Đối chiếu GitHub `fetch_pr` xác nhận `state=closed`, `draft=false`, `merged=true`, `merged_at=2026-11-28T08:50:48Z`, merge SHA **`431d7a0090ba2ee88804e56947bbfb09bc23e4a6`**, base `feature/staging-demo-quiz-pilot`. Bản chẩn đoán opt-in booleans chỉ trên pinned Preview/tài khoản DEMO đã vào nhánh staging; **chưa xác minh có deployment mới trên alias**.
+
+**Gate `PR38_MERGED_TO_STAGING: PASS`; `PR38_PINNED_PREVIEW_DEPLOY: PENDING`; `PHASE6D_STUDENT_UI_ROOT_CAUSE: UNKNOWN`.**
+
+**Bước 255:** vào Cloudflare Workers & Pages `duongtrcnhiem-test` → Deployments; tìm bản **Preview** nhánh `feature/staging-demo-quiz-pilot`, commit **`431d7a0`** (Merge PR38), trạng thái `success`; mở Details xác nhận alias **`feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`**. Nếu chưa có đúng SHA/alias, STOP chứ không Retry bản cũ. Không dùng hashed/branch PR38 URL để test signed student API.
+
+Sau khi gate 255 PASS, mở pinned URL `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1` trong Edge InPrivate có tài khoản học viên DEMO, vào Mục Chuyên Đề, xem panel `Phase 6D — Chẩn đoán hiển thị (chỉ Preview DEMO)`, chụp **6 trạng thái ĐẠT/CHƯA ĐẠT** không cần username/UID/email/token. **Không bấm `Bắt đầu làm bài` hoặc Nộp bài**, không sửa D1, Phase6E OFF, PR36 Draft, Production/main không đổi.

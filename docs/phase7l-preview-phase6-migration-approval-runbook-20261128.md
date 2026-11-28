@@ -1159,3 +1159,14 @@ Operator gửi ảnh GitHub Checks PR40, commit `16208a6`:
 - GitHub `fetch_pr` xác minh PR40 **draft=true**, `state=open`, `merged=false`, `mergeable=true`, base `feature/staging-demo-quiz-pilot`, head `feature/phase6d-normalize-vite-ui-flag-20261128`, SHA `16208a6485138a079e55859de1cde72dd1a670d3`, đúng **2 file** frontend.
 
 **Gate `PR40_CI_DEPLOY_GREEN: PASS`; `PR40_READY_TO_MERGE: PENDING`; `PR40_MERGED: NO`**. Bước265 operator mở PR40 Conversation → `Ready for review`, rồi kiểm tra 2 checks xanh/no conflicts trước khi tự gộp vào **feature/staging-demo-quiz-pilot**, không main. Sau merge phải xác minh Cloudflare pinned Preview alias nhận merge commit mới rồi mở Edge InPrivate student `/?phase6_debug=1`, kỳ vọng 6/6 ĐẠT và panel 6D hiện. Chỉ dùng `Tải danh sách đề thi DEMO` read-only, chưa Start/Submit. PR39 build-only diagnostic vẫn Draft, không gộp. Phase6E OFF, PR36 Draft, Production không đổi.
+
+## Bước 265 — PR40 Ready for review, hai check PASS và mergeable (operator screenshot, 28/11/2026)
+
+Operator gửi ảnh GitHub merge gate PR40:
+- `All checks have passed` (2 successful checks).
+- `No conflicts with base branch`; merging can be performed automatically.
+- Nút xanh `Merge pull request` đã có; `Convert to draft` cho thấy PR đã rời Draft.
+
+GitHub connector `fetch_pr` xác minh PR40 `state=open`, `draft=false`, `merged=false`, `mergeable=true`, base **`feature/staging-demo-quiz-pilot`**, head `feature/phase6d-normalize-vite-ui-flag-20261128`, SHA `16208a6485138a079e55859de1cde72dd1a670d3`, 2 file frontend.
+
+**Gate `PR40_READY_TO_MERGE: PASS`, `PR40_MERGED: NO` tại thời điểm ghi**. Operator được hướng dẫn tự bấm `Merge pull request` → `Confirm merge` trên PR40, chỉ vào staging, không main/PR39/PR36; không merge bằng API. Sau operator gửi thông báo merged, xác minh merge SHA qua GitHub, Cloudflare pinned Preview alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` deploy đúng SHA, mở `/?phase6_debug=1` với DEMO student, kỳ vọng tất cả 6 booleans ĐẠT + Phase6D panel xuất hiện; chỉ thử `Tải danh sách đề thi DEMO` read-only khi UI hiện. Không bấm Start/Submit, không chỉnh D1/Firebase/Production. PR39 build-only probe vẫn Draft chưa merge.

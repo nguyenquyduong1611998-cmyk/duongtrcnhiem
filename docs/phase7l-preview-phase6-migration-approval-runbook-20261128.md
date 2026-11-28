@@ -663,3 +663,20 @@ SELECT
 Ban đầu Bước206 cả hai bảng bằng 0. Nếu `drafts=1,events=1,creates=1`, xác nhận INSERT+trigger hoạt động, API kiểm tra sai giả thuyết rất hợp lý; nếu vẫn `0,0,0` cần đọc log runtime/SQL lỗi server được redacted, không giả định nguyên nhân. Bất kỳ sai khác nào: STOP, điều tra trước khi retry.
 
 Chưa sửa code, chưa chạy INSERT/UPDATE/DELETE từ SQL Studio, chưa bật flags publish/student/results hay thay đổi Production. PR36 Draft; sửa code chỉ qua nhánh review/test riêng sau khi có bằng chứng.
+
+## Bước 224 — D1 Preview xác nhận create đã commit dù UI lỗi + PR37 sửa trigger-inclusive changes (operator screenshot, 28/11/2026)
+
+Operator đã chạy truy vấn read-only trên `duongtrcnhiem-auth-preview` ngay sau lỗi create Bước223:
+```sql
+SELECT
+ (SELECT COUNT(*) FROM phase6_admin_drafts) AS drafts,
+ (SELECT COUNT(*) FROM phase6_admin_draft_events) AS events,
+ (SELECT COUNT(*) FROM phase6_admin_draft_events WHERE event_type='create') AS creates;
+```
+Ảnh D1 Studio hiển thị **`drafts=1`, `events=1`, `creates=1`**. Kết hợp Bước206 có 0/0 trước đó, xác nhận lần thử tạo nháp đã **ghi một draft và một event** dù frontend báo lỗi. Không còn được retry Create vì có thể tạo trùng bản nháp. Chưa xét dữ liệu nháp có thể sửa/xóa qua UI.
+
+Tài liệu Cloudflare D1 `meta.changes` dựa trên `sqlite3_total_changes()` (https://developers.cloudflare.com/api/resources/d1/); SQLite total_changes bao gồm trigger (https://www.sqlite.org/c3ref/total_changes.html). `functions/_shared/phase6-synthetic-admin-drafts.mjs` đang reject `meta.changes>1`, vì vậy một direct row + một audit trigger row rất có khả năng dẫn đến báo 503 **sau commit**. Đây là chẩn đoán từ source/schema + DB state, chưa có log thực tế của `PHASE6_D1_WRITE_UNEXPECTED`.
+
+**PR sửa riêng:** [PR37](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/37) Draft, nhánh `feature/phase6b-d1-audit-change-count-fix-20261128`, base `feature/staging-demo-quiz-pilot`. Thay đổi helper `changed()` để chấp nhận `meta.changes` bằng 1 hoặc 2 (vẫn chặn 0, invalid và >2); cập nhật test Phase6B/6C để mock `meta.changes` bằng chênh lệch `total_changes()` và test tạo/lưu/xóa đều đúng 2 thay đổi. **PR37 chưa merge, chưa deploy và CI chưa xác nhận PASS khi ghi phần này.**
+
+**Bước 225 read-only:** operator vào tab Admin trên pinned Preview, bấm `Tải danh sách bản nháp` **một lần**, kỳ vọng `Bản nháp DEMO: 1`; xem tiêu đề, thời gian 15 phút. Không bấm Tạo đề, không bấm Xóa, không chỉnh thời gian/lưu cho đến khi PR37 CI/review và deployment Preview mới được xác minh. Không đụng Production, D1 schema hay API publish/student/results; PR36 vẫn Draft.

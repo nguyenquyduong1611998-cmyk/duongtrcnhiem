@@ -520,3 +520,16 @@ Cloudflare Pages docs về build-time vars và preview deployments: https://deve
 Người vận hành chụp ảnh selector **Preview** và xác nhận bằng lời đã lưu `PHASE6_ADMIN_DRAFTS_ENABLED=true` (server runtime flag) rồi trả lời `đã thêm vite` sau hướng dẫn thêm `VITE_PHASE6_ADMIN_DRAFTS_UI=true` (build-time flag) vào **Workers & Pages → duongtrcnhiem-test → Settings → Preview → Variables and secrets**. Hai cờ được ghi nhận theo xác nhận operator, **chưa có ảnh liệt kê cặp cờ này sau Save** hoặc kiểm chứng chúng đã có hiệu lực trong deployment. Cờ xuất bản (`PHASE6_ADMIN_PUBLISH_ENABLED`, `VITE_PHASE6_ADMIN_PUBLISH_UI`) và ba cờ student/results vẫn OFF/chưa cấu hình.
 
 **Gate `ADMIN_DRAFT_SERVER_AND_BUILD_FLAGS_CONFIGURED: OPERATOR_REPORTED`**, `PREVIEW_NEW_BUILD_WITH_FLAGS: PENDING`. Vite `import.meta.env.VITE_PHASE6_ADMIN_DRAFTS_UI` được biên dịch lúc build, nên phải có **build Preview mới của nhánh đúng** `feature/staging-demo-quiz-pilot`. Chỉ retry/rebuild deployment thuộc nhánh này, tuyệt đối không chọn Production hoặc merge PR36. Trên Cloudflare Pages → Deployments, chọn deployment **Preview** đúng branch và xem thao tác retry/build lại; nếu không có tùy chọn, cần bước riêng cho commit rỗng lên đúng branch (không thay code). Dừng trước nút không rõ nghĩa và gửi screenshot. Sau build thành công, xác minh alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` và Google Admin signed UI; bắt đầu bằng read-only `Tải danh sách bản nháp` dự kiến `0`. Không bấm tạo/publish trước nghiệm thu.
+
+## Bước 211 — Retry Cloudflare Pages Preview báo Success, cần kiểm tra source branch (operator screenshot 28/11/2026)
+
+Sau khi operator xác nhận đã thêm `PHASE6_ADMIN_DRAFTS_ENABLED=true` và `VITE_PHASE6_ADMIN_DRAFTS_UI=true` vào Settings Preview, họ dùng `Retry deployment` từ dòng commit `75f2d81` rồi gửi ảnh **All deployments**:
+- Environment: `Preview`
+- Commit: `75f2d81` (merge PR35)
+- Deployment mới (hashed URL): `f9811742.duongtrcnhiem-test.pages.dev` (không xem URL hash là hostname được API cho phép).
+- Status: success, a few seconds ago
+- **Source cắt ngắn hiển thị `feature/phase7...`** (không phải rõ ràng `feature/staging-demo-quiz-pilot`).
+
+Đối chiếu GitHub PR35: merge commit `75f2d814...` đã merge `feature/phase7k-offline-submit-recovery-20261127` vào `feature/staging-demo-quiz-pilot`. PR36 vẫn Draft, source branch là `feature/phase7l-recovery-acceptance-checklist-20261127`, base `feature/staging-demo-quiz-pilot`. Phải xác minh **full Source branch** trong Cloudflare Deployment details, không suy đoán từ commit hash. Code Phase6 chỉ chấp nhận **hostname alias cố định** `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`; hashed deployment URL không đủ quyền. Cloudflare Preview build Success không chứng minh hostname alias đã cập nhật, UI flags được đóng gói, hay signed Admin API hoạt động.
+
+**Gate `PREVIEW_RETRY_BUILD_REPORTED_SUCCESS`: PASS; `PINNED_ALIAS_BRANCH_AND_UI_FLAGS_VERIFIED`: PENDING**. Bước 212: operator mở **Details** deployment mới `f9811742...` → chụp phần full Branch/Source và Aliases (nếu có), không lộ secrets. Nếu branch không đúng, không bấm Retry tiếp; xem xét tạo build mới từ đúng branch thay vì thay Production/merge PR36. Chưa bật `PHASE6_ADMIN_PUBLISH_ENABLED` hay ba Phase6 student/results flags, chưa thử POST API, không đổi D1 schemas nữa.

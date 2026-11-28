@@ -320,3 +320,19 @@ Hai ảnh kết quả hiển thị `sqlite_master · 2×5`, đủ năm hàng:
 **Gate `PREVIEW_PHASE6B_SCHEMA_PRESENCE: PASS`**: tồn tại 2 bảng và 3 trigger đúng tên trên D1 Preview theo ngữ cảnh thao tác. Ảnh được cắt không hiện header tên DB; nguồn là trình tự Bước 194–195. Chưa kiểm chứng thiết kế trigger SQL exact hoặc hành vi API.
 
 **Gate `PREVIEW_PHASE6B_INTEGRITY_AND_BASELINE: PENDING`**: Bước 196 phải đọc số dòng của 8 bảng cũ `5,0,3,1,1,1,1,2`, `PRAGMA quick_check = ok` và `PRAGMA foreign_key_check` trả 0 hàng trên chính `duongtrcnhiem-auth-preview`. Nếu có thay đổi, dừng và kiểm tra trước khi chạy 6C; không tự rollback hoặc chạy lại 6B. Ba flag Phase 6 vẫn chưa được cấu hình; chưa thay đổi Production hoặc merge PR36.
+
+## Bước 196 — Phase 6B hậu kiểm trên D1 Preview đạt (operator screenshots + confirmation, 28/11/2026)
+
+Theo hai ảnh Cloudflare D1 Studio do operator gửi, khi đang kiểm tra `duongtrcnhiem-auth-preview`:
+- `PRAGMA quick_check;` trả `ok`.
+- `PRAGMA foreign_key_check;` trả `Query · 4×0`, không phát hiện hàng lỗi khóa ngoại.
+- Operator xác nhận bằng lời 8 bảng cũ có đúng các số lượng `5, 0, 3, 1, 1, 1, 1, 2` (14 hàng). Ảnh đếm số dòng không được gửi trong bước 196.
+- Bước 195 đã chụp đúng 2 bảng và 3 trigger của Phase 6B trong `sqlite_master`.
+
+**Gate `PREVIEW_PHASE6B_POSTFLIGHT: PASS`** đối với bảng/trigger, số lượng bản ghi và tính toàn vẹn đã kiểm tra; đối chiếu số dòng không khẳng định hash/nội dung từng hàng giống nhau. Không có kiểm thử API Phase6 live trong bước này; ba server flags Phase6 giữ OFF.
+
+**Bước 197 theo phê duyệt operator Bước 194:** chạy **một file Phase 6C** trên đúng `duongtrcnhiem-auth-preview`:
+```cmd
+npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6c-publication-metadata-draft.sql
+```
+Git file blob SHA bản staging đã rà soát: `2121265b988342fe601582d0fb4f73ddb43b98c3`; 5 câu DDL tạo 1 bảng `phase6_admin_publications`, 1 index và 3 triggers. Operator phải kiểm tra đúng database trong prompt; nếu lỗi STOP, không retry; sau lệnh phải xác minh **3 bảng và 6 trigger Phase6**, 8 counts baseline, `quick_check=ok`, `foreign_key_check=0` trước bước 6A. Không chạy 6A, 6D trong bước này, không bật flag API, không đổi Production hoặc merge PR36.

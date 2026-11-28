@@ -780,3 +780,11 @@ Sau Bước232 lưu thành công một lần, operator bấm `Tải danh sách b
 Operator gửi ảnh phần chỉnh sửa Phase6B, mục `Câu hỏi toán học giả (1/12)` với dòng `1. 2 + 2 = ?`. Các nút `Lên`, `Xuống`, `Bỏ câu` và `Thêm câu mẫu` hiển thị. Đây là xác nhận **state giao diện đã thêm một câu mẫu**, **chưa có ảnh/lệnh cho thấy nút `Lưu thay đổi vào D1 Preview` được bấm hoặc backend trả thành công**. Không tuyên bố D1 có version 3 hay đã ghi 1 câu chỉ dựa vào ảnh.
 
 **Gate `PHASE6B_ONE_SAMPLE_QUESTION_EDITOR: PASS (screenshot)`; `PHASE6B_SAMPLE_QUESTION_PERSISTENCE: PENDING`.** Hướng dẫn operator giữ 30 phút, bấm `Lưu thay đổi vào D1 Preview` chỉ **1 lần**, kỳ vọng version 3, 30 phút, 1 câu, notice đã lưu và chưa xuất bản. Nếu lỗi, STOP không retry; dùng list read-only để kiểm chứng. Cờ publish/student/results vẫn OFF, PR36 Draft, Production không thay đổi.
+
+## Bước 234 — UI list confirms 30 minutes, 1 question, version 3 (operator screenshot, 28/11/2026)
+
+Operator tiếp tục sau khi thêm câu mẫu `2 + 2 = ?` và thao tác lưu vào D1 Preview. Screenshot mới trong danh sách Phase6B hiển thị **`Bản nháp DEMO: 1`** / **`Toán học DEMO - Cơ bản`** / **`30 phút · 1 câu · bản sửa 3`**. Kết hợp Bước234 trước `0/12` tại version 2, kết quả phù hợp một lần lưu thay đổi thành công.
+
+**Gate `PHASE6B_1QUESTION_VERSION3_LIST_READBACK: PASS (operator screenshot)`**. Ảnh này xác minh **count/time/version qua UI danh sách**, **chưa kiểm tra lại nội dung câu hỏi qua `get` độc lập** và chưa chứng minh ấn phẩm/phiên thi. Không suy diễn đã có đề được published.
+
+**Bước 235 an toàn/read-only:** trên pinned Preview tab Admin → Giai đoạn 6B, bấm `Chỉnh sửa` bản nháp duy nhất; xác minh tiêu đề `Chỉnh sửa bản nháp · phiên bản 3`, thời gian `30`, danh sách có `1. 2 + 2 = ?` (`1/12`). Chụp ảnh; **không bấm Lưu/Xóa/Tạo đề mới**. Nếu PASS, lên kế hoạch riêng để bật `PHASE6_ADMIN_PUBLISH_ENABLED` và `VITE_PHASE6_ADMIN_PUBLISH_UI` chỉ ở Preview sau khi xem xét quyền và scope; không bật cờ student/results đồng thời. PR36 Draft; Production không thay đổi.

@@ -30,7 +30,7 @@ base: process.env.VITE_FIREBASE_ENV === 'staging'
           });
           const names = Object.keys(process.env);
           const nearKeys = names.filter(name =>
-            name.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim() === key);
+            name.replace(/[\u200B-\u200D\uFEFF]/g, '').trim() === key);
           console.info('[phase6d-build-probe] ' + JSON.stringify({
             processEnv: describe(process.env[key]),
             viteEnv: describe(config.env[key]),

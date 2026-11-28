@@ -1150,3 +1150,12 @@ Operator gửi ba ảnh Cloudflare PR39 branch Preview `4752e4a` (Cloudflare bui
 - Không sửa server `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, không chạm D1/answers, không enable Phase6E, không đổi Production/main. PR39 build probe vẫn **Draft chưa merge**; PR36 Draft.
 
 **Bước 264:** operator mở PR40 → tab **Checks**, chờ hai job `demo-quiz-ci` và Cloudflare Pages PASS, kiểm merge gate/no conflicts trước Ready for review. Không merge ngay; chỉ sau kiểm tra gộp vào staging (không main) và verify deployment commit mới trên pinned alias mới mở Edge InPrivate `/?phase6_debug=1` để mong đợi 6/6 PASS và Phase6D panel. Sau khi UI hiện, hành động đầu tiên chỉ **`Tải danh sách đề thi DEMO`**, kiểm danh sách (30 phút, revision3, 1 câu) và nếu lỗi server flag thì chẩn đoán riêng; không bấm `Bắt đầu làm bài` trước gate. Không Retry PR39/staging bừa.
+
+## Bước 264 — PR40 fix whitespace Phase6D UI flag: Cloudflare + isolated CI PASS (operator screenshot, 28/11/2026)
+
+Operator gửi ảnh GitHub Checks PR40, commit `16208a6`:
+- `Cloudflare Workers and Pages / Cloudflare Pages`: **Deployed successfully** tới URL build riêng `c56fbca1.duongtrcnhiem-test.pages.dev`, không phải pinned staging alias
+- `Staging DEMO Quiz Pilot (isolated) → demo-quiz-ci`: **PASS**
+- GitHub `fetch_pr` xác minh PR40 **draft=true**, `state=open`, `merged=false`, `mergeable=true`, base `feature/staging-demo-quiz-pilot`, head `feature/phase6d-normalize-vite-ui-flag-20261128`, SHA `16208a6485138a079e55859de1cde72dd1a670d3`, đúng **2 file** frontend.
+
+**Gate `PR40_CI_DEPLOY_GREEN: PASS`; `PR40_READY_TO_MERGE: PENDING`; `PR40_MERGED: NO`**. Bước265 operator mở PR40 Conversation → `Ready for review`, rồi kiểm tra 2 checks xanh/no conflicts trước khi tự gộp vào **feature/staging-demo-quiz-pilot**, không main. Sau merge phải xác minh Cloudflare pinned Preview alias nhận merge commit mới rồi mở Edge InPrivate student `/?phase6_debug=1`, kỳ vọng 6/6 ĐẠT và panel 6D hiện. Chỉ dùng `Tải danh sách đề thi DEMO` read-only, chưa Start/Submit. PR39 build-only diagnostic vẫn Draft, không gộp. Phase6E OFF, PR36 Draft, Production không đổi.

@@ -173,3 +173,21 @@ Kết hợp với hai ảnh Bindings:
 **Kết luận phạm vi:** `ACCOUNT_WORKERS_PAGES_INVENTORY_REVIEW: PASS` đối với danh sách hiển thị và binding của Pages project hiện tại. Không chứng minh loại trừ hoàn toàn truy cập D1 qua CLI/REST API/khóa quản trị, các account khác, hoặc dữ liệu nhạy cảm có/không tồn tại trong restore-test. Không mở flag Phase 6, không ghi DB, không merge.
 
 **Bước 165 chỉ đọc:** vào `D1 → duongtrcnhiem-auth-preview → Studio/Explore Data` thực hiện truy vấn metadata `SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'phase6_%' ORDER BY name;` để xác nhận Phase 6 schema trên **đúng DB Preview thực sự**, không suy luận từ restore-test. Không chạy file draft SQL hay câu lệnh ghi. Khi kết quả rõ, tiếp tục phân loại và bảo đảm bản backup Preview đủ mới, phê duyệt kế hoạch rollback trước khi xem xét migration.
+
+## Bước 165 — Preview chưa có bảng Phase 6 (ảnh operator 28/11/2026)
+
+Người vận hành đã chạy câu truy vấn metadata read-only trên `duongtrcnhiem-auth-preview` theo Bước 165:
+
+```sql
+SELECT name
+FROM sqlite_master
+WHERE type = 'table'
+  AND name LIKE 'phase6_%'
+ORDER BY name;
+```
+
+Ảnh chụp kết quả Cloudflare Studio hiển thị `sqlite_master · 1×0`: **0 hàng tên bảng `phase6_%`**. Theo ngữ cảnh Bước 165, kết quả này được quy về DB Preview; ảnh kết quả được cắt nên không độc lập hiển thị header tên database. Trước đó Overview đã ghi nhận 8 bảng ứng dụng.
+
+**Kết luận:** Không có bằng chứng bảng Phase 6 đã được áp dụng trên D1 Preview; đối chiếu với `restore-test` nơi 5 bảng/12 trigger đã được xác minh. Không chạy migration ngay; cần làm mới bản export D1 Preview vì bản snapshot được kiểm thử là `preview-backup-20261127.sql`, còn hiện ngày 28/11, dữ liệu có thể đã thay đổi.
+
+**Bước 166 (chỉ đọc):** kiểm tra tình trạng dữ liệu Preview bằng thống kê số dòng trên các bảng cần bảo toàn (không lấy bản ghi, username, hash, token hay câu hỏi), hoặc xác định D1 Preview có thay đổi từ bản export ngày 27/11. Sau đó lập kế hoạch xuất backup *mới* và thử restore độc lập được phê duyệt trước khi đưa SQL draft lên Preview. Giữ `PHASE6_*` server OFF, không merge Production.

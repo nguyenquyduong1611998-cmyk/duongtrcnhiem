@@ -248,3 +248,17 @@ Người vận hành chạy câu SQL read-only preflight theo Bước 191 trên 
 **Trạng thái:** `PREVIEW_PREFLIGHT_PARTIAL: 8/9 FIELDS VISIBLE`; không khẳng định Bước 191 PASS cho tới khi operator cung cấp giá trị attempts. Truy vấn bổ sung **chỉ đọc**: `SELECT COUNT(*) AS attempts FROM phase5_content_attempts;`, kỳ vọng 2. Nếu không phải 2, dừng migration để kiểm tra biến động dữ liệu/backup và Time Travel.
 
 **Không chạy** bất kỳ file Phase6 trên `duongtrcnhiem-auth-preview`, không thêm `PHASE6_*`, không merge PR36 hoặc triển khai Production trước khi đủ gate và quyết định cấp quyền riêng.
+
+## Bước 192 — D1 Preview đối chiếu đủ 9 giá trị preflight (ảnh operator, 28/11/2026)
+
+Ảnh D1 Studio của người vận hành tại `duongtrcnhiem-auth-preview` sau query `SELECT COUNT(*) AS attempts FROM phase5_content_attempts;` trả **`attempts = 2`**. Kết hợp Bước 191 trực tiếp trên Preview đã có:
+- `phase6_tables = 0`;
+- `demo_students = 5`, `login_attempts = 0`, `synthetic_graded_attempts = 3`;
+- `phase5_content_topics = 1`, `versions = 1`, `questions = 1`, `answer_keys = 1`;
+- `phase5_content_attempts = 2` (Bước 192).
+
+**Gate `PREVIEW_PREFLIGHT_COUNTS_9_OF_9_MATCH: PASS`** đối với mốc đo trong Bước 191–192: 8 bảng ứng dụng với tổng 14 hàng, Preview vẫn chưa có bảng `phase6_%`. Đây là bằng chứng **đếm hàng**, không so sánh nội dung từng bản ghi, và chỉ đúng tại thời điểm đo.
+
+Bản backup 28/11 đã khôi phục trên D1 riêng `duongtrcnhiem-restore-20261128` với 8 bảng, 14 hàng, `quick_check=ok`, `foreign_key_check=0`. Trên cùng D1 bản sao, người vận hành đã chạy bốn migration 6B→6C→6A→6D, thông báo đủ 5 bảng/12 trigger và hậu kiểm 8 counts/integrity/FK PASS. Việc đã vượt gate này **chưa** đồng nghĩa migration trên `duongtrcnhiem-auth-preview` được cấp phép.
+
+**Bước 193 (preflight cuối, chỉ đọc):** chọn thời điểm **không có học viên DEMO hoặc Admin đang ghi dữ liệu**, lấy bookmark mới cho chính Preview bằng `npx wrangler d1 time-travel info duongtrcnhiem-auth-preview`, và ghi timestamp/bookmark vào hồ sơ vận hành riêng (không đẩy lên GitHub). Nếu đã có thay đổi dữ liệu so với snapshot, cần export backup mới và xác minh lại. Trước khi gửi bất kỳ lệnh `wrangler d1 execute ... --remote` nào nhắm vào Preview, cần phê duyệt rõ từng migration, đích, và kế hoạch dừng/rollback. Không gộp PR36, không bật ba cờ Phase6 API, không đụng Production.

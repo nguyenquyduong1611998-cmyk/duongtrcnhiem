@@ -533,3 +533,16 @@ Sau khi operator xác nhận đã thêm `PHASE6_ADMIN_DRAFTS_ENABLED=true` và `
 Đối chiếu GitHub PR35: merge commit `75f2d814...` đã merge `feature/phase7k-offline-submit-recovery-20261127` vào `feature/staging-demo-quiz-pilot`. PR36 vẫn Draft, source branch là `feature/phase7l-recovery-acceptance-checklist-20261127`, base `feature/staging-demo-quiz-pilot`. Phải xác minh **full Source branch** trong Cloudflare Deployment details, không suy đoán từ commit hash. Code Phase6 chỉ chấp nhận **hostname alias cố định** `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`; hashed deployment URL không đủ quyền. Cloudflare Preview build Success không chứng minh hostname alias đã cập nhật, UI flags được đóng gói, hay signed Admin API hoạt động.
 
 **Gate `PREVIEW_RETRY_BUILD_REPORTED_SUCCESS`: PASS; `PINNED_ALIAS_BRANCH_AND_UI_FLAGS_VERIFIED`: PENDING**. Bước 212: operator mở **Details** deployment mới `f9811742...` → chụp phần full Branch/Source và Aliases (nếu có), không lộ secrets. Nếu branch không đúng, không bấm Retry tiếp; xem xét tạo build mới từ đúng branch thay vì thay Production/merge PR36. Chưa bật `PHASE6_ADMIN_PUBLISH_ENABLED` hay ba Phase6 student/results flags, chưa thử POST API, không đổi D1 schemas nữa.
+
+## Bước 212 — Đã xác nhận Alias đúng pinned Preview trên deployment mới (operator screenshots, 28/11/2026)
+
+Operator gửi hai ảnh Cloudflare Pages **Deployment details** và **All deployments** của bản retry mới, được tạo **10:37 AM ngày 28/11/2026**:
+- Environment badge `Preview`, Status `success`, Duration `13s`.
+- Commit `75f2d81` (merge PR35 trên Staging branch).
+- Deployment URL hashed `9f0b0595.duongtrcnhiem-test.pages.dev` **không phải host API Phase6 được cho phép**.
+- **Aliases** hiển thị chính xác `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` — **trùng hostname pinned** trong `functions/_shared/phase4-host-guard.mjs` và `staging-db-binding.mjs` ở Staging.
+- Branch trên card hiển thị rút gọn `feature/stagi...`, khớp tiền tố của `feature/staging-demo-quiz-pilot`; PR35 merge target đã xác minh là nhánh này. Ảnh không hiển thị *toàn bộ* branch tên dài.
+
+**Gate `PINNED_PREVIEW_ALIAS_ON_SUCCESSFUL_RETRY: PASS`**. Gate `UI_BUILD_FLAG_EFFECTIVE` và `SIGNED_ADMIN_DRAFTS_LIST_RUNTIME` vẫn PENDING — Deployment Success **không chứng minh** Vite UI đã hiện hoặc API signed Admin trả 200. Hai flags `PHASE6_ADMIN_DRAFTS_ENABLED=true` và `VITE_PHASE6_ADMIN_DRAFTS_UI=true` mới có xác nhận lưu từ operator, chưa có ảnh kiểm chứng giá trị trên deployment runtime.
+
+**Bước 213 (không ghi D1):** mở **alias pinned** `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` (không dùng hash URL), qua Cloudflare Access rồi đăng nhập Google Admin staging. Kiểm tra có khung **`Giai đoạn 6B — Ngân hàng đề nháp DEMO`**. Nếu có, chỉ bấm **`Tải danh sách bản nháp`** (API action list: truy vấn đọc-only, bảng drafts ở Bước206 là 0) rồi chụp giao diện/trạng thái; không bấm **Tạo đề nháp mới**, **Xuất bản** hoặc chỉnh các biến. Nếu không có panel hoặc trả lỗi: chụp màn hình và STOP; kiểm tra Preview build variables/host binding, không bật thêm cờ theo phỏng đoán. Publish/Student/Results server flags vẫn OFF, PR36 Draft, Production không đổi.

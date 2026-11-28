@@ -1210,6 +1210,31 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                           onStartTopic={(topic) => setActiveQuizTopic(topic)}
                         />
                       )}
+                      {/* Preview-only, opt-in diagnostic: no UID, email, token or key is rendered.
+                          Remove after verifying the Phase 6D UI guard on demo students. */}
+                      {activeTab === 'topics' && IS_FIREBASE_STAGING &&
+                         typeof window !== 'undefined' &&
+                         isPhase5DemoPreviewHostname(window.location.hostname) &&
+                         /^test_hv_[a-f0-9]{12}$/.test(currentUser.username.toLowerCase()) &&
+                         new URLSearchParams(window.location.search).get('phase6_debug') === '1' && (
+                           <section className="mt-4 space-y-2 rounded-xl border border-[#94A3B8] bg-white p-4"
+                             aria-label="Kiểm tra điều kiện hiển thị Phase 6D (Preview)">
+                             <h3 className="text-sm font-bold">Phase 6D — Chẩn đoán hiển thị (chỉ Preview DEMO)</h3>
+                             <p className="text-xs text-[#475569]">
+                               Chỉ kiểm tra các điều kiện đúng/sai. Không hiển thị UID, email,
+                               mật khẩu, Firebase token hoặc đáp án.
+                             </p>
+                             <dl className="grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
+                               <div>Vai trò nội bộ là học viên: <strong>{currentUser.role === 'student' ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
+                               <div>Có phiên Firebase: <strong>{firebaseUser ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
+                               <div>UID nội bộ khớp phiên Firebase: <strong>{firebaseUser && currentUser.id === firebaseUser.uid ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
+                               <div>Cờ Vite giao diện 6D trong JavaScript: <strong>{import.meta.env.VITE_PHASE6_STUDENT_TIMED_UI === 'true' ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
+                               <div>Đúng môi trường Firebase staging: <strong>{IS_FIREBASE_STAGING ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
+                               <div>Đúng địa chỉ Preview cố định: <strong>{isPhase5DemoPreviewHostname(window.location.hostname) ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
+                             </dl>
+                             <p className="text-xs text-[#475569]">Khung này không gọi API, không tạo phiên thi và không ghi dữ liệu.</p>
+                           </section>
+                         )}
                       {activeTab === 'topics' && currentUser.role === 'student' &&
                          firebaseUser && currentUser.id === firebaseUser.uid &&
                          isPhase6StudentExamUiEnabled(

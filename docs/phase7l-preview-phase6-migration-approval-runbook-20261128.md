@@ -1191,3 +1191,19 @@ Operator gửi ảnh Cloudflare Pages `duongtrcnhiem-test` **Deployment details*
 **Gate `PR40_PINNED_PREVIEW_DEPLOY_SUCCESS: PASS (operator screenshot)`.** Mã đã merged trên staging chuẩn hoá duy nhất client UI flag bằng `typeof flag==='string'&&flag.trim()==='true'`; các guard student role, Firebase UID, staging và exact hostname giữ nguyên. **`PHASE6D_STUDENT_UI_6_OF_6: PENDING`, `PHASE6D_READONLY_STUDENT_LIST: PENDING`.**
 
 **Bước 268:** trên Edge InPrivate với tài khoản học viên DEMO đã đăng nhập, mở `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1`, tab Mục Chuyên Đề. Chụp khung diagnostic 6 booleans; mong đợi cờ Vite **`ĐẠT`** (sau trim) và toàn bộ **6/6 ĐẠT**, đồng thời thấy panel `Phase 6D — Thi toán học DEMO có thời hạn`. Không bấm `Bắt đầu làm bài` hoặc `Nộp bài` trước khi UI gate PASS. Khi có đủ bằng chứng mới tiến hành `Tải danh sách đề thi DEMO` (read-only). Không thêm biến, Retry, đổi DB/Production, gộp PR36/PR39.
+
+## Bước 268 — Phase6D student UI và 6/6 guard PASS sau PR40 pinned Preview (operator screenshot, 28/11/2026)
+
+Operator trong đúng student Preview sau merge PR40 `ded0b22` và deployment thành công Bước267 gửi ảnh khung `Phase 6D — Chẩn đoán hiển thị (chỉ Preview DEMO)`:
+- `Vai trò nội bộ là học viên: ĐẠT`
+- `Có phiên Firebase: ĐẠT`
+- `UID nội bộ khớp phiên Firebase: ĐẠT`
+- `Đúng môi trường Firebase staging: ĐẠT`
+- `Cờ Vite giao diện 6D trong JavaScript (bỏ khoảng trắng): ĐẠT`
+- `Đúng địa chỉ Preview cố định: ĐẠT`
+
+Ngay bên dưới đã xuất hiện khung thực tế `Phase 6D — Thi toán học DEMO có thời hạn` cùng nút `Tải danh sách đề thi DEMO`. Screenshot xác nhận **6/6 PASS** và UI mount thành công. Chưa có bằng chứng operator đã nhấn nút tải danh sách hoặc API Phase6D trả thành công, chưa bắt đầu/nộp bài.
+
+**Gate `PHASE6D_STUDENT_UI_GUARDS_ALL_PASS: PASS (operator screenshot)`; `PHASE6D_STUDENT_PANEL_VISIBLE: PASS`; `PHASE6D_STUDENT_EXAM_LIST: PENDING`; `PHASE6D_STUDENT_SESSION_START: NOT EXECUTED`.**
+
+**Bước 269 (READ-ONLY):** trên cùng tab Edge InPrivate đang đăng nhập DEMO student, nhấn **`Tải danh sách đề thi DEMO` đúng một lần**. Mã `src/components/Phase6StudentExamPanel.tsx` gọi `listPhase6Exams(user)` tới `/api/phase6/exam` action list; không tạo phiên và không chạy đồng hồ. Mong đợi thông báo `Đã tải 1 đề toán học DEMO đã xuất bản.` và một dòng `Toán học DEMO - Cơ bản`, `Phiên bản 3 · 1 câu · 30 phút`, nút `Mở đề`. **Chưa bấm `Mở đề` hoặc `Bắt đầu làm bài (máy chủ tính giờ)`** trước khi có ảnh kết quả list; nếu 404/403/503 thì STOP để chẩn đoán Phase6D backend flag, host/binding, không retry bừa. Chưa bật API Phase6E đọc điểm hoặc thay đổi PR39, PR36 Draft, Production/main nguyên trạng.

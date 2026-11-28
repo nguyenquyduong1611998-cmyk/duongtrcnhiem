@@ -169,3 +169,16 @@ Người vận hành cung cấp hai ảnh Cloudflare D1 Studio sau khi áp dụn
 **Gate `REMOTE_CLONE_PHASE6C_POSTFLIGHT: PASS`** đối với các phép kiểm đã quan sát/xác nhận; giới hạn của đối chiếu chỉ là **row counts**, không phải hash dữ liệu từng bản ghi. Phase6A **chưa** chạy trong Bước 184.
 
 **Bước 185 tiếp theo:** chỉ trên D1 clone `duongtrcnhiem-restore-20261128` thử một file `serverless/d1-phase6-timed-sessions-draft.sql` bằng Wrangler, kiểm tra prompt target, không `--yes`. Nếu chạy thành công, mới dùng metadata read-only xác minh 4 bảng Phase6 / 9 triggers, rồi hậu kiểm dữ liệu/integrity/FK trước khi chạy Phase6D. Không ghi vào `duongtrcnhiem-auth-preview`, không bật các cờ Phase6, không merge PR36 hoặc thay đổi Production.
+
+## Bước 185 — Phase 6A remote clone execution (operator screenshot, 28/11/2026)
+
+Người vận hành chạy `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6-timed-sessions-draft.sql` trên D1 bản sao cô lập theo Bước 185. Ảnh CMD cho thấy:
+- `Executed 5 queries in 3.56ms (3 rows read, 8 rows written)`
+- Total queries executed: 5; Rows read: 3; Rows written: 8; Database size (MB): 0.17.
+- Lệnh hoàn tất và quay về CMD prompt, không thấy lỗi trong phần ảnh.
+
+Kết quả 5 câu lệnh phù hợp cấu trúc dự thảo 6A tại GitHub: 1 bảng `phase6_exam_sessions`, 1 chỉ mục và 3 trigger `phase6_session_start_guard`, `phase6_session_no_delete`, `phase6_session_no_update`.
+
+**Trạng thái: `REMOTE_CLONE_PHASE6A_EXECUTION_REPORTED_SUCCESS`, POSTFLIGHT CHƯA ĐẠT** cho tới khi xác minh bằng read-only metadata. Bước 186: dùng D1 Studio trên **duongtrcnhiem-restore-20261128** chạy `SELECT type, name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;` kỳ vọng **4 bảng + 9 triggers = 13 hàng**. Sau đó, trước Phase6D, kiểm tra 8 counts baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0 dòng. Nếu bất thường, STOP, không retry migration.
+
+Không thực hiện trên D1 `duongtrcnhiem-auth-preview`, không bật ba cờ API Phase 6, không merge PR36 hoặc thay đổi Production.

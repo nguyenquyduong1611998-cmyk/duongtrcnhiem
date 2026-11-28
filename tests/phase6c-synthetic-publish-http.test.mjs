@@ -81,8 +81,11 @@ function fixture(){
             async first(){return sqlite.prepare(sql).get(...args)??null;},
             async all(){return {success:true,results:sqlite.prepare(sql).all(...args)};},
             async run(){
-              const result=sqlite.prepare(sql).run(...args);
-              return {success:true,meta:{changes:result.changes}};
+              const before=sqlite.prepare('SELECT total_changes() AS n').get().n;
+              sqlite.prepare(sql).run(...args);
+              // Match Cloudflare D1 total_changes() with draft audit trigger rows.
+              const after=sqlite.prepare('SELECT total_changes() AS n').get().n;
+              return {success:true,meta:{changes:after-before}};
             },
           };
         },

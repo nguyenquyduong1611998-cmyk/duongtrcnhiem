@@ -469,3 +469,28 @@ Mã nguồn Phase6 student exam route `functions/api/phase6/exam.js` trả 404 k
 Student `action:'list'` đọc `phase5_content_versions` trạng thái `published` liên kết `phase6_admin_publications` (không chỉ dựa vào việc bảng tồn tại). Migration là schema-only: **chưa chứng minh đã có bất kỳ đề Phase 6 nào được xuất bản**. Nếu `phase6_admin_publications` trống, danh sách đề Phase6 sẽ rỗng ngay cả sau khi bật API.
 
 Để kiểm tra chỉ số dữ liệu mà không hiển thị thông tin tài khoản hay đề thi, tại `duongtrcnhiem-auth-preview` chạy 1 SELECT với scalar subqueries `COUNT(*)` cho năm bảng `phase6_admin_drafts`, `phase6_admin_draft_events`, `phase6_admin_publications`, `phase6_exam_sessions`, `phase6_exam_submissions`. Chỉ báo năm con số; **không** chạy INSERT/UPDATE/DELETE, không tạo tài khoản hoặc đề thật, không thử API ghi, không bật flags trước quyết định riêng.
+
+## Bước 206 — Cả năm bảng Phase6 trên Preview mới migration đều trống (ảnh operator 28/11/2026)
+
+Operator truy vấn read-only tại `duongtrcnhiem-auth-preview`:
+```sql
+SELECT
+ (SELECT COUNT(*) FROM phase6_admin_drafts) AS drafts,
+ (SELECT COUNT(*) FROM phase6_admin_draft_events) AS events,
+ (SELECT COUNT(*) FROM phase6_admin_publications) AS publications,
+ (SELECT COUNT(*) FROM phase6_exam_sessions) AS sessions,
+ (SELECT COUNT(*) FROM phase6_exam_submissions) AS submissions;
+```
+Ảnh Cloudflare Studio `phase6_admin_drafts · 5×1` cho **`drafts=0`, `events=0`, `publications=0`, `sessions=0`, `submissions=0`**. Gate `PREVIEW_PHASE6_EMPTY_DATA_BASELINE: PASS`; phù hợp DDL-only migration. Chưa có đề DEMO Phase6 nào được xuất bản, vì vậy không cho phép hiểu `API Phase6 ready` chỉ từ schema.
+
+### Phát hiện quan trọng từ source trước khi bật API
+
+Đã đọc tại `feature/staging-demo-quiz-pilot`:
+- `functions/api/phase6/admin/drafts.js`: route **Admin draft CRUD** đòi `PHASE6_ADMIN_DRAFTS_ENABLED === 'true'`, thêm `PHASE4_PREVIEW_HOST_OPT_IN`, pinned Preview hostname, signed Google Admin và binding `AUTH_DB_PREVIEW`. Default OFF.
+- `functions/api/phase6/admin/publish.js`: route **Admin publication** đòi **cả** `PHASE6_ADMIN_PUBLISH_ENABLED === 'true'` **và** `PHASE6_ADMIN_DRAFTS_ENABLED === 'true'`; tương tự yêu cầu host/Admin. Default OFF.
+- `src/App.tsx`: 6B Admin UI cần build-time `VITE_PHASE6_ADMIN_DRAFTS_UI === 'true'`; nút xuất bản còn cần `VITE_PHASE6_ADMIN_PUBLISH_UI === 'true'`. Đây là **hai build-time UI flags**, không giống hai server-side flags.
+- `src/components/Phase6AdminDraftsPanel.tsx`: Admin có workflow tạo nháp toán DEMO, thêm 1–12 câu mẫu cố định, đặt thời gian phút, lưu rồi xác nhận xuất bản. Không cần viết SQL seed bằng tay khi API/UI được bật có kiểm soát.
+- `src/utils/phase6AdminDrafts.ts`: client chỉ cho Firebase signed Admin trên Preview thao tác; `functions/_shared/phase6-synthetic-publication.mjs` dùng transaction `db.batch` tạo revision, câu hỏi giả, answer keys và `phase6_admin_publications` đồng nhất.
+- Cả ba API học viên/đọc điểm `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED` vẫn mặc định OFF/chưa được cấu hình theo Bước 155. **Đừng bật cả loạt** khi chưa có đề xuất bản.
+
+**Bước 207 (chỉ xem Settings):** Cloudflare Pages project `duongtrcnhiem-test` → **Settings → Preview → Variables and secrets**; kiểm tra sự tồn tại/giá trị **4 cờ** `PHASE6_ADMIN_DRAFTS_ENABLED`, `PHASE6_ADMIN_PUBLISH_ENABLED`, `VITE_PHASE6_ADMIN_DRAFTS_UI`, `VITE_PHASE6_ADMIN_PUBLISH_UI` và xác nhận selector đúng Preview. **Không Add/Edit/Delete/Save/Reveal**; chỉ báo tên+giá trị plain-text, che tất cả secrets. Sau đó cân nhắc phê duyệt mở từng cờ (trước tiên chỉ Admin drafts) và bảo đảm deployment Preview thực sự dùng build mới. Không bật student timed exam/results, không merge PR36/đụng Production.

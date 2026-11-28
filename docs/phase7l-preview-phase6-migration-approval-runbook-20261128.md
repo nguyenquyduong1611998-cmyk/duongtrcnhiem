@@ -237,3 +237,14 @@ Operator cung cấp ảnh hai truy vấn trực tiếp sau khi hoàn tất Phase
 **Kết luận:** `PHASE6_6B_6C_6A_6D_REMOTE_CLONE_MIGRATION_REHEARSAL: PASS (within checked scope)`; bốn file đã chạy tuần tự trên database clone, số bảng và trigger được operator xác nhận, số dòng gốc khớp, SQLite quick_check ok, foreign_key_check 0. Chưa xác nhận tính tương đương từng byte dữ liệu trên remote; bài test RAM bản export đã kiểm tra dữ liệu gốc không đổi bằng SHA.
 
 **Không suy ra D1 Preview đã migrate:** `duongtrcnhiem-auth-preview` trước đó chưa có phase6 tables; 3 flag server Phase6 chưa được cấu hình; PR36 vẫn Draft. Không ghi vào Production. Bước kế tiếp: lập preflight read-only tại Preview gần thời điểm phê duyệt: đúng tên/ID DB, 8 bảng và số hàng hiện tại (dừng nếu khác baseline), 0 phase6 objects, Time Travel bookmark mới, backup snapshot có thể restore. Chỉ sau phê duyệt riêng cho target Preview mới chạy migration.
+
+## Bước 191 — D1 Preview preflight: 8/9 giá trị nhìn thấy, attempts chưa hiển thị (operator screenshots 28/11/2026)
+
+Người vận hành chạy câu SQL read-only preflight theo Bước 191 trên D1 Preview `duongtrcnhiem-auth-preview`, trả một hàng/9 cột. Hai ảnh hiển thị:
+- `phase6_tables=0` (khớp dự kiến, chưa migrate Phase6 trên Preview).
+- `students=5`, `logins=0`, `grades=3`, `topics=1`, `versions=1`, `questions=1`, `answer_keys=1` (khớp baseline trước đó).
+- Cột `attempts` có header nhưng **giá trị nằm ngoài khung phải của ảnh**, nên **chưa được xác minh**. Baseline Bước 166: `phase5_content_attempts=2`.
+
+**Trạng thái:** `PREVIEW_PREFLIGHT_PARTIAL: 8/9 FIELDS VISIBLE`; không khẳng định Bước 191 PASS cho tới khi operator cung cấp giá trị attempts. Truy vấn bổ sung **chỉ đọc**: `SELECT COUNT(*) AS attempts FROM phase5_content_attempts;`, kỳ vọng 2. Nếu không phải 2, dừng migration để kiểm tra biến động dữ liệu/backup và Time Travel.
+
+**Không chạy** bất kỳ file Phase6 trên `duongtrcnhiem-auth-preview`, không thêm `PHASE6_*`, không merge PR36 hoặc triển khai Production trước khi đủ gate và quyết định cấp quyền riêng.

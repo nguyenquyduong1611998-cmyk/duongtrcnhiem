@@ -160,3 +160,16 @@ Giới hạn: chỉ một cấu hình Pages Preview được kiểm tra, chưa c
 Lưu ý: `Production` ở đây là Production của **Pages project thử nghiệm** `duongtrcnhiem-test`, không đồng nghĩa website đơn vị/main đã triển khai Phase 6. Hai ảnh không chứng minh `restore-test` không được một Worker hoặc Pages project **khác** bind; cũng chưa đối chiếu UUID của D1 với effective deployment runtime. Không sửa cấu hình, chạy migration hoặc bật API flags.
 
 **Bước 164 đề nghị (chỉ đọc):** đối chiếu `duongtrcnhiem-restore-test` có binding tới Pages/Workers **khác** không. Nếu Dashboard không có danh sách đối tượng đã bind từ DB Overview, vào `Workers & Pages` xem các project đang dùng, chỉ kiểm tra binding của những project liên quan. Chưa tái sử dụng hay ghi vào `restore-test` cho tới khi rõ nguồn dữ liệu và chủ sở hữu.
+
+## Bước 164 — Workers & Pages account inventory (ảnh operator 28/11/2026)
+
+Ảnh Cloudflare `Workers & Pages` cho thấy bộ lọc `Show all` và `Showing 1-1 of 1`, liệt kê **duy nhất** một dự án `duongtrcnhiem-test`. Không sao chép ID tài khoản/subdomain riêng tư từ Dashboard vào tài liệu này.
+
+Kết hợp với hai ảnh Bindings:
+- Pages Preview `AUTH_DB_PREVIEW → duongtrcnhiem-auth-preview`.
+- Pages Production thử nghiệm `AUTH_DB → duongtrcnhiem-auth-staging`.
+- `duongtrcnhiem-restore-test` **không hiển thị** trong binding của dự án Pages đang liệt kê.
+
+**Kết luận phạm vi:** `ACCOUNT_WORKERS_PAGES_INVENTORY_REVIEW: PASS` đối với danh sách hiển thị và binding của Pages project hiện tại. Không chứng minh loại trừ hoàn toàn truy cập D1 qua CLI/REST API/khóa quản trị, các account khác, hoặc dữ liệu nhạy cảm có/không tồn tại trong restore-test. Không mở flag Phase 6, không ghi DB, không merge.
+
+**Bước 165 chỉ đọc:** vào `D1 → duongtrcnhiem-auth-preview → Studio/Explore Data` thực hiện truy vấn metadata `SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'phase6_%' ORDER BY name;` để xác nhận Phase 6 schema trên **đúng DB Preview thực sự**, không suy luận từ restore-test. Không chạy file draft SQL hay câu lệnh ghi. Khi kết quả rõ, tiếp tục phân loại và bảo đảm bản backup Preview đủ mới, phê duyệt kế hoạch rollback trước khi xem xét migration.

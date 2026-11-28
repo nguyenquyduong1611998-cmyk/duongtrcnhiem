@@ -119,3 +119,9 @@ Trong hội thoại ngày **26/11/2026**, người vận hành đã phê duyệt
 - Trên máy: export D1 Preview đã nạp được vào SQLite RAM, schema Phase 6 additive và 8/8 bảng cũ không đổi, mô phỏng nhiều tình huống chấm/khóa thời gian/100 học viên PASS. Trên PC/iPhone đã có các thử nghiệm đăng nhập/đồng bộ DEMO và PWA, **nhưng chưa hoàn tất quy trình nghiệm thu Phase 6 live trên hai thiết bị**.
 
 **Next decisions:** (1) Đánh dấu gate schema remote restore-test PASS, không tạo database mới không cần thiết; (2) rà soát binding/nguồn dữ liệu và trạng thái 8 bảng Preview một lần trước phê duyệt migration riêng; (3) bảo vệ bản backup đủ mới và nghiệm thu restore trên D1 thứ hai chỉ với dữ liệu được phép; (4) review SQL/rollback cùng quyền dữ liệu rồi mới cho phép migration 6B→6C→6A→6D trên Preview; (5) mở flag từng bước chỉ cho DEMO và thử signed A/B/Admin, PC/iPhone; (6) test thực tế tải 30–100 người và phê duyệt trước thi thật. **Không chuyển dữ liệu thật, không bật flags/migration/merge Production khi chưa qua các gate.**
+
+## Bước 161 — Kiểm tra khóa ngoại D1 restore-test (operator screenshot, 28/11/2026)
+
+Ảnh Cloudflare D1 Studio cho database `duongtrcnhiem-restore-test` hiển thị câu lệnh read-only `PRAGMA foreign_key_check;` và bảng kết quả `Query · 4×0` với 4 cột `table`, `rowid`, `parent`, `fkid` nhưng **0 hàng kết quả**. Kết luận riêng phép thử này: `FOREIGN_KEY_CHECK: PASS`, không phát hiện bản ghi vi phạm tại thời điểm kiểm tra.
+
+**Chưa có ảnh kết quả `PRAGMA quick_check;` trong Bước 161 hiện tại.** Dù lịch sử trước có ghi nhận `quick_check: ok`, không đánh dấu kiểm tra hiện tại PASS cho đến khi người vận hành cung cấp kết quả. Không thực hiện bất cứ thao tác ghi, import, migration, hoặc thay đổi binding/flags nào từ phép kiểm này.

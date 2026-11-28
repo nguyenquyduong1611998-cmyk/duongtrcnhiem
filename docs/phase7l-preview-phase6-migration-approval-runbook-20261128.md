@@ -581,3 +581,15 @@ Operator gửi hai ảnh chụp **Variables and secrets** chỉ có các hàng T
 Ảnh xác nhận hai giá trị `true`, nhưng **tên đầy đủ chưa hiển thị** vì giới hạn chiều rộng input; không thể loại trừ lỗi ký tự/thiếu hậu tố `_ENABLED` hoặc `_UI`. Hai tên mã nguồn yêu cầu chính xác là `PHASE6_ADMIN_DRAFTS_ENABLED` (server) và `VITE_PHASE6_ADMIN_DRAFTS_UI` (build-time). Trước khi chỉnh biến/Retry, cần xác nhận **nguyên văn full-name** bằng copy Name field (không gửi secrets) hoặc click vào ô rồi bấm End và chụp phần cuối. Nếu khớp, chuyển sang kiểm tra logs từ **deployment Preview 28/11 lúc 10:37 (75f2d81)**; không suy ra flag Vite đã được biên dịch chỉ từ Settings hiển thị giá trị, và không dùng console in `process.env` hoặc keys Firebase.
 
 **Gate `PREVIEW_ADMIN_DRAFT_FLAG_VALUES_VISIBLE_TRUE`: PASS; `FULL_VAR_NAMES_VERIFIED`: PENDING; `BUILT_UI_FLAG_EFFECTIVE`: PENDING.** Không sửa code, không thêm cờ khác, chưa thử POST hay thay đổi Production; PR36 Draft.
+
+## Bước 216 — Full names of both Preview Admin flags confirmed by operator (28/11/2026)
+
+Người vận hành xác nhận trực tiếp sau khi làm theo hướng dẫn copy tên biến: **"2 tên đều khớp"**. Đối chiếu với tên bắt buộc trong mã tại deployment commit `75f2d81`:
+- `PHASE6_ADMIN_DRAFTS_ENABLED` đúng tên, Text value `true` trong ảnh Bước 215.
+- `VITE_PHASE6_ADMIN_DRAFTS_UI` đúng tên, Text value `true` trong ảnh Bước 215.
+
+**Gate `PREVIEW_ADMIN_DRAFT_FLAG_NAMES_AND_VALUES: PASS (operator reported + screenshot values)`.** Vẫn chưa có bằng chứng cờ Vite đã được đóng gói vào JS ở deployment `9f0b0595`, hoặc Google Admin UI guard đã thỏa mãn trong phiên browser. Không yêu cầu thêm, xóa, sửa hoặc retry hai flag lần nữa.
+
+**Bước 217 read-only:** Cloudflare Pages `duongtrcnhiem-test` → **Deployments** → bản retry **Preview** commit `75f2d81` lúc **10:37 AM 28/11/2026** có alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` → **Details → Build log**. Kiểm tra lệnh Vite build chạy ở đúng Preview, log có cảnh báo env/build, có báo build success; chỉ chụp các dòng đầu/cuối và những lỗi/warnings liên quan build, **không** chụp/dán dòng chứa token, Firebase secrets, JWT, hoặc toàn bộ environment dump. Build log có thể **không** in riêng `VITE_PHASE6_ADMIN_DRAFTS_UI`; thiếu dòng tên flag trong log không chứng minh cờ vắng. Nếu build log bình thường, chẩn đoán tiếp asset bundle và kiểm tra `adminAccessAllowed` mà không kích hoạt POST/mutation.
+
+Giữ mọi flags publish/student/results OFF, không đụng D1/Production, PR36 Draft.

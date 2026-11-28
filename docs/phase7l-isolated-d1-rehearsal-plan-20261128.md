@@ -144,3 +144,19 @@ Không thấy `duongtrcnhiem-restore-test` trong danh sách binding hiển thị
 Giới hạn: chỉ một cấu hình Pages Preview được kiểm tra, chưa chứng minh database `restore-test` không bị một Worker/Pages project khác sử dụng; chưa khớp UUID database với binding runtime thực tế, chưa xác nhận Production binding, chưa chứng minh các bảng Phase 6 đã có trong `auth-preview`.
 
 **Bước kế tiếp (163, chỉ đọc):** mở Settings → chọn environment Production → Bindings của `duongtrcnhiem-test`; chụp các dòng Type/Name/Value nhưng không thay đổi cấu hình, bấm Reveal, hoặc chia sẻ secret. Không bắt đầu migration/bật cờ Phase 6.
+
+## Bước 163 — Production bindings của Pages test project (ảnh operator 28/11/2026)
+
+Ảnh Cloudflare Pages `duongtrcnhiem-test → Settings`, selector môi trường bên phải hiển thị **Production**, phần Bindings có một hàng:
+- Type: `D1 database`
+- Name: `AUTH_DB`
+- Value: `duongtrcnhiem-auth-staging`
+
+**PASS — trong hai môi trường của dự án Pages thử nghiệm đã xem:**
+- Preview: `AUTH_DB_PREVIEW → duongtrcnhiem-auth-preview` (Bước 162).
+- Production: `AUTH_DB → duongtrcnhiem-auth-staging` (Bước 163).
+- Không môi trường nào hiển thị binding trỏ `duongtrcnhiem-restore-test`.
+
+Lưu ý: `Production` ở đây là Production của **Pages project thử nghiệm** `duongtrcnhiem-test`, không đồng nghĩa website đơn vị/main đã triển khai Phase 6. Hai ảnh không chứng minh `restore-test` không được một Worker hoặc Pages project **khác** bind; cũng chưa đối chiếu UUID của D1 với effective deployment runtime. Không sửa cấu hình, chạy migration hoặc bật API flags.
+
+**Bước 164 đề nghị (chỉ đọc):** đối chiếu `duongtrcnhiem-restore-test` có binding tới Pages/Workers **khác** không. Nếu Dashboard không có danh sách đối tượng đã bind từ DB Overview, vào `Workers & Pages` xem các project đang dùng, chỉ kiểm tra binding của những project liên quan. Chưa tái sử dụng hay ghi vào `restore-test` cho tới khi rõ nguồn dữ liệu và chủ sở hữu.

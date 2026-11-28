@@ -59,3 +59,16 @@ Dừng nếu: đã dùng hết hạn mức Free; tên/ID DB không rõ; export c
 Chỉ lưu vào hồ sơ: `PASS/FAIL/BLOCKED`, ngày giờ, tên lab (không UUID bắt buộc), commit SQL được duyệt, số lượng bảng/trigger/row synthetic và mô tả lỗi đã làm sạch. **Không** lưu SQL backup thật, thông tin học viên, hashes, secrets, access tokens, cookie hay OTP.
 
 Tình trạng hiện tại: **Gate A/B/C/D BLOCKED để chờ xác minh và phê duyệt; không có remote D1 nào được tạo hoặc sửa bởi PR #36**. Không mở `PHASE6_*`, không merge PR, không sửa main/Production.
+
+## Bước 157 — Bằng chứng danh sách D1 (ảnh operator ngày 28/11/2026)
+
+Ảnh trang Cloudflare `D1 Database` hiển thị `Showing 1-3 of 3`, với đúng ba tên:
+1. `duongtrcnhiem-restore-test`
+2. `duongtrcnhiem-auth-preview`
+3. `duongtrcnhiem-auth-staging`
+
+**Gate A / kiểm tra số lượng:** `COUNT_OBSERVED=3`; dưới ngưỡng 10 database của tài khoản D1 Free theo tài liệu đã đối chiếu. Chưa xác minh loại plan, quota/storage còn lại hay quyền sở hữu chi tiết; không coi các cột Queries/Rows Read/Rows ở cửa sổ thống kê bằng 0 là bằng chứng các database trống. Không lưu Database IDs trong tài liệu.
+
+**Phát hiện:** Đã tồn tại database `duongtrcnhiem-restore-test`, tên gợi ý từng dùng để restore/test nhưng **chưa có bằng chứng** về nội dung, người tạo, binding, mục đích, quyền truy cập hoặc khả năng tái sử dụng. Tuyệt đối không nhập dữ liệu mới/xóa/khôi phục đè lên DB này chỉ vì tên của nó.
+
+**Bước kế tiếp (chỉ đọc):** mở `duongtrcnhiem-restore-test` → Overview; xem Number of Tables / Storage used. Sau đó cần đối chiếu có binding ứng dụng hay không và có được phép tái sử dụng hay phải tạo lab mới với dữ liệu tổng hợp, sau khi được chủ DB chấp thuận. Giữ nguyên ba cờ API Phase 6 chưa cấu hình. Gate B–D NO-GO.

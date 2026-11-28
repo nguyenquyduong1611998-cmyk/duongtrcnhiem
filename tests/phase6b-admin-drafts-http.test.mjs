@@ -61,8 +61,11 @@ function fixture(){
         bind(...args){
           return {
             async run(){
-              const result=stmt.run(...args);
-              return {success:true,meta:{changes:result.changes}};
+              const before=sqlite.prepare('SELECT total_changes() AS n').get().n;
+              stmt.run(...args);
+              // D1 meta.changes counts rows written by AFTER audit triggers.
+              const after=sqlite.prepare('SELECT total_changes() AS n').get().n;
+              return {success:true,meta:{changes:after-before}};
             },
             async first(){return stmt.get(...args)??null;},
             async all(){return {success:true,results:stmt.all(...args)};},
@@ -118,7 +121,11 @@ test('Google Admin can create/list/get/save/delete synthetic drafts, metadata au
   const f=fixture();
   try{
     const before=snapshot(f);
+    const totalChanges=()=>f.sqlite.prepare('SELECT total_changes() AS n').get().n;
+    const beforeCreate=totalChanges();
     const created=await f.call(create);
+    assert.equal(totalChanges()-beforeCreate,2,
+      'one draft INSERT and one AFTER INSERT audit row must both count');
     assert.equal(created.status,201);
     const data=await created.json();
     assert.match(data.draft.draftId,/^p6_demo_[a-f0-9]{32}$/);
@@ -132,10 +139,13 @@ test('Google Admin can create/list/get/save/delete synthetic drafts, metadata au
     assert.equal(list.drafts.length,1);
     assert.equal(list.drafts[0].draftId,id);
     assert.equal(list.drafts[0].templates,undefined);
+    const beforeSave=totalChanges();
     const saved=await f.call({
       action:'save',draftId:id,version:1,titleCode:'practice',minutes:45,
       templates:['sum_2_2','minus_10_3'],
     });
+    assert.equal(totalChanges()-beforeSave,2,
+      'one draft UPDATE and one AFTER UPDATE audit row must both count');
     assert.equal(saved.status,200);
     const body=await saved.json();
     assert.equal(body.draft.version,2);
@@ -148,7 +158,10 @@ test('Google Admin can create/list/get/save/delete synthetic drafts, metadata au
       assert.equal(publicJson.includes(forbidden),false,forbidden);
     const loaded=await (await f.call({action:'get',draftId:id})).json();
     assert.deepEqual(loaded.draft,body.draft);
+    const beforeDelete=totalChanges();
     assert.equal((await f.call({action:'delete',draftId:id,version:2})).status,200);
+    assert.equal(totalChanges()-beforeDelete,2,
+      'one draft DELETE and one AFTER DELETE audit row must both count');
     assert.equal((await f.call({action:'get',draftId:id})).status,404);
     assert.equal(f.count('phase6_admin_drafts'),0);
     assert.deepEqual(f.sqlite.prepare(

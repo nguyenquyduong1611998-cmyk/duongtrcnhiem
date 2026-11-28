@@ -306,3 +306,11 @@ Người vận hành đã chủ động tạo một D1 mới, tên đúng `duong
 **Gate còn BLOCKED:** D1 backup 28/11 chứa 5 tài khoản DEMO và 14 rows, khả năng có password hashes. Phải được người sở hữu dữ liệu xác nhận toàn bộ chỉ là dữ liệu giả, không có danh tính/mật khẩu/đề thi thật, và được phép nhân bản lên D1 trong cùng tài khoản Cloudflare, trước mọi lệnh `wrangler d1 execute --remote --file=...`. Nếu không xác minh được, dùng schema-only/synthetic data thay cho phục hồi full backup. Cloudflare docs xác nhận `d1 execute --remote --file` thực sự ghi remote: https://developers.cloudflare.com/d1/best-practices/import-export-data/ và https://developers.cloudflare.com/d1/wrangler-commands/.
 
 **Không có import nào được thực hiện tại Bước 172.** Preview, Staging, restore-test, Production và ba cờ API Phase 6 giữ nguyên.
+
+## Bước 173 — Người vận hành xác nhận quyền sao chép dữ liệu DEMO (28/11/2026)
+
+Người vận hành **đã xác nhận rõ bằng lời trong hội thoại**: cả năm tài khoản và 14 bản ghi trong `preview-backup-20261128-prephase6.sql` đều là dữ liệu DEMO giả, không chứa danh tính, mật khẩu hoặc đề thi thật của đơn vị, và họ có quyền sao chép sang D1 thử nghiệm. Đây là xác nhận của người có quyền theo lời họ, **không phải việc trợ lý tự kiểm chứng từng bản ghi**, và không bao gồm phê duyệt cho dữ liệu thật hoặc Production.
+
+**Bước 174 — Mở gate remote restore chỉ cho database cô lập:** operator có thể nhập file backup 28/11 vào **duy nhất** database mới `duongtrcnhiem-restore-20261128` bằng `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file="%USERPROFILE%\Documents\D1-Backup\preview-backup-20261128-prephase6.sql"`. Không dùng `--yes`, chỉ xác nhận nếu prompt hiển thị **chính xác** database đích. Nếu thấy lỗi không chạy lại ngay; xem trạng thái DB và điều tra. Lệnh remote ghi dữ liệu và cần người vận hành chủ động chạy. Cloudflare docs: https://developers.cloudflare.com/d1/best-practices/import-export-data/ và https://developers.cloudflare.com/d1/wrangler-commands/.
+
+**Chưa có kết quả import ở thời điểm cập nhật tài liệu.** Sau đó cần truy vấn metadata 8 bảng, đối chiếu 14 row counts, `PRAGMA quick_check` và `PRAGMA foreign_key_check`, không query dữ liệu mật, không bật API Phase6, chưa migration trên `auth-preview` hoặc merge PR.

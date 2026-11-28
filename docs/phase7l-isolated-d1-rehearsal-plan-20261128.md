@@ -131,3 +131,16 @@ Trong hội thoại ngày **26/11/2026**, người vận hành đã phê duyệt
 Sau ảnh `PRAGMA foreign_key_check` 0 lỗi, người vận hành xác nhận đã chạy `PRAGMA quick_check;` ngay trước câu lệnh khóa ngoại và nhận `ok`. Kết luận `quick_check=ok` dựa trên **lời xác nhận**, chưa có ảnh độc lập cho chính lệnh này tại Bước 161. Hai phép kiểm cùng đủ điều kiện đi tiếp xem bindings; không yêu cầu người vận hành chạy lại.
 
 **Bước 162 đề nghị, chỉ đọc:** kiểm tra Pages `duongtrcnhiem-test` → Settings → chọn `Preview` → `Bindings`, đối chiếu D1 binding `AUTH_DB_PREVIEW` trỏ `duongtrcnhiem-auth-preview`, không phải `duongtrcnhiem-restore-test`. Sau đó kiểm tra `Production` bindings; việc không thấy `restore-test` ở một dự án Pages **không chứng minh** database này không được bất kỳ Worker/Pages nào khác sử dụng. Không Add/Edit/Delete/Save.
+
+## Bước 162 — Pages Preview binding phân tách khỏi restore-test (ảnh operator 28/11/2026)
+
+Ảnh Cloudflare Pages `duongtrcnhiem-test` → Settings → `Bindings` (theo ngữ cảnh đang chọn **Preview** từ Bước 162) cho thấy đúng một dòng:
+- Type `D1 database`
+- Name `AUTH_DB_PREVIEW`
+- Value `duongtrcnhiem-auth-preview`
+
+Không thấy `duongtrcnhiem-restore-test` trong danh sách binding hiển thị. **Bước 162 PASS cho cấu hình Pages Preview đã quan sát**. Ảnh chỉ cắt phần Bindings, không có environment selector nên phép suy luận môi trường Preview phụ thuộc ngữ cảnh thao tác người vận hành. Bằng chứng `/api/auth/status` ở bước trước hỗ trợ rằng API cơ bản đã truy cập D1 trên alias Preview.
+
+Giới hạn: chỉ một cấu hình Pages Preview được kiểm tra, chưa chứng minh database `restore-test` không bị một Worker/Pages project khác sử dụng; chưa khớp UUID database với binding runtime thực tế, chưa xác nhận Production binding, chưa chứng minh các bảng Phase 6 đã có trong `auth-preview`.
+
+**Bước kế tiếp (163, chỉ đọc):** mở Settings → chọn environment Production → Bindings của `duongtrcnhiem-test`; chụp các dòng Type/Name/Value nhưng không thay đổi cấu hình, bấm Reveal, hoặc chia sẻ secret. Không bắt đầu migration/bật cờ Phase 6.

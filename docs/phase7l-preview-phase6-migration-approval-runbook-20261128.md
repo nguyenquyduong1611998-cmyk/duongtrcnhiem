@@ -452,3 +452,20 @@ Sau hướng dẫn đọc `SELECT type, name FROM sqlite_master WHERE type IN ('
 **Gate `PREVIEW_PHASE6_SCHEMA_COUNT: PASS (operator-reported)`**. **Gate `PREVIEW_PHASE6D_FINAL_POSTFLIGHT: PENDING`** cho đến khi kiểm tra lại 8 số lượng bản ghi gốc `5,0,3,1,1,1,1,2`, `PRAGMA quick_check` = `ok`, `PRAGMA foreign_key_check` trả 0 hàng trên **chính** D1 Preview. Nếu lỗi hoặc số hàng khác baseline, dừng; không rollback tự động, không chạy lại migration.
 
 Các cờ máy chủ `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED` tiếp tục không cấu hình/OFF; chưa xác minh API thực tế, chưa merge PR36 và chưa đổi Production.
+
+## Bước 205 — Toàn bộ Phase 6D final postflight PASS trên D1 Preview (operator-confirmed, 28/11/2026)
+
+Sau Bước 204 báo đủ 17 đối tượng Phase 6 trên `duongtrcnhiem-auth-preview` (kỳ vọng 5 bảng/12 trigger; operator-reported), operator hoàn thành ba phép kiểm read-only của Bước 205 và phản hồi **"cả 3 đều pass"**:
+- 8 bảng gốc có `COUNT(*)` khớp baseline `5,0,3,1,1,1,1,2` (14 bản ghi);
+- `PRAGMA quick_check;` = `ok`;
+- `PRAGMA foreign_key_check;` = 0 hàng lỗi.
+
+**Chứng cứ mức operator-reported, không có screenshot mới** cho ba kết quả ở Bước 205; chưa so sánh từng hàng D1 remote hash/content byte-for-byte. Kết hợp bằng chứng migration từng bước và D1 clone thử trước: **`PREVIEW_PHASE6_SCHEMA_MIGRATION_POSTFLIGHT: PASS (checked scope)`**. 4 SQL đã được báo thực thi trên D1 Preview, không phải mới chỉ trên SQLite cục bộ. Chưa xác nhận Phase6 runtime student/Admin, phát hành DEMO exam, các trường hợp A/B/PC/iPhone. Không tự bật API hoặc merge PR36; Pages Production và staging D1 chưa thay đổi trong những bước này.
+
+### Bước 206 đề nghị — Kiểm tra dữ liệu Phase6 trước khi mở flags (chỉ đọc)
+
+Mã nguồn Phase6 student exam route `functions/api/phase6/exam.js` trả 404 khi thiếu `PHASE6_STUDENT_TIMED_EXAM_ENABLED='true'` và yêu cầu host Preview cố định, `PHASE4_PREVIEW_HOST_OPT_IN`, `AUTH_DB_PREVIEW` binding và Firebase signed student. Các route student/admin results yêu cầu `PHASE6_RESULTS_READONLY_ENABLED='true'` và admin yêu cầu thêm `PHASE6_ADMIN_RESULTS_ENABLED='true'`; không cấu hình ba cờ server là OFF (đã xác nhận Bước155).
+
+Student `action:'list'` đọc `phase5_content_versions` trạng thái `published` liên kết `phase6_admin_publications` (không chỉ dựa vào việc bảng tồn tại). Migration là schema-only: **chưa chứng minh đã có bất kỳ đề Phase 6 nào được xuất bản**. Nếu `phase6_admin_publications` trống, danh sách đề Phase6 sẽ rỗng ngay cả sau khi bật API.
+
+Để kiểm tra chỉ số dữ liệu mà không hiển thị thông tin tài khoản hay đề thi, tại `duongtrcnhiem-auth-preview` chạy 1 SELECT với scalar subqueries `COUNT(*)` cho năm bảng `phase6_admin_drafts`, `phase6_admin_draft_events`, `phase6_admin_publications`, `phase6_exam_sessions`, `phase6_exam_submissions`. Chỉ báo năm con số; **không** chạy INSERT/UPDATE/DELETE, không tạo tài khoản hoặc đề thật, không thử API ghi, không bật flags trước quyết định riêng.

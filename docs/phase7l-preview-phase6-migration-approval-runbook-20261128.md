@@ -711,3 +711,17 @@ GitHub connector confirmed `PR37 draft=true`, `merged=false`, base staging, `mer
 Operator mở rộng mục `Staging DEMO Quiz Pilot (isolated)` (on: push) trên tab Checks của [PR37](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/37) và gửi ảnh hiện **dấu tích xanh tại job `demo-quiz-ci`**. Ảnh trước đó Bước226 cũng cho thấy **Cloudflare Pages** succeeded cho commit `f2a0afd` ở nhánh fix riêng. **Gate `PR37_ISOLATED_CI: PASS (screenshot)`**, `PR37_FIX_BRANCH_CLOUDFLARE_BUILD: PASS`; các trạng thái khác/chi tiết từng test step không hiển thị riêng. Dấu số 1 bên cạnh workflow có thể là annotation, không phủ định trạng thái xanh của job nhưng chưa được kiểm tra nội dung annotation.
 
 GitHub API `fetch_pr` xác nhận PR37 vẫn **Draft, open, merged=false, mergeable=true**, base `feature/staging-demo-quiz-pilot`, commit cuối `f2a0afdbc9962ffeddb7968e1dc107cd214f3d0c`. **Không tự merge** hoặc thay đổi Cloudflare; chỉ đề xuất chuyển Ready for review sau xem lại diff 3 file. Sau khi người vận hành phê duyệt và merge PR37 vào staging, chờ đúng preview pinned alias deploy, đọc lại bản nháp hiện có (không tạo trùng) trước khi thử save/update. PR36 vẫn Draft, Production chưa thay đổi.
+
+## Bước 228 — PR37 ready for review, all checks green and mergeable (operator screenshot, 28/11/2026)
+
+Operator gửi ảnh phần merge gate PR37:
+- `All checks have passed` với **2 successful checks**.
+- `No conflicts with base branch`, merging can be performed automatically.
+- Nút xanh `Merge pull request` và đường dẫn `Convert to draft`: chứng minh PR đã rời Draft.
+
+Đối chiếu GitHub connector `fetch_pr`:
+- PR37 `state=open`, `draft=false`, `merged=false`, `mergeable=true`.
+- Base chính xác `feature/staging-demo-quiz-pilot`, head `feature/phase6b-d1-audit-change-count-fix-20261128`, SHA `f2a0afdbc9962ffeddb7968e1dc107cd214f3d0c`.
+- Chỉ đổi 3 file: `functions/_shared/phase6-synthetic-admin-drafts.mjs`, `tests/phase6b-admin-drafts-http.test.mjs`, `tests/phase6c-synthetic-publish-http.test.mjs`.
+
+**Gate `PR37_READY_TO_MERGE: PASS`**, operator được hướng dẫn tự bấm `Merge pull request` rồi `Confirm merge` trên PR37, **chưa xác nhận đã merge** tại thời điểm ghi. Không tự merge bằng API. Sau operator xác nhận merge, phải đợi và kiểm tra đúng pinned Preview alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` nhận merge commit mới, mở UI Admin 6B → `Tải danh sách bản nháp` → bản nháp 15 phút/0 câu v1 vẫn còn, rồi mới thử save/update. Không bấm `Tạo đề nháp mới` lần nữa; không bật publish/student/results flags hoặc thay Production; PR36 vẫn Draft.

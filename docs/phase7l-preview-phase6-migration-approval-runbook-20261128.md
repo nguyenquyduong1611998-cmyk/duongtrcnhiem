@@ -1288,3 +1288,31 @@ Operator sau Bước274 đã nộp bài DEMO revision 3 và API báo score 10/10
 **Gate `PHASE6D_STUDENT_SUBMITTED_SCORE_INDEPENDENT_RESULT_READBACK: PASS (operator screenshot)`**. Đã xác minh điểm finalized được API đọc kết quả D1 trả lại trong phiên đang mở, không chỉ phản hồi POST submit. **Chưa có bằng chứng score persist sau reload F5 và reopening** và chưa có SQL D1 integrity/unique submission count sau nộp.
 
 Đối chiếu `src/components/Phase6StudentExamPanel.tsx`: `Mở đề` gọi `readPhase6Exam`, `setExam(next)` sẽ set `result` từ `next.result??null` để hiển thị score đã lưu. **Bước 276 (READ-ONLY):** F5 trên đúng Edge InPrivate đang đăng nhập học viên DEMO; `Mục Chuyên Đề` → `Tải danh sách đề thi DEMO` → `Mở đề` bản revision 3. Mong đợi `Đã nộp: 10/10 điểm · 1/1 câu đúng` vẫn hiện, không có form trả lời/nộp lại; nếu điểm chưa hiện dùng `Đọc lại kết quả từ D1` đúng một lần; không bấm Bắt đầu hoặc Submit. Nếu không khớp, dừng và chụp trạng thái. Đồng hồ có thể tiếp tục giảm sau final score nhưng hạn nộp không còn liên quan bài đã nộp. Không chạm API Phase6E, D1 schema, PR36/PR39 hoặc Production.
+
+## Bước 276 — Phase6D grade 10/10 persists across F5 and read-only Mở đề (operator screenshot, 28/11/2026)
+
+Operator tải lại website học viên DEMO trên pinned Preview, `Mục Chuyên Đề` → `Tải danh sách đề thi DEMO` → `Mở đề` rev3. Screenshot chứng minh:
+- `Toán học DEMO - Cơ bản · phiên bản 3`
+- `Còn lại: 16:53` tại thời điểm ảnh (session timer continues; not reset)
+- ô kết quả màu xanh **`Đã nộp: 10/10 điểm · 1/1 câu đúng.`**
+- chỉ nút `Đọc lại kết quả từ D1` và `Đồng bộ phiên thi`, không thấy form trả lời/nộp lại
+- notice **`Đã khôi phục phiên thi từ máy chủ.`**
+
+**Gate `PHASE6D_SUBMITTED_SCORE_PERSISTS_AFTER_F5: PASS (operator screenshot)`**. Kết quả đã persisted qua page reload và read-only session read theo API, không chỉ client memory. Chưa chạy kiểm tra SQL trực tiếp về session/submit counts, DB integrity hậu ghi điểm.
+
+**Bước 277 read-only D1 audit (không lộ UID/đáp án):** đúng `duongtrcnhiem-auth-preview` → Explore Data → Query:
+```sql
+SELECT
+ COUNT(*) AS sessions,
+ COUNT(sub.submission_id) AS submissions,
+ SUM(CASE WHEN s.time_limit_seconds=1800
+     AND s.expires_at=s.started_at+1800 THEN 1 ELSE 0 END) AS valid_30min_sessions,
+ SUM(CASE WHEN sub.score_tenths=100
+     AND sub.correct_count=1 AND sub.total_count=1 THEN 1 ELSE 0 END) AS perfect_submissions
+FROM phase6_exam_sessions s
+JOIN phase6_admin_publications p
+  ON p.draft_id=s.topic_id AND p.revision=s.revision
+LEFT JOIN phase6_exam_submissions sub ON sub.session_id=s.session_id
+WHERE p.revision=3;
+```
+Expected for this one isolated student workflow: **sessions=1, submissions=1, valid_30min_sessions=1, perfect_submissions=1** (if additional DEMO accounts have also started revision3, counts may exceed one, so inspect separately, no mutation). Query is SELECT only; no usernames, Firebase UID, answers or tokens exposed. If errors, STOP rather than retry write. Then `PRAGMA quick_check;` expects `ok` and `PRAGMA foreign_key_check;` expects 0 rows, each separately, stage later. Keep Phase6E OFF, PR36/PR39 Draft, Production unchanged.

@@ -867,3 +867,31 @@ FROM phase6_admin_drafts;
 **Bước 241 (operator-controlled single write, Preview DEMO only):** trên pinned Preview alias `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` → Google Admin → Quản Trị → Phase6B, tải danh sách và mở **bản nháp duy nhất**, đảm bảo đúng `Toán học DEMO - Cơ bản`, 30 phút, 1 câu, revision 3. Không thay đổi dữ liệu, không bấm Lưu. Tại `6C — Duyệt xuất bản bản toán học DEMO`, tick **chỉ** checkbox `Tôi xác nhận đây chỉ là đề toán DEMO và đã kiểm tra nội dung`; bấm `Xuất bản phiên bản toán học DEMO` **chỉ một lần**. Sau đó chụp thông báo/receipt; mong đợi `Đã xuất bản revision 3 vào D1 Preview.` và publication metadata `revision=3`, `questionCount=1`, `timeLimitSeconds=1800`. Nếu timeout/lỗi, **không bấm lại**, kiểm tra database read-only vì transaction có thể đã commit. Không bật student API/results trước khi publication được xác nhận. Publish tạo metadata và bản snapshot Phase5 bất biến; không có thao tác thu hồi trong UI hiện tại.
 
 **Bước 242 sau đó (chỉ đọc)** kiểm `phase6_admin_publications`, `phase5_content_versions` và `phase5_content_questions` cho draft id hiện tại (tránh hiển thị đáp án/khoá trong screenshot), `PRAGMA quick_check`, `PRAGMA foreign_key_check` trước khi bật student timed exam. Giữ Production và PR36 Draft nguyên trạng.
+
+## Bước 241 — UI xác nhận publication revision 3 đã tồn tại sau lỗi mạng và retry (operator screenshot, 28/11/2026)
+
+Operator sau khi bấm publish trên pinned Preview gặp lỗi mạng; sau đó thử lại rồi gửi screenshot panel `6C — Duyệt xuất bản bản toán học DEMO` hiển thị:
+- `Đã xác nhận phiên bản 3 được lưu cố định ở máy chủ.`
+- `Phiên bản này đã xuất bản trước đó, không tạo bản sao.`
+- checkbox xác nhận publish đang bỏ chọn và nút publish disabled.
+
+Theo `src/components/Phase6AdminDraftsPanel.tsx`, thông báo thứ hai đến từ API trả receipt với `created=false`, client đã parse `publication` với revision=3 và set state `publishedRevision`. Theo `functions/_shared/phase6-synthetic-publication.mjs`, `priorPublication` SELECT đúng bản published của draft + revision, nếu tồn tại trả `created:false`. **Gate `PHASE6C_RETRY_ACKNOWLEDGED_EXISTING_REVISION3: PASS (operator screenshot)`**. Bằng chứng cho thấy hệ thống nhận biết publication tồn tại và không tạo một publication cùng draft+revision lần nữa, **chưa chứng minh toàn bộ D1 không chứa bản phát hành khác**.
+
+Bước 242 **read-only** trên đúng D1 `duongtrcnhiem-auth-preview` kiểm bản phát hành có 30 phút, 1 câu, 1 answer key; không hiển thị draft_id, đáp án hoặc Google UID:
+```sql
+SELECT
+  p.revision,
+  v.state,
+  v.time_limit_seconds,
+  (SELECT COUNT(*) FROM phase5_content_questions q
+   WHERE q.topic_id=p.draft_id AND q.revision=p.revision) AS questions,
+  (SELECT COUNT(*) FROM phase5_content_answer_keys k
+   WHERE k.topic_id=p.draft_id AND k.revision=p.revision) AS answer_keys,
+  (SELECT COUNT(*) FROM phase6_admin_publications) AS total_publications
+FROM phase6_admin_publications p
+JOIN phase5_content_versions v
+  ON v.topic_id=p.draft_id AND v.revision=p.revision;
+```
+Kỳ vọng **đúng 1 hàng**: `revision=3`, `state=published`, `time_limit_seconds=1800`, `questions=1`, `answer_keys=1`, `total_publications=1`. Nếu khác, STOP, không retry publish. Sau khi pass mới tiếp tục `PRAGMA quick_check` và `PRAGMA foreign_key_check` rồi cân nhắc thử student exam theo phase gate riêng.
+
+Không bật student/results flags, không chạy bất kỳ SQL sửa dữ liệu nào, PR36 còn Draft, Production không đổi.

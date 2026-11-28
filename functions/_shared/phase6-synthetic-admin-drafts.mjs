@@ -64,10 +64,15 @@ async function findDraft(db,id){
   return db.prepare(SQL_GET).bind(id).first();
 }
 function changed(result){
-  if(result?.success!==true||!Number.isSafeInteger(result.meta?.changes))
+  if(result?.success!==true||!Number.isSafeInteger(result.meta?.changes)||
+     result.meta.changes<0)
     throw new Error('PHASE6_D1_WRITE_UNCONFIRMED');
-  if(result.meta.changes>1)throw new Error('PHASE6_D1_WRITE_UNEXPECTED');
-  return result.meta.changes===1;
+  // Cloudflare D1 meta.changes is based on sqlite3_total_changes(): the single
+  // draft INSERT/UPDATE/DELETE also writes one audit event via an AFTER trigger.
+  // SQLite adapters reporting only direct changes return 1; D1 may return 2.
+  // The draft PK + version predicates cap the direct write at exactly one row.
+  if(result.meta.changes>2)throw new Error('PHASE6_D1_WRITE_UNEXPECTED');
+  return result.meta.changes>=1;
 }
 
 export async function handlePhase6SyntheticAdminDrafts(db,data){

@@ -1207,3 +1207,15 @@ Ngay bên dưới đã xuất hiện khung thực tế `Phase 6D — Thi toán h
 **Gate `PHASE6D_STUDENT_UI_GUARDS_ALL_PASS: PASS (operator screenshot)`; `PHASE6D_STUDENT_PANEL_VISIBLE: PASS`; `PHASE6D_STUDENT_EXAM_LIST: PENDING`; `PHASE6D_STUDENT_SESSION_START: NOT EXECUTED`.**
 
 **Bước 269 (READ-ONLY):** trên cùng tab Edge InPrivate đang đăng nhập DEMO student, nhấn **`Tải danh sách đề thi DEMO` đúng một lần**. Mã `src/components/Phase6StudentExamPanel.tsx` gọi `listPhase6Exams(user)` tới `/api/phase6/exam` action list; không tạo phiên và không chạy đồng hồ. Mong đợi thông báo `Đã tải 1 đề toán học DEMO đã xuất bản.` và một dòng `Toán học DEMO - Cơ bản`, `Phiên bản 3 · 1 câu · 30 phút`, nút `Mở đề`. **Chưa bấm `Mở đề` hoặc `Bắt đầu làm bài (máy chủ tính giờ)`** trước khi có ảnh kết quả list; nếu 404/403/503 thì STOP để chẩn đoán Phase6D backend flag, host/binding, không retry bừa. Chưa bật API Phase6E đọc điểm hoặc thay đổi PR39, PR36 Draft, Production/main nguyên trạng.
+
+## Bước 269 — Học viên đọc danh sách đề Phase6D thành công trên D1 Preview (operator screenshot, 28/11/2026)
+
+Operator trong Edge InPrivate dùng học viên DEMO, sau khi Phase6D 6/6 guard PASS ở Bước268, đã bấm `Tải danh sách đề thi DEMO`. Screenshot cho thấy khung `Phase 6D — Thi toán học DEMO có thời hạn`:
+- Bản ghi **`Toán học DEMO - Cơ bản`**.
+- **`Phiên bản 3 · 1 câu · 30 phút`**.
+- Nút **`Mở đề`**.
+- Trạng thái xanh **`Đã tải 1 đề toán học DEMO đã xuất bản.`**.
+
+Điều này xác minh **`PHASE6D_STUDENT_READONLY_LIST: PASS (operator screenshot)`**, API `/api/phase6/exam` action `list` đã phản hồi thành công cho học viên DEMO trên pinned Preview, đọc được publication revision 3 (1 câu, time_limit_seconds=1800). **Không xác minh start/resume/submit/grade**; API đọc danh sách không tạo phiên.
+
+**Bước 270 (READ-ONLY):** trên cùng học viên/đề, bấm **`Mở đề`** đúng một lần. Theo `src/components/Phase6StudentExamPanel.tsx`, thao tác này gọi `readPhase6Exam(user,t)`, **không gọi `startPhase6Exam`** và không tạo phiên thi. Nếu chưa từng có phiên với học viên này, mong đợi `Chưa bắt đầu phiên thi. Bấm Bắt đầu để máy chủ ấn định giờ.`, tên đề revision 3 và nút `Bắt đầu làm bài (máy chủ tính giờ)` / `Đọc lại phiên từ D1 (sau mất mạng)`. Nếu phát hiện server trả phiên đã tồn tại, không giả định chưa từng bắt đầu; dừng và báo hiện trạng. **Chưa bấm Bắt đầu**, không submit, không sửa D1/Production, không bật Phase6E, PR39 và PR36 vẫn Draft.

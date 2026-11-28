@@ -556,3 +556,18 @@ Kiểm tra chính xác `src/App.tsx` ở nhánh `feature/staging-demo-quiz-pilot
 Bước chẩn đoán đầu tiên **không ghi dữ liệu**: dùng URL pinned `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`, vào Admin, kiểm tra Google Admin Cloud đã kết nối và kéo xuống cuối phần Admin; thử tải mới bằng `Ctrl+Shift+R` trên máy tính (PWA có thể đang dùng assets cũ) hoặc cửa sổ riêng nếu cần đăng nhập lại. Chụp ảnh đáy tab Admin + URL (che tài khoản) nếu không thấy. Chưa được nhấn tạo đề/publish, chưa thêm cờ mới, không chạy SQL, không retry Cloudflare deploy bừa bãi, không đụng Production.
 
 Nếu vẫn không thấy sau hard refresh, cần kiểm tra bộ asset JS đã build với `VITE_PHASE6_ADMIN_DRAFTS_UI` thực tế thay vì suy ra từ Deployment Success; Vite flag compile lúc build. Xác minh từ Preview Build Logs và Variables and secrets / deployment env. Không tiết lộ JWT, Firebase secrets hoặc Cloudflare Access cookies.
+
+## Bước 214 — Giao diện Admin Phase 6B vẫn không xuất hiện trong cửa sổ ẩn danh (operator, 28/11/2026)
+
+Người vận hành đã dùng cửa sổ ẩn danh, qua Access, đăng nhập Google Admin, vào tab Admin trên pinned Preview, **vẫn không thấy** khung `Giai đoạn 6B — Ngân hàng đề nháp DEMO`. Điều này giảm khả năng chỉ vì cache browser/service worker của phiên trước. Không còn yêu cầu họ lặp lại refresh.
+
+Đối chiếu **chính xác commit deployment `75f2d814b0ef70b5a4ae7118885cd2e0548e69a8`** trực tiếp qua GitHub:
+- `src/App.tsx`: import/render `Phase6AdminDraftsPanel` tồn tại (sau AdminPanel trong tab admin), dựa vào `adminAccessAllowed && firebaseUser && isPhase6AdminDraftsUiEnabled(hostname,import.meta.env.VITE_PHASE6_ADMIN_DRAFTS_UI)`.
+- `adminAccessAllowed` trên staging yêu cầu cloud connected + isCloudAdmin + UID Firebase Admin đúng; nếu thấy chính AdminPanel theo nhánh này, điều kiện `adminAccessAllowed` đã đúng, trừ khi giao diện họ thấy không phải `AdminPanel` đó.
+- `src/utils/phase6AdminDrafts.ts` helper yêu cầu `IS_FIREBASE_STAGING && flag==='true' && isPhase5DemoPreviewHostname(hostname)`.
+- `src/utils/phase5DemoTopics.ts` hostname cố định đúng alias operator chụp ở Bước212; `src/utils/firebaseStagingHost.ts` staging tự động theo host `*.duongtrcnhiem-test.pages.dev`.
+- `package.json` build script `vite build`, `VITE_PHASE6_ADMIN_DRAFTS_UI` **được nhúng vào JS tại build-time**, nên chỉ Save runtime variable hoặc retry deployment không chứng minh flag đã có trong JS.
+
+**Diagnosis: `UI_COMPONENT_PRESENT_AT_DEPLOYED_COMMIT: PASS`, `BROWSER_CACHE_ONLY_CAUSE: UNLIKELY`, `BUILT_VITE_FLAG_EFFECTIVE: UNKNOWN`; nguyên nhân còn cần điều tra là flag lưu sai/missing trong Preview, flag không đi vào build, hoặc quyền Admin UI chưa đúng.** Không tuyên bố root cause đã chắc chắn.
+
+**Bước 215 nên ưu tiên chỉ đọc:** Operator mở Cloudflare Pages project `duongtrcnhiem-test` → Settings → đúng **Preview** → **Variables and secrets** và chụp/chỉ đọc đúng hai hàng plain-text `PHASE6_ADMIN_DRAFTS_ENABLED` và `VITE_PHASE6_ADMIN_DRAFTS_UI` (value cần là `true`, không có ngoặc kép/khoảng trắng); che mọi secrets. Nếu hai biến đúng, xem Deployment details của bản **10:37 28/11 commit 75f2d81** → Build log (chỉ chụp phần bước build và các dòng env variable **tên public**, tuyệt đối không chia sẻ giá trị secret hoặc dump toàn bộ env), để biết build có thực sự lấy biến Preview. Chưa sửa các cờ, chưa retry thêm, không test POST API, không merge PR36 hay đụng Production.

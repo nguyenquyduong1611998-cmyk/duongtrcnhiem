@@ -231,3 +231,27 @@ Bước tiếp theo an toàn: dùng `node -e` chỉ đọc `fs.statSync` và `cr
 Bản export ngày 27/11 cũng từng báo 12.145 byte, nhưng **kích thước bằng nhau không chứng minh hai file giống nhau**. Kiểm thử restore cục bộ, đếm 8 bảng gốc và `integrity_check/foreign_key_check` cho bản 28/11 **chưa được thực hiện ở Bước 168**.
 
 **Bước 169 (chỉ tại RAM cục bộ):** Node.js `node:sqlite` import file do operator tự xuất D1 vào `:memory:`, kiểm tra 8 bảng ứng dụng, 8 row counts baseline trước migration `5,0,3,1,1,1,1,2`, `integrity_check=ok`, `foreign_key_check=0`. Chỉ ghi kết quả PASS/FAIL vào hồ sơ, không đưa file backup, password hashes, nội dung đề, hay bản ghi người dùng lên repo/chat. Nếu số dòng khác baseline, không tự ghi đè/khôi phục; có thể là dữ liệu thay đổi giữa các thời điểm, cần điều tra.
+
+## Bước 169 — Backup mới đã restore và khớp snapshot cục bộ (ảnh operator 28/11/2026)
+
+Người vận hành chạy Node.js `node:sqlite` với file cục bộ `Documents/D1-Backup/preview-backup-20261128-prephase6.sql`; thực thi export D1 do operator tự tải vào `:memory:`. Ảnh CMD trả `Restore: SUCCESS`, `Tables: 8`, `Integrity: ok`, `Foreign key errors: 0`, `Result: PASS`.
+
+Số dòng trong bản restore:
+- `demo_students=5`, `login_attempts=0`, `synthetic_graded_attempts=3`.
+- `phase5_content_topics=1`, `phase5_content_versions=1`, `phase5_content_questions=1`, `phase5_content_answer_keys=1`, `phase5_content_attempts=2`.
+- Tổng 14 hàng, **trùng số lượng chụp trực tiếp** ở Bước 166.
+
+**Đã đạt:** `FRESH_PREVIEW_EXPORT_LOCAL_RESTORE_SMOKE: PASS`, `8_TABLE_COUNTS_MATCH_OBSERVED_BASELINE: PASS`, `SQLITE_INTEGRITY: PASS`, `SQLITE_FOREIGN_KEYS: PASS`.
+
+**Chưa đạt/không thể suy ra:** SQL backup giống mọi byte của D1 live sau thời điểm export; hồi phục bản backup lên D1 Cloudflare thứ hai; migration 6B/6C/6A/6D áp dụng thành công với **file backup 28/11**; không bị lộ data hash/password khi upload; hoặc phê duyệt vận hành remote.
+
+### Rà soát mã các bản draft trước bước thử tiếp
+
+Đã đọc bốn file `serverless/d1-phase6*-draft.sql` tại commit Staging `75f2d81`:
+- 6B tạo `phase6_admin_drafts` và `phase6_admin_draft_events`, log create/save/delete.
+- 6C tạo `phase6_admin_publications`, liên kết Phase5 published revision.
+- 6A tạo `phase6_exam_sessions`, khóa deadline và ghi nhận thời gian theo DB.
+- 6D tạo `phase6_exam_submissions`, kiểm tra phiên/sở hữu/thời hạn và chống sửa/xóa/nộp trùng.
+- Các file có `CREATE ... IF NOT EXISTS` cho schema bổ sung, không chứa DML xóa dữ liệu cũ trong đoạn mã được rà soát. **Tuy nhiên**, vì SQL draft vẫn ghi rõ không triển khai lên Cloudflare khi chưa review/phê duyệt, việc pass trên SQLite RAM không thay thế review tác động D1 thực tế, kế hoạch xử lý migration lỗi một phần và rollback.
+
+**Bước 170 đề nghị:** test lại *duy nhất một lần* migration 6B→6C→6A→6D trên backup **28/11** trong SQLite `:memory:` với kiểm tra row counts trước/sau và integrity/foreign keys. Giữ `PHASE6_*` API OFF. Sau đó chuyển sang phê duyệt remote restore để xác minh recovery trước khi triển khai Preview, không tiếp tục lặp lại các thử nghiệm 100 học viên đã PASS.

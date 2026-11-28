@@ -131,3 +131,18 @@ Operator gửi bốn ảnh Cloudflare D1 Studio, theo ngữ cảnh đang làm vi
 Kết hợp Bước 180 (2 bảng Phase6B + 3 trigger hiện diện), **gate `REMOTE_CLONE_PHASE6B_POSTFLIGHT: PASS`** đối với danh sách đối tượng, số dòng và kiểm tra toàn vẹn. So sánh row counts không phải kiểm chứng byte-for-byte nội dung tám bảng; test cục bộ bản sao đã kiểm tra SHA-256 riêng. Các ảnh Bước 181 chỉ chụp kết quả truy vấn, không chứa đầu trang tên DB, vì vậy kết luận đích dựa vào luồng thao tác liên tục từ các bước 179–180.
 
 **Bước 182 có thể tiếp tục CHỈ trên clone `duongtrcnhiem-restore-20261128`:** chạy duy nhất file `serverless/d1-phase6c-publication-metadata-draft.sql` qua `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6c-publication-metadata-draft.sql`; không dùng `--yes`, xác nhận đúng target trước khi đồng ý prompt. Nếu lỗi, STOP, không retry. Hậu kiểm kế tiếp: 3 bảng Phase 6 / 6 trigger, 8 row counts baseline, `quick_check=ok`, `foreign_key_check=0`. Không ghi lên `duongtrcnhiem-auth-preview`, không bật `PHASE6_*`, không merge PR36 hoặc thay đổi Production.
+
+## Bước 182 — Phase 6C remote rehearsal execution report (operator screenshot, 28/11/2026)
+
+Người vận hành chạy `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6c-publication-metadata-draft.sql` trên **D1 bản sao cô lập** theo Bước 182. Ảnh phần cuối CMD cho thấy:
+- `Executed 5 queries in 3.81ms (3 rows read, 7 rows written)`
+- Total queries executed: 5
+- Rows read: 3; rows written: 7
+- Database size (MB): 0.15
+- CMD đã về prompt, không thấy lỗi trong ảnh.
+
+Đối chiếu file Phase 6C: 1 bảng `phase6_admin_publications`, 1 index `phase6_publications_latest` và 3 trigger `phase6_publication_no_delete`, `phase6_publication_no_update`, `phase6_publication_requires_published` tương ứng 5 lệnh DDL.
+
+**Trạng thái:** `REMOTE_CLONE_PHASE6C_EXECUTION_REPORTED_SUCCESS`, **POSTFLIGHT CHƯA PASS**. Ảnh CMD chưa xác minh trực tiếp 3 bảng/6 trigger Phase 6 có mặt và row counts/tính toàn vẹn. Chưa được tiếp tục 6A nếu postflight chưa đạt.
+
+**Bước 183 chỉ đọc:** trong D1 Studio database `duongtrcnhiem-restore-20261128`, chạy `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;`. Kỳ vọng 3 bảng và 6 trigger (9 hàng). Sau đó đối chiếu 8 counts baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0 dòng. Nếu bất thường: STOP, không retry migration hay chạy 6A. Giữ `auth-preview` nguyên trạng, 3 flags Phase6 OFF, PR36 Draft.

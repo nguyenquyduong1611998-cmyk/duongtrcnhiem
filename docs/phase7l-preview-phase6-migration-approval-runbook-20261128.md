@@ -827,3 +827,24 @@ Sau khi operator báo đã thêm `PHASE6_ADMIN_PUBLISH_ENABLED=true` và `VITE_P
 **Gate `PHASE6C_PINNED_PREVIEW_RETRY_SUCCESS: PASS (operator screenshot)`**, **`PHASE6C_PUBLISH_UI_VISIBLE: PENDING`**, **`PHASE6C_PUBLICATION_EXISTS: NOT YET CONFIRMED`**. Không suy ra đã xuất bản đề chỉ từ deployment thành công; không thử API ghi trước UI gate.
 
 **Bước 239 read-only:** mở `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` (không dùng hash URL), Google Admin → Quản Trị → Giai đoạn 6B → `Tải danh sách bản nháp` → **Chỉnh sửa** bản nháp sẵn có `Toán học DEMO - Cơ bản` (30 phút, 1 câu, revision 3). Cuộn trong editor để tìm khung **`6C — Duyệt xuất bản bản toán học DEMO`**, chụp ảnh khung nếu có; **chưa đánh dấu checkbox xác nhận, chưa bấm Xuất bản**. Nếu không thấy, chụp ảnh và sau đó kiểm tra Build settings/environment variables cho Preview; không thêm/sửa/cài lại gì theo phỏng đoán. Cờ student exam/results OFF, PR36 Draft, Production không đổi.
+
+## Bước 239 — Phase6C publish UI hiện trên pinned Preview, chưa thao tác xuất bản (operator screenshot 28/11/2026)
+
+Sau khi Cloudflare retry Preview với cờ publish đã được operator thêm, người vận hành gửi screenshot từ khu vực chỉnh sửa bản nháp Phase6B với panel **`6C — Duyệt xuất bản bản toán học DEMO`**, cảnh báo lưu thay đổi trước và phiên bản xuất bản bất biến. Checkbox `Tôi xác nhận đây chỉ là đề toán DEMO và đã kiểm tra nội dung` vẫn **unchecked**. Nút `Xuất bản phiên bản toán học DEMO` đang **disabled**. **Không có thông báo publication receipt, chưa có bằng chứng đã publish**.
+
+**Gate `PHASE6C_PUBLISH_UI_VISIBLE: PASS (operator screenshot)`; `PHASE6C_SERVER_FLAG_EFFECTIVE: NOT TESTED`; `PHASE6C_PUBLICATION: NOT YET EXECUTED`.** Đây là bằng chứng Vite UI mới đã hiện qua pinned Preview, không đồng nghĩa API server trả thành công.
+
+**Bước 240 read-only pre-publication gate:** Cloudflare D1 → `duongtrcnhiem-auth-preview` → Explore Data → Query, chạy **chỉ SELECT** để xác minh đúng một draft với version 3, 30 phút, 1 câu và chưa có publication:
+```sql
+SELECT
+  (SELECT COUNT(*) FROM phase6_admin_publications) AS publications,
+  COUNT(*) AS drafts,
+  MIN(title_code) AS title_code,
+  MIN(minutes) AS minutes,
+  MIN(version) AS version,
+  MIN(json_array_length(templates_json)) AS questions
+FROM phase6_admin_drafts;
+```
+Kỳ vọng `publications=0, drafts=1, title_code=basic, minutes=30, version=3, questions=1`. Bảng Phase6C đang trống ở Bước206 nhưng **chưa có pre-publish baseline mới**, nên không giả định 0 nếu SQL chưa chạy. Nếu không khớp: STOP, không xuất bản hoặc thêm dữ liệu.
+
+Sau gate preflight đạt và có chỉ dẫn riêng thì mới đánh dấu checkbox DEMO và bấm publish **đúng một lần**. Không chia sẻ JWT/secret/đáp án riêng tư, không enable student timed-exam/results, không chạm Production, PR36 Draft.

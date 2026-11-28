@@ -225,3 +225,15 @@ Sau khi chạy truy vấn metadata `SELECT type,name FROM sqlite_master WHERE ty
 Theo kết quả mong đợi, 17 đối tượng bao gồm 5 bảng và 12 trigger Phase6. **Mức chứng cứ: OPERATOR-REPORTED tổng số 17; chưa có ảnh đầy đủ từng tên ở lần gửi này**, chưa đối chiếu chi tiết trực tiếp names của Phase6D trong Bước 189. Không đánh đồng số lượng đúng với việc trigger định nghĩa chính xác hay hoạt động đúng trên runtime.
 
 **Trạng thái:** `REMOTE_CLONE_PHASE6D_SCHEMA_COUNT: PASS (operator-reported)`. **Chưa hoàn tất hậu kiểm Phase6D:** yêu cầu 8 row counts `5,0,3,1,1,1,1,2`, `PRAGMA quick_check;` → `ok`, `PRAGMA foreign_key_check;` → 0 hàng trên đúng clone. Nếu không đạt: STOP, không tái chạy migration và không đụng D1 Preview. Nếu đạt, có thể đánh dấu rehearsal bốn SQL D1 clone đầy đủ, nhưng việc chạy trên `duongtrcnhiem-auth-preview` cần phê duyệt riêng và xác minh preflight mới. Ba server flags `PHASE6_*` vẫn chưa cấu hình; PR36 giữ Draft.
+
+## Bước 190 — Final Phase 6D postflight trên D1 restore clone (ảnh và xác nhận operator, 28/11/2026)
+
+Operator cung cấp ảnh hai truy vấn trực tiếp sau khi hoàn tất Phase6D trên `duongtrcnhiem-restore-20261128`:
+- `PRAGMA quick_check;` trả `ok`.
+- `PRAGMA foreign_key_check;` trả kết quả `4×0` (bốn cột, không có vi phạm).
+- Operator xác nhận bằng lời 8 bảng ứng dụng gốc giữ đúng số hàng baseline `5,0,3,1,1,1,1,2` (tổng 14), chưa cung cấp ảnh số lượng của bước này.
+- Bước 189 operator xác nhận tổng 17 đối tượng Phase6 (dự kiến 5 bảng, 12 trigger); đó là xác nhận qua phản hồi chứ không có ảnh chi tiết từng tên ở chính bước 189.
+
+**Kết luận:** `PHASE6_6B_6C_6A_6D_REMOTE_CLONE_MIGRATION_REHEARSAL: PASS (within checked scope)`; bốn file đã chạy tuần tự trên database clone, số bảng và trigger được operator xác nhận, số dòng gốc khớp, SQLite quick_check ok, foreign_key_check 0. Chưa xác nhận tính tương đương từng byte dữ liệu trên remote; bài test RAM bản export đã kiểm tra dữ liệu gốc không đổi bằng SHA.
+
+**Không suy ra D1 Preview đã migrate:** `duongtrcnhiem-auth-preview` trước đó chưa có phase6 tables; 3 flag server Phase6 chưa được cấu hình; PR36 vẫn Draft. Không ghi vào Production. Bước kế tiếp: lập preflight read-only tại Preview gần thời điểm phê duyệt: đúng tên/ID DB, 8 bảng và số hàng hiện tại (dừng nếu khác baseline), 0 phase6 objects, Time Travel bookmark mới, backup snapshot có thể restore. Chỉ sau phê duyệt riêng cho target Preview mới chạy migration.

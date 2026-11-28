@@ -125,3 +125,9 @@ Trong hội thoại ngày **26/11/2026**, người vận hành đã phê duyệt
 Ảnh Cloudflare D1 Studio cho database `duongtrcnhiem-restore-test` hiển thị câu lệnh read-only `PRAGMA foreign_key_check;` và bảng kết quả `Query · 4×0` với 4 cột `table`, `rowid`, `parent`, `fkid` nhưng **0 hàng kết quả**. Kết luận riêng phép thử này: `FOREIGN_KEY_CHECK: PASS`, không phát hiện bản ghi vi phạm tại thời điểm kiểm tra.
 
 **Chưa có ảnh kết quả `PRAGMA quick_check;` trong Bước 161 hiện tại.** Dù lịch sử trước có ghi nhận `quick_check: ok`, không đánh dấu kiểm tra hiện tại PASS cho đến khi người vận hành cung cấp kết quả. Không thực hiện bất cứ thao tác ghi, import, migration, hoặc thay đổi binding/flags nào từ phép kiểm này.
+
+### Bước 161 hoàn tất — người vận hành xác nhận quick_check đạt
+
+Sau ảnh `PRAGMA foreign_key_check` 0 lỗi, người vận hành xác nhận đã chạy `PRAGMA quick_check;` ngay trước câu lệnh khóa ngoại và nhận `ok`. Kết luận `quick_check=ok` dựa trên **lời xác nhận**, chưa có ảnh độc lập cho chính lệnh này tại Bước 161. Hai phép kiểm cùng đủ điều kiện đi tiếp xem bindings; không yêu cầu người vận hành chạy lại.
+
+**Bước 162 đề nghị, chỉ đọc:** kiểm tra Pages `duongtrcnhiem-test` → Settings → chọn `Preview` → `Bindings`, đối chiếu D1 binding `AUTH_DB_PREVIEW` trỏ `duongtrcnhiem-auth-preview`, không phải `duongtrcnhiem-restore-test`. Sau đó kiểm tra `Production` bindings; việc không thấy `restore-test` ở một dự án Pages **không chứng minh** database này không được bất kỳ Worker/Pages nào khác sử dụng. Không Add/Edit/Delete/Save.

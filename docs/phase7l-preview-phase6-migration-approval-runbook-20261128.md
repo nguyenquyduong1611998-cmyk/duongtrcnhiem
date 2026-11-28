@@ -1005,3 +1005,17 @@ Operator dùng **Microsoft Edge InPrivate** (khác profile/browser Chrome Incogn
 **Gate `PHASE6D_EDGE_INPRIVATE_ISOLATED_UI: FAIL (operator screenshot)`; `SHARED_CHROME_INCOGNITO_IS_ONLY_CAUSE: RULED_OUT`; `PHASE6D_ROOT_CAUSE: UNKNOWN`.** Chưa bắt đầu thi, chưa submit, không thay đổi D1/Cloudflare.
 
 **Bước 251 chẩn đoán frontend không sửa dữ liệu:** Trong **Edge InPrivate** tại đúng tab học viên, mở DevTools (F12) → **Sources** → **Search all files** (`Ctrl+Shift+F`) → tìm literal `Phase 6D — Thi toán học DEMO có thời hạn` hoặc `Tải danh sách đề thi DEMO`; gửi ảnh **có/không có kết quả**. Search trong code tải về có thể phân biệt bundle không chứa 6D vs code có nhưng điều kiện runtime sai, nhưng **có chuỗi không tự chứng minh flag runtime true**. Không paste script lạ vào Console, không gửi JWT/password/Firebase auth state đầy đủ. Nếu mã bundle có panel, cần diagnostic boolean-only của app guard (không tiết lộ UID) qua review/PR riêng; nếu bundle không chứa panel, điều tra Cloudflare alias asset và Vite output. Không Retry/đăng xuất/xóa cache lặp lại, không bật Phase6E, PR36 Draft, Production unchanged.
+
+## Bước 251 — Source search confirms delivered JS contains Phase6D; diagnostic PR38 prepared, not merged (operator screenshot, 28/11/2026)
+
+Operator trên Edge InPrivate tab học viên Preview mở DevTools Sources → Search all files và tìm `Tải danh sách đề thi DEMO`. Screenshot cho thấy **một kết quả** tại file `index-...js` của host `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`. Chuỗi JSX UI Phase6D có trong JavaScript được tải. Điều này không tự chứng minh compiled flag `VITE_PHASE6_STUDENT_TIMED_UI` bật hay guard UID nội bộ bằng Firebase.
+
+Ở Bước249 cả hai cờ deployment build env đều `true`, hostname pinned đúng. Bước250 độc lập Edge InPrivate vẫn không thấy Phase6D trên tab topics sau login học viên; khả năng chia sẻ phiên Chrome Incognito không giải thích hết. Root cause **chưa được khẳng định**.
+
+Đã tạo [PR38](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/38) (Draft), branch `feature/phase6d-preview-ui-guard-diagnostics-20261128`, base `feature/staging-demo-quiz-pilot`, commit `6ac30e98a06761e4f1a37e9827bb909942529650`. PR chỉ thêm **25 dòng vào `src/App.tsx`**, không sửa guard thật, API, Cloudflare hay database:
+- Giao diện diagnostic **read-only**, **opt-in qua URL query `?phase6_debug=1`**, chỉ render cho `test_hv_[a-f0-9]{12}` trên đúng pinned Preview staging và tab topics.
+- Chỉ in booleans/nhãn `ĐẠT/CHƯA ĐẠT` cho role student, có phiên Firebase, hai UID có bằng nhau không, cờ VITE build-time, Firebase staging, hostname đúng.
+- Không hiển thị UID, tài khoản email, token, mật khẩu, đề/đáp án; không tạo phiên, không ghi D1.
+- **PR38 đang Draft, chưa merge, chưa deploy**. Operator cần kiểm tra tab Checks (CI và Cloudflare) trước khi chuyển Ready for review/merge vào staging. Chỉ khi verified pinned Preview alias đã nhận merge commit mới, mới truy cập URL `https://feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev/?phase6_debug=1` bằng học viên DEMO, chụp trạng thái 6 boolean, không bấm Bắt đầu/nộp bài. Nếu chỉ có snippet trong bundle và flag vẫn CHƯA ĐẠT, tập trung Vite compile env; nếu UID mismatch, tập trung auth/session, không bỏ guard. Nếu tất cả ĐẠT mà panel vẫn thiếu, điều tra UI mount/layout.
+
+**Gate `PHASE6D_JS_UI_STRING_PRESENT: PASS (operator screenshot)`, `PR38_DIAGNOSTIC_TESTS: PENDING`, `PHASE6D_STUDENT_UI_VISIBLE: FAIL`.** Giữ Phase6E flags OFF, PR36 Draft, Production unchanged.

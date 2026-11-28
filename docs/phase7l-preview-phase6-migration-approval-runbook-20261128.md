@@ -639,3 +639,27 @@ Operator bấm `Tải danh sách bản nháp` trong khung Admin 6B trên pinned 
 Mã nguồn đúng commit đã triển khai `75f2d81`: `src/utils/phase6AdminDrafts.ts` gọi `POST /api/phase6/admin/drafts` với `{action:'list'}`, gửi Firebase signed Admin ID token; `functions/_shared/phase6-synthetic-admin-drafts.mjs` action `list` dùng `SELECT` và không ghi D1. Do đó **gate `PREVIEW_ADMIN_PHASE6B_SIGNED_LIST_SMOKE_TEST: PASS`** trên UI, với giới hạn chưa kiểm chứng HTTP status độc lập qua DevTools. Cả giao diện Admin 6B và API đọc nháp đều đã hoạt động.
 
 **Bước 223 (operator action, ghi dữ liệu DEMO đã được chấp thuận trong phạm vi thử nghiệm):** chỉ trên pinned Preview với signed Google Admin và tab Quản Trị, giữ `Tên chuyên đề DEMO: Toán học DEMO - Cơ bản` và `Thời gian làm bài: 15 phút`, bấm `Tạo đề nháp mới` **một lần**. Mã action `create` chèn 1 bản nháp `p6_demo_...` vào `phase6_admin_drafts` với `minutes=15`, `templates_json='[]'`, revision=1, không tạo ấn phẩm, phiên thi, bài nộp, và không đụng 8 bảng dữ liệu gốc. Sau khi có thông báo `Đã tạo bản nháp DEMO mới. Chưa được xuất bản.`, gửi ảnh, không tự bấm lại nếu API có lỗi/timeout vì có thể đã tạo thành công nhưng client mất phản hồi. Hậu kiểm tiếp là đọc lại draft, bổ sung câu mẫu/sửa thời gian theo kế hoạch nghiệm thu. Giữ publish/student/results API flags OFF, PR36 Draft, không đụng Pages Production.
+
+## Bước 223 — Lần thử tạo Phase6B draft đầu tiên báo lỗi, **chưa xác minh ghi D1** (operator screenshot, 28/11/2026)
+
+Sau khi `action:'list'` trả `Bản nháp DEMO: 0` (Bước222), operator thử nút **Tạo đề nháp mới** (mặc định title `Toán học DEMO - Cơ bản`, minutes `15`). Screenshot tiếp theo cho thấy UI vẫn ghi `Bản nháp DEMO: 0` (đây có thể là state cũ chưa refresh) và alert đỏ `Máy chủ chưa thể lưu hoặc đọc bản nháp DEMO.` Chưa có thông báo `Đã tạo bản nháp`. Đây là lỗi generic của client khi POST `/api/phase6/admin/drafts` trả không thành công, **không chứng minh transaction INSERT chưa commit**. Không retry action create.
+
+### Chẩn đoán mã nguồn tại deployed commit `75f2d814...`
+
+`functions/_shared/phase6-synthetic-admin-drafts.mjs`:
+- `SQL_INSERT`: `INSERT INTO phase6_admin_drafts (...) SELECT ?,?,?, '[]',1,... WHERE (SELECT count(*)...)<100`.
+- `changed(result)`: `result?.success===true` và `meta.changes` integer, **throw `PHASE6_D1_WRITE_UNEXPECTED` khi `result.meta.changes > 1`**.
+- Migration `serverless/d1-phase6b-synthetic-admin-drafts-draft.sql`: trigger `phase6_admin_draft_created` **AFTER INSERT** tự ghi thêm **1 row** vào `phase6_admin_draft_events`.
+- Cloudflare D1 REST API docs mô tả `meta.changes` là ước lượng số row thay đổi theo `sqlite3_total_changes()` của SQLite. SQLite `total_changes` **bao gồm các hàng ghi trong trigger**, khác `changes()` chỉ đếm direct statement. Vì vậy nếu D1 `.run()` báo `meta.changes=2` cho một draft và một audit event, `changed()` sẽ throw **sau khi insert đã commit**, endpoint `failSafe()` 503, browser chỉ hiện lỗi chung. Đây là **giả thuyết kỹ thuật có căn cứ cao**, chưa phải root cause được chứng minh trên remote vì chưa có `meta` hay state DB sau thử.
+- Cần lưu ý `rows_written` bao gồm các bản ghi chỉ mục, không phải `meta.changes`. Không sửa code/remote trước khi xác minh trạng thái.
+
+**Bước 224 — truy vấn read-only tại đúng `duongtrcnhiem-auth-preview`:**
+```sql
+SELECT
+ (SELECT COUNT(*) FROM phase6_admin_drafts) AS drafts,
+ (SELECT COUNT(*) FROM phase6_admin_draft_events) AS events,
+ (SELECT COUNT(*) FROM phase6_admin_draft_events WHERE event_type='create') AS creates;
+```
+Ban đầu Bước206 cả hai bảng bằng 0. Nếu `drafts=1,events=1,creates=1`, xác nhận INSERT+trigger hoạt động, API kiểm tra sai giả thuyết rất hợp lý; nếu vẫn `0,0,0` cần đọc log runtime/SQL lỗi server được redacted, không giả định nguyên nhân. Bất kỳ sai khác nào: STOP, điều tra trước khi retry.
+
+Chưa sửa code, chưa chạy INSERT/UPDATE/DELETE từ SQL Studio, chưa bật flags publish/student/results hay thay đổi Production. PR36 Draft; sửa code chỉ qua nhánh review/test riêng sau khi có bằng chứng.

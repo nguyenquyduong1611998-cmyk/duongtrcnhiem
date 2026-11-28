@@ -17,7 +17,7 @@ import {getSyntheticQuizQuestion,submitSyntheticQuiz,readOwnSyntheticQuiz,listSy
 import {isPhase5DemoPreviewHostname,listPhase5DemoTopics,readPhase5DemoTopic} from './utils/phase5DemoTopics';
 import {listPhase5AdminScores} from './utils/phase5AdminResults';
 import {isPhase6AdminDraftsUiEnabled} from './utils/phase6AdminDrafts';
-import {isPhase6StudentExamUiEnabled} from './utils/phase6StudentExam';
+import {isPhase6StudentExamUiEnabled,isPhase6StudentTimedUiFlagEnabled} from './utils/phase6StudentExam';
 import {isPhase6StudentHistoryUiEnabled,isPhase6AdminResultsUiEnabled} from './utils/phase6Results';
 import {isPhase7PreviewPreflightUiEnabled} from './utils/phase7PreviewPreflight';
 import {isPhase5SyntheticSubmitUiEnabled,submitPhase5SyntheticAttempt,readOwnPhase5SyntheticAttempt} from './utils/phase5SyntheticSubmission';
@@ -1228,7 +1228,7 @@ const handleCompleteAttempt = (newAttempt: QuizAttempt) => {
                                <div>Vai trò nội bộ là học viên: <strong>{currentUser.role === 'student' ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
                                <div>Có phiên Firebase: <strong>{firebaseUser ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
                                <div>UID nội bộ khớp phiên Firebase: <strong>{firebaseUser && currentUser.id === firebaseUser.uid ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
-                               <div>Cờ Vite giao diện 6D trong JavaScript: <strong>{import.meta.env.VITE_PHASE6_STUDENT_TIMED_UI === 'true' ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
+                               <div>Cờ Vite giao diện 6D trong JavaScript (bỏ khoảng trắng): <strong>{isPhase6StudentTimedUiFlagEnabled(import.meta.env.VITE_PHASE6_STUDENT_TIMED_UI) ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
                                <div>Đúng môi trường Firebase staging: <strong>{IS_FIREBASE_STAGING ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
                                <div>Đúng địa chỉ Preview cố định: <strong>{isPhase5DemoPreviewHostname(window.location.hostname) ? 'ĐẠT' : 'CHƯA ĐẠT'}</strong></div>
                              </dl>

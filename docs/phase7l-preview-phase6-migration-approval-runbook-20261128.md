@@ -87,3 +87,24 @@ Người vận hành ủy quyền lựa chọn phương án phù hợp thay vì 
 5. Sau khi 6B PASS trên clone, xem xét tiếp từng file 6C → 6A → 6D với postflight riêng, **chỉ trên clone** trước khi lập phê duyệt cuối cho Preview.
 
 **Giới hạn và STOP:** không ghi vào `duongtrcnhiem-auth-preview`, `duongtrcnhiem-auth-staging`, `duongtrcnhiem-restore-test`, hoặc Production; không bật `PHASE6_*`; không gộp PR36. Đây là bài rehearsal D1 remote với **dữ liệu DEMO đã được người vận hành xác nhận quyền sao chép**. Chưa coi migration Preview được phê duyệt chỉ từ sự ủy quyền chung.
+
+## Bước 179 — Cloudflare D1 remote lab báo đã execute Phase 6B (ảnh CMD 28/11/2026)
+
+Người vận hành chạy `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6b-synthetic-admin-drafts-draft.sql` theo kế hoạch trên **database clone D1 mới** và cung cấp ảnh phần cuối output của Wrangler:
+
+- `Executed 6 queries in 1.88ms (5 rows read, 11 rows written)`
+- `Total queries executed: 6`
+- `Rows read: 5`, `Rows written: 11`
+- `Database size (MB): 0.14`
+- Wrangler trở về CMD prompt, không có lỗi được hiển thị trong ảnh.
+- Bookmark D1 hiển thị trong ảnh người vận hành; **không sao chép vào repo**.
+
+**Trạng thái:** `PHASE6B_REMOTE_CLONE_EXECUTION_REPORTED_SUCCESS`, **chưa phải postflight PASS**. Một file Phase 6B đúng dự kiến thực thi 6 DDL (2 tables, 1 index, 3 triggers), nhưng phải xác nhận trực tiếp `sqlite_master` và 8 counts baseline, quick_check và foreign_key_check trên DB clone trước khi tiếp tục 6C.
+
+**Bước 180 (metadata-only):** trên `duongtrcnhiem-restore-20261128` trong D1 Studio:
+```sql
+SELECT type,name FROM sqlite_master
+WHERE type IN ('table','trigger') AND name LIKE 'phase6_%'
+ORDER BY type,name;
+```
+Kỳ vọng 5 dòng: 2 bảng (`phase6_admin_drafts`, `phase6_admin_draft_events`) và 3 trigger (`phase6_admin_draft_created`, `phase6_admin_draft_saved`, `phase6_admin_draft_deleted`). **Chưa chạy 6C hoặc migration trên Preview.**

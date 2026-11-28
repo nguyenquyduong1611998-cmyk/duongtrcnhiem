@@ -1110,3 +1110,15 @@ Người vận hành gửi ảnh tab GitHub Checks của [PR39](https://github.c
 - GitHub `fetch_pr` trực tiếp cho `PR39 state=open, draft=true, merged=false, mergeable=true`, base `feature/staging-demo-quiz-pilot`, head SHA `c115ee273bd04e80164c960237117465d17919a2`.
 
 **Gate `PR39_BRANCH_CI_AND_DEPLOY: PASS (operator screenshot)`; `PR39_SANITIZED_VITE_BUILD_LOG: PENDING`**. Không suy ra nguyên nhân từ deployment success. **Bước 261** operator bấm `View logs` → Cloudflare Build log → tìm `[phase6d-build-probe]`, gửi **chỉ một dòng sanitized** chứa booleans `processEnv/viteEnv.exactTrue`, `trimmedTrue`, `length`, `exactKeyFound`, `nearMatchKeyCount`. Không gửi secrets, UID, token, password. PR39 **không cần merge** vì plugin probe đã chạy khi build nhánh riêng; giữ staging/main/Production nguyên trạng, không Retry hay sửa Vite nữa trước khi có diagnostic.
+
+## Bước 261 — PR39 build log: process.env flag present as string but NOT exact 'true' (operator screenshot, 28/11/2026)
+
+Operator mở Cloudflare Pages build log của **nhánh PR39 riêng**, commit `c115ee2`, tìm `[phase6d-build-probe]`. Screenshot dòng 48 (2026-11-28T09:10:55.913097Z) hiển thị phần đầu:
+```text
+[phase6d-build-probe] {"processEnv":{"present":true,"type":"string","exactTrue":false,"trimmedTrue"...
+```
+Phần còn lại của cùng một dòng bị **cắt ngang ở mép phải ảnh**, chưa thể quan sát `processEnv.trimmedTrue`, `length`, `viteEnv.*`, `exactKeyFound`, `nearMatchKeyCount`. Chỉ được kết luận **trong build nhánh PR39, `process.env.VITE_PHASE6_STUDENT_TIMED_UI` tồn tại dưới dạng chuỗi nhưng không bằng chính xác chuỗi `'true'`**. Không suy đoán giá trị raw, dấu cách/newline hoặc cloud provider. Đây là bằng chứng chẩn đoán build khớp với browser panel ở pinned staging (5/6 PASS, compiled UI flag CHƯA ĐẠT).
+
+**Gate `PR39_BUILD_ENV_PROCESS_FLAG_EXACT_TRUE: FAIL (operator screenshot)`; `PR39_BUILD_ENV_TRIMMED_TRUE: UNKNOWN`; `PR39_RESOLVED_VITE_FLAG: UNKNOWN`.**
+
+**Bước 262:** trong Cloudflare build log, **chỉ** copy toàn bộ dòng `[phase6d-build-probe]` (đã được code giới hạn vào booleans/length, không log giá trị thô hoặc secret) và gửi nguyên dòng, hoặc kéo ngang chụp nửa phải cho thấy `trimmedTrue`, `length`, `viteEnv`, `exactKeyFound`, `nearMatchKeyCount`. Không gửi các dòng chứa secrets/other env values. Nếu `trimmedTrue=true` thì nghi có whitespace thừa ở value; nếu cả `exactTrue=false` lẫn `trimmedTrue=false` cần kiểm tra khác biệt value và cấu hình env overrides không đoán bừa. Nếu `processEnv` true mà `viteEnv` khác thì rà Vite env resolution. Không sửa biến/Retry thêm trước khi lấy đủ dòng. PR39 Draft chưa merge, PR36 Draft; no D1, Firebase, student exam, or Production changes.

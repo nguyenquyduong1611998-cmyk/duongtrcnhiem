@@ -1100,3 +1100,13 @@ Operator gửi ảnh chẩn đoán `?phase6_debug=1` trên pinned Preview sau re
 Đã tạo [PR39](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/39) **Draft** nhánh `feature/phase6d-vite-env-build-probe-20261128`, base `feature/staging-demo-quiz-pilot`, latest commit `c115ee273bd04e80164c960237117465d17919a2`. Chỉ sửa `vite.config.ts` để thêm plugin `configResolved` in **một dòng diagnostic** nhãn `[phase6d-build-probe]`, không in raw env values/secrets, chỉ in booleans (`present,type,exactTrue,trimmedTrue,length`) so sánh `processEnv` và `viteEnv`, `exactKeyFound` và `nearMatchKeyCount`. Branch riêng Preview có thể build và in log ngay, **không cần merge PR39 vào staging để điều tra**. Không đổi flag thực tế hoặc thành phần Auth/UI; không thử endpoint qua branch hashed host.
 
 **Bước 260:** operator mở PR39 tab Checks → Cloudflare Pages / View logs (hoặc Cloudflare Pages `duongtrcnhiem-test` → deployment Preview của **nhánh PR39, commit `c115ee2`**). Mở Build log, tìm `[phase6d-build-probe]`; chụp **duy nhất dòng này** cùng trạng thái build, không chụp Firebase secret. Nếu processEnv.exactTrue=false, kiểm tra tên biến sai/Env Preview; nếu true nhưng viteEnv=false, xem resolution; nếu cả true mà runtime trên staging false, kiểm tra khác biệt nhánh/asset, không đoán trước. **PR39 Draft chưa merged, PR36 Draft, pinned staging và Production không đổi**.
+
+## Bước 260 — PR39 build-only diagnostic checks green, đang chờ sanitized log (operator screenshot, 28/11/2026)
+
+Người vận hành gửi ảnh tab GitHub Checks của [PR39](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/39):
+- `Cloudflare Workers and Pages / Cloudflare Pages` xanh, `Deployed successfully` trên commit **`c115ee2`**. Đây là **branch preview PR39**, không phải pinned alias.
+- `Staging DEMO Quiz Pilot (isolated) → demo-quiz-ci` dấu xanh.
+- Nút `View logs` dưới Cloudflare check có sẵn, chưa có ảnh dòng `[phase6d-build-probe]`.
+- GitHub `fetch_pr` trực tiếp cho `PR39 state=open, draft=true, merged=false, mergeable=true`, base `feature/staging-demo-quiz-pilot`, head SHA `c115ee273bd04e80164c960237117465d17919a2`.
+
+**Gate `PR39_BRANCH_CI_AND_DEPLOY: PASS (operator screenshot)`; `PR39_SANITIZED_VITE_BUILD_LOG: PENDING`**. Không suy ra nguyên nhân từ deployment success. **Bước 261** operator bấm `View logs` → Cloudflare Build log → tìm `[phase6d-build-probe]`, gửi **chỉ một dòng sanitized** chứa booleans `processEnv/viteEnv.exactTrue`, `trimmedTrue`, `length`, `exactKeyFound`, `nearMatchKeyCount`. Không gửi secrets, UID, token, password. PR39 **không cần merge** vì plugin probe đã chạy khi build nhánh riêng; giữ staging/main/Production nguyên trạng, không Retry hay sửa Vite nữa trước khi có diagnostic.

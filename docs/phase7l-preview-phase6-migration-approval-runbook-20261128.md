@@ -1276,3 +1276,15 @@ Sau Bước273 session DEMO revision 3 restore thành công, operator đã chọ
 **Gate `PHASE6D_STUDENT_SUBMIT_SCORE_UI_ACK: PASS (operator screenshot)`**, một lần nộp đáp án mẫu có điểm đủ 10/10 theo phản hồi API. Chưa kiểm tra độc lập qua một request mới sau submit hoặc F5, chưa chứng minh cấm nộp lần hai bằng kiểm thử phá hoại. Không cần/không nên nộp tiếp trên revision đã lưu.
 
 **Bước 275 read-only:** ngay trong panel vừa nộp, bấm `Đọc lại kết quả từ D1` **một lần**, chụp ô `Đã nộp: 10/10 điểm · 1/1 câu đúng` và notice `Đã đọc điểm đã lưu từ D1.`. Bước này `readPhase6ExamResult(user,chosen)` chỉ đọc server, không ghi điểm hay tạo session. Nếu không nhận được, STOP, không nộp lại. Sau khi pass có thể tiếp tục F5/re-open readback và integrity SQL, nhưng tách gate riêng. Không bật Phase6E result listing/Admin flags, không merge PR36/PR39, không chạm Production/main hoặc cấu hình Vite.
+
+## Bước 275 — Student Phase6D persisted score readback 10/10 from D1 PASS (operator screenshot, 28/11/2026)
+
+Operator sau Bước274 đã nộp bài DEMO revision 3 và API báo score 10/10 đã nhấn **`Đọc lại kết quả từ D1`** một lần. Screenshot cùng khung `Toán học DEMO - Cơ bản · phiên bản 3` cho thấy:
+- **`Đã nộp: 10/10 điểm · 1/1 câu đúng.`**
+- Thông báo xanh **`Đã đọc điểm đã lưu từ D1.`**.
+- Đồng hồ giao diện còn **19:48** tại thời điểm chụp (chỉ metadata của session; kết quả đã final).
+- Chỉ còn các nút `Đọc lại kết quả từ D1`, `Đồng bộ phiên thi`, không có form nộp lại.
+
+**Gate `PHASE6D_STUDENT_SUBMITTED_SCORE_INDEPENDENT_RESULT_READBACK: PASS (operator screenshot)`**. Đã xác minh điểm finalized được API đọc kết quả D1 trả lại trong phiên đang mở, không chỉ phản hồi POST submit. **Chưa có bằng chứng score persist sau reload F5 và reopening** và chưa có SQL D1 integrity/unique submission count sau nộp.
+
+Đối chiếu `src/components/Phase6StudentExamPanel.tsx`: `Mở đề` gọi `readPhase6Exam`, `setExam(next)` sẽ set `result` từ `next.result??null` để hiển thị score đã lưu. **Bước 276 (READ-ONLY):** F5 trên đúng Edge InPrivate đang đăng nhập học viên DEMO; `Mục Chuyên Đề` → `Tải danh sách đề thi DEMO` → `Mở đề` bản revision 3. Mong đợi `Đã nộp: 10/10 điểm · 1/1 câu đúng` vẫn hiện, không có form trả lời/nộp lại; nếu điểm chưa hiện dùng `Đọc lại kết quả từ D1` đúng một lần; không bấm Bắt đầu hoặc Submit. Nếu không khớp, dừng và chụp trạng thái. Đồng hồ có thể tiếp tục giảm sau final score nhưng hạn nộp không còn liên quan bài đã nộp. Không chạm API Phase6E, D1 schema, PR36/PR39 hoặc Production.

@@ -733,3 +733,15 @@ Operator gửi screenshot GitHub `Pull request successfully merged and closed`. 
 **Gate `PR37_MERGED_TO_STAGING: PASS`, `STAGING_SOURCE_HAS_D1_TRIGGER_CHANGE_FIX: PASS`.** **Chưa có bằng chứng Cloudflare Pages pinned Preview alias đã deploy commit `1182512`** hoặc bản sửa đã hoạt động trên runtime. Chưa thực hiện API write/retry.
 
 **Bước 230:** Cloudflare Workers & Pages → `duongtrcnhiem-test` → Deployments → All deployments, tìm **Preview** có đúng nhánh `feature/staging-demo-quiz-pilot` và commit `1182512` (merge PR37), status Success. Mở Details kiểm tra **Aliases** `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev`. Nếu chưa có đúng commit/alias, STOP; không Retry deployment bản cũ hay tự push, không dùng URL preview ngẫu nhiên. **Bước 231 sau gate:** mở đúng pinned Preview → Google Admin → Quản Trị → Giai đoạn 6B → `Tải danh sách bản nháp`, kỳ vọng 1 `Toán học DEMO - Cơ bản`, 15 phút, 0 câu, sửa 1. Không `Tạo đề nháp mới`; chỉ sau khi xác minh commit mới mới thử Save phiên bản 2 qua UI. Ba cờ publish/student/results vẫn OFF, Production không đổi. Không xóa nhánh fix trong lúc rà soát nếu không cần.
+
+## Bước 230 — Cloudflare pinned Preview triển khai PR37 merge SHA thành công (operator screenshot, 28/11/2026)
+
+Người vận hành gửi ảnh **Deployment details** Cloudflare Pages với:
+- Environment **Preview**, Deployment ID `f0f49da8-0fd7-4cbd-884e-6438d245b4ac`, hashed URL `f0f49da8.duongtrcnhiem-test.pages.dev` (không dùng hashed URL để test signed API).
+- Alias chính xác `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` — đúng pinned host.
+- Branch rút gọn `feature/stagi...`, commit `1182512` (`Merge pull request #37`) — đúng SHA merge `1182512574e03b68abf22e38ca7ef1494616c49a` đã xác nhận GitHub.
+- Status `success`, 2:27 PM November 28, 2026; Duration 14s.
+
+**Gate `PR37_PINNED_PREVIEW_MERGE_DEPLOY: PASS (operator screenshot)`**, không suy ra API write được nghiệm thu tự động. Code sửa `changed()` chấp nhận `meta.changes=1` hoặc `2` đã merged vào đúng staging và deployed; script cũ vẫn hiện lỗi trước deployment khi create đã commit. Bản nháp từ Bước225 (`Toán học DEMO - Cơ bản`, **15 phút, 0 câu, phiên bản 1**) phải giữ nguyên.
+
+**Bước 231 chỉ đọc:** mở pinned alias trên Chrome với Google Admin, vào Quản Trị → Giai đoạn 6B → bấm `Tải danh sách bản nháp`, kỳ vọng **1**; bấm `Chỉnh sửa` của **bản nháp hiện có**, chỉ thực hiện `action:'get'` qua API. Kỳ vọng editor hiện **Chỉnh sửa bản nháp · phiên bản 1** và **15 phút**, **0 câu**. Không bấm `Tạo đề nháp mới`, `Lưu bản nháp`, `Xóa` hay `Xuất bản` ở Bước231. Chỉ sau khi read-back PASS mới kiểm thử save trên Preview để xác nhận fix thực tế. Giữ các flags publish/student/results OFF, Production không đổi, PR36 Draft.

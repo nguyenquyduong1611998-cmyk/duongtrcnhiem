@@ -382,3 +382,22 @@ npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1
 Lệnh **ghi remote**; phải xác nhận đúng tên database khi Wrangler hỏi, không dùng `--yes`. Nếu lỗi hoặc target khác, STOP, không retry. Sau đó phải đọc `sqlite_master` để xác minh 4 bảng Phase6/9 triggers, kiểm 8 counts baseline và `PRAGMA quick_check`, `PRAGMA foreign_key_check` rồi mới xét 6D.
 
 **Chưa có kết quả lệnh 6A tại thời điểm này**. Không bật API Phase6, không đổi Pages Production, không merge PR36.
+
+## Bước 200 — Phase 6A Preview execution report (operator screenshot, 28/11/2026)
+
+Người vận hành chạy lệnh Phase6A đã hướng dẫn trước đó `npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6-timed-sessions-draft.sql`. Ảnh CMD phần cuối cho thấy:
+- `Executed 5 queries in 2.98ms (3 rows read, 8 rows written)`.
+- `Total queries executed: 5`.
+- `Rows read: 3`, `Rows written: 8`, `Database size (MB): 0.17`.
+- Có hiển thị current bookmark D1 (không sao chép giá trị vào GitHub).
+- Không có lỗi hiển thị trong phần ảnh.
+
+**Trạng thái:** `PREVIEW_PHASE6A_EXECUTION_REPORTED_SUCCESS`; **POSTFLIGHT PENDING**. Ảnh CMD được cắt, không có tên đích; kết luận database Preview dựa trên lệnh hướng dẫn ngay trước đó. Theo migration 6A, 5 DDL là 1 bảng `phase6_exam_sessions`, 1 index và 3 triggers `phase6_session_start_guard`, `phase6_session_no_delete`, `phase6_session_no_update`. Không coi số `rows written` là số bản ghi ứng dụng.
+
+**Bước 201 (read-only), trên đúng `duongtrcnhiem-auth-preview`:**
+```sql
+SELECT type,name FROM sqlite_master
+WHERE type IN ('table','trigger') AND name LIKE 'phase6_%'
+ORDER BY type,name;
+```
+Kỳ vọng 4 bảng Phase6/9 triggers, tổng 13 đối tượng. Trước khi chạy 6D, bắt buộc kiểm tra số dòng 8 bảng cũ theo baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check;` → `ok`, `PRAGMA foreign_key_check;` → 0 hàng. Nếu có bất thường, STOP, không tự chạy lại 6A hoặc thực hiện restore. Giữ ba flag API Phase6 chưa cấu hình, PR36 Draft, Production không thay đổi.

@@ -364,3 +364,21 @@ Kỳ vọng 3 bảng `phase6_admin_draft_events`, `phase6_admin_drafts`, `phase6
 Người vận hành trả lời trực tiếp **"có 9 đối tượng"** sau hướng dẫn chạy read-only `SELECT type,name FROM sqlite_master WHERE type IN ('table','trigger') AND name LIKE 'phase6_%' ORDER BY type,name;` tại `duongtrcnhiem-auth-preview`. Kỳ vọng đã thông báo trong Bước 198 là 3 bảng Phase6 và 6 trigger Phase6. **Mức chứng cứ: operator-reported count, không có ảnh chụp danh sách 9 tên ở bước này**; do đó chỉ đánh dấu `PREVIEW_PHASE6C_SCHEMA_COUNT: PASS (operator-reported)`, chưa xác minh chính xác từng định nghĩa.
 
 **Bước 199 — hậu kiểm bắt buộc, chỉ đọc trên Preview:** truy vấn `COUNT(*)` của 8 bảng gốc (baseline `5,0,3,1,1,1,1,2`, tổng 14), `PRAGMA quick_check;` phải trả `ok`, `PRAGMA foreign_key_check;` phải trả 0 dòng. Nếu sai khác, dừng triển khai; **không** tự chạy lại 6C, chạy 6A, hoặc time-travel restore. Ba server flags Phase6 vẫn OFF, PR36 Draft, Production không thay đổi.
+
+## Bước 199 — Preview Phase 6C hậu kiểm hoàn thành (operator screenshot/statement, 28/11/2026)
+
+Operator gửi ảnh Cloudflare D1 Studio sau 6C: kết quả `PRAGMA foreign_key_check;` hiển thị `Query · 4×0`, tức **0 hàng lỗi khóa ngoại**. Operator đồng thời xác nhận bằng lời `8 bảng đúng giá trị quick ok`, theo nội dung các lệnh đã hướng dẫn (8 counts `5,0,3,1,1,1,1,2`, `PRAGMA quick_check;` → `ok`). **Mức chứng cứ:** lỗi FK bằng ảnh; 8 counts và quick_check bằng xác nhận của operator, không có ảnh độc lập hai kết quả đó trong lần gửi này. Bước 198 xác nhận bằng lời 9 đối tượng Phase6, dự kiến 3 tables/6 triggers.
+
+**Gate `PREVIEW_PHASE6C_POSTFLIGHT: PASS (within observed/reported scope)`**, không hàm ý từng bản ghi được hash đối chiếu hay runtime API đã bật. Các server Phase6 flags vẫn không cấu hình, PR36 giữ Draft.
+
+## Bước 200 — Chỉ một migration Phase 6A trên D1 Preview, sau gate 199 PASS
+
+Đối chiếu file SQL staging `serverless/d1-phase6-timed-sessions-draft.sql` (blob `6257e6d85e565fe8aaf02f6316761df5b40bc718`), bản này chỉ CREATE một bảng `phase6_exam_sessions`, một index, ba triggers `phase6_session_start_guard`, `phase6_session_no_update`, `phase6_session_no_delete`. Không thấy lệnh DML trên bảng Phase4/5 trong file.
+
+Operator đã phê duyệt tuần tự 6B→6C→6A→6D ở Bước 194, với gate hậu kiểm mỗi bước. Bước 200 chỉ chạy **6A** vào D1 `duongtrcnhiem-auth-preview`:
+```cmd
+npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6-timed-sessions-draft.sql
+```
+Lệnh **ghi remote**; phải xác nhận đúng tên database khi Wrangler hỏi, không dùng `--yes`. Nếu lỗi hoặc target khác, STOP, không retry. Sau đó phải đọc `sqlite_master` để xác minh 4 bảng Phase6/9 triggers, kiểm 8 counts baseline và `PRAGMA quick_check`, `PRAGMA foreign_key_check` rồi mới xét 6D.
+
+**Chưa có kết quả lệnh 6A tại thời điểm này**. Không bật API Phase6, không đổi Pages Production, không merge PR36.

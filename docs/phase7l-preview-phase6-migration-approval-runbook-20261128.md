@@ -977,3 +977,13 @@ Code `src/App.tsx` trên Staging cho thấy `TopicsView` đứng trước `Phase
 3. Nếu host/flags đúng và vẫn không có UI sau mở lại pinned alias, xem browser profile đang dùng app cũ hoặc inspect auth currentUser UID == Firebase UID bằng phép kiểm an toàn, **không yêu cầu gửi UID/token/secret**.
 
 Chưa bật Phase6E results, không bấm bắt đầu thi, không chạy SQL, không retry trước khi biết nguyên nhân, không thay đổi Production/main; PR36 Draft.
+
+## Bước 248 — Cả hai cờ Phase6D hiện true trong Build settings của Preview (operator screenshots, 28/11/2026)
+
+Operator mở `Build settings` trong đúng deployment Preview đã báo success commit `1182512` lúc 15:21, gửi 2 ảnh:
+- `VITE_PHASE6_STUDENT_TIMED_UI = true` (chính xác cả tên và giá trị, bên cạnh cờ 6C)
+- `PHASE6_STUDENT_TIMED_EXAM_ENABLED = true` (chính xác cả tên và giá trị, bên cạnh cờ 6C)
+
+**Gate `PHASE6D_DEPLOYMENT_BUILD_ENV_FLAGS_VISIBLE_TRUE: PASS (operator screenshots)`**, loại trừ lỗi sai tên/giá trị trong build environment nhìn thấy. **Không tự suy ra đã được nạp vào bundle runtime** nhưng Vite build previously confirmed successful. Student screenshot Bước247 không chứa browser address bar, vì thế **hostname hiện tại chưa được xác minh**. Mã `src/utils/phase5DemoTopics.ts` hardcodes `PHASE5_STUDENT_PREVIEW_HOST = 'feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev'`, `isPhase5DemoPreviewHostname(hostname)` yêu cầu **strict string equality**. `src/utils/phase6StudentExam.ts` uses `IS_FIREBASE_STAGING && flag==='true' && isPhase5DemoPreviewHostname(host)`. Do đó nếu học viên mở project root `duongtrcnhiem-test.pages.dev` hoặc URL hash `a64d3328.duongtrcnhiem-test.pages.dev`, sẽ không thấy UI 6D dù cả 2 flag đang true. Cloud badge không xác nhận current hostname hay UID equality.
+
+**Bước 249 (read-only, một chi tiết duy nhất):** hỏi operator nhìn thanh địa chỉ **ngay trong tab học viên hiện thấy 3 chuyên đề** và xác nhận hostname có đúng y hệt pinned alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` (không gửi query params/tokens). **Không đóng tab hoặc đăng xuất**, không Retry, không thêm biến, không bấm Bắt đầu làm bài. Nếu host sai, mở đúng pinned alias để kiểm tra UI; nếu đúng mà UI vẫn mất, tiếp tục diagnose `currentUser.id===firebaseUser.uid` versus old cached PWA/browser build with non-sensitive diagnostics, không yêu cầu user cung cấp UID, token, passwords.

@@ -221,3 +221,13 @@ Người vận hành chạy `npx wrangler d1 export duongtrcnhiem-auth-preview -
 **Trạng thái:** `D1_PREVIEW_EXPORT_COMMAND_SUCCESS: PASS` theo output do người vận hành cung cấp. Bản ngày 27/11 vẫn là file riêng; chưa kiểm tra kích thước, SHA-256, SQL contents, schema/row counts thực tế trong bản 28/11 hoặc thực nghiệm restore. **Không** tải file SQL lên GitHub, chat hoặc CI vì có thể chứa account data/hash mật khẩu. Bản backup mới cũng chưa thay thế yêu cầu phê duyệt khôi phục remote hoặc migration.
 
 Bước tiếp theo an toàn: dùng `node -e` chỉ đọc `fs.statSync` và `crypto.createHash('sha256')` trên file mới tại chính máy người vận hành; không tiết lộ nội dung SQL. Sau đó có thể thử khôi phục trong `SQLite :memory:` riêng và đối chiếu row counts baseline 8 bảng `5,0,3,1,1,1,1,2` nếu được cho phép; không dùng `--remote` để restore.
+
+## Bước 168 — Kiểm tra metadata của file export 28/11 (operator screenshot)
+
+Ảnh CMD của người vận hành ngày 28/11/2026 cho thấy lệnh Node `fs.readFileSync` + SHA-256 đã chạy thành công trên file cục bộ `preview-backup-20261128-prephase6.sql`:
+- `Bytes: 12145` (12.145 byte)
+- `SHA256` đã được tính và in ra; hash không cần đưa vào hồ sơ GitHub vì chỉ làm định danh file trên máy.
+
+Bản export ngày 27/11 cũng từng báo 12.145 byte, nhưng **kích thước bằng nhau không chứng minh hai file giống nhau**. Kiểm thử restore cục bộ, đếm 8 bảng gốc và `integrity_check/foreign_key_check` cho bản 28/11 **chưa được thực hiện ở Bước 168**.
+
+**Bước 169 (chỉ tại RAM cục bộ):** Node.js `node:sqlite` import file do operator tự xuất D1 vào `:memory:`, kiểm tra 8 bảng ứng dụng, 8 row counts baseline trước migration `5,0,3,1,1,1,1,2`, `integrity_check=ok`, `foreign_key_check=0`. Chỉ ghi kết quả PASS/FAIL vào hồ sơ, không đưa file backup, password hashes, nội dung đề, hay bản ghi người dùng lên repo/chat. Nếu số dòng khác baseline, không tự ghi đè/khôi phục; có thể là dữ liệu thay đổi giữa các thời điểm, cần điều tra.

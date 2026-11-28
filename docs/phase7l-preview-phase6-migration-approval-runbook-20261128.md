@@ -1219,3 +1219,13 @@ Operator trong Edge InPrivate dùng học viên DEMO, sau khi Phase6D 6/6 guard 
 Điều này xác minh **`PHASE6D_STUDENT_READONLY_LIST: PASS (operator screenshot)`**, API `/api/phase6/exam` action `list` đã phản hồi thành công cho học viên DEMO trên pinned Preview, đọc được publication revision 3 (1 câu, time_limit_seconds=1800). **Không xác minh start/resume/submit/grade**; API đọc danh sách không tạo phiên.
 
 **Bước 270 (READ-ONLY):** trên cùng học viên/đề, bấm **`Mở đề`** đúng một lần. Theo `src/components/Phase6StudentExamPanel.tsx`, thao tác này gọi `readPhase6Exam(user,t)`, **không gọi `startPhase6Exam`** và không tạo phiên thi. Nếu chưa từng có phiên với học viên này, mong đợi `Chưa bắt đầu phiên thi. Bấm Bắt đầu để máy chủ ấn định giờ.`, tên đề revision 3 và nút `Bắt đầu làm bài (máy chủ tính giờ)` / `Đọc lại phiên từ D1 (sau mất mạng)`. Nếu phát hiện server trả phiên đã tồn tại, không giả định chưa từng bắt đầu; dừng và báo hiện trạng. **Chưa bấm Bắt đầu**, không submit, không sửa D1/Production, không bật Phase6E, PR39 và PR36 vẫn Draft.
+
+## Bước 270 — Student Phase6D read-only Mở đề shows no prior timed session (operator screenshot, 28/11/2026)
+
+Operator tại pinned Cloudflare Preview, Edge InPrivate account học viên DEMO, đã mở danh sách revision 3/1 câu/30 phút ở Bước269 rồi bấm `Mở đề`. Screenshot UI hiển thị:
+- `Toán học DEMO - Cơ bản · Phiên bản 3 · 1 câu · 30 phút`;
+- panel chi tiết `Toán học DEMO - Cơ bản · phiên bản 3`;
+- nút `Bắt đầu làm bài (máy chủ tính giờ)` và `Đọc lại phiên từ D1 (sau mất mạng)`;
+- dòng **`Chưa bắt đầu phiên thi. Bấm Bắt đầu để máy chủ ấn định giờ.`**.
+
+Bước 270 chỉ gọi `readPhase6Exam` (READ) và **không khởi tạo phiên D1**. **Gate `PHASE6D_STUDENT_READONLY_OPEN_NO_SESSION: PASS (operator screenshot)`**. Chưa xác nhận start, server-owned deadline, recovery, submit, score. Bước271 có thể bắt đầu thử nghiệm phiên 30 phút **chỉ khi operator có thời gian làm thử ngay**: trên đúng học viên DEMO và pinned Preview bấm `Bắt đầu làm bài (máy chủ tính giờ)` **một lần duy nhất**. Deadline bắt đầu ngay theo server, không dừng/đặt lại được. Mong đợi hiện câu toán `2+2=?` và đồng hồ khoảng 30:00 giảm dần; chụp status không bao gồm token/đáp án riêng. Nếu thông báo lỗi/mất mạng, **không bấm Bắt đầu lần thứ hai**; dùng nút `Đọc lại phiên từ D1 (sau mất mạng)` trước để xác minh D1 đã tạo phiên chưa. Không nộp bài ngay trước khi kiểm tra timer, không bật Phase6E, không đổi D1/Production, PR36/PR39 vẫn Draft.

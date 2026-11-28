@@ -190,3 +190,15 @@ Người vận hành **xác nhận bằng lời** `có đủ 13 đối tượng`
 **Postflight Phase6A CHƯA hoàn tất:** operator cần kiểm tra 8 row counts của baseline `5,0,3,1,1,1,1,2`; `PRAGMA quick_check;` = `ok`; `PRAGMA foreign_key_check;` = 0 dòng; chỉ thực hiện trên **clone**, không chạy migration 6D trước khi các bước trên PASS.
 
 Giữ nguyên `duongtrcnhiem-auth-preview` (Phase6 chưa được triển khai), ba server flags Phase6 chưa cấu hình, PR36 vẫn Draft, không thay đổi Production.
+
+## Bước 187 — Phase 6A hậu kiểm trên D1 bản sao PASS (ảnh + người vận hành xác nhận, 28/11/2026)
+
+Người vận hành gửi ảnh D1 Studio sau migration 6A tại `duongtrcnhiem-restore-20261128`:
+- `PRAGMA quick_check;` → `ok` (ảnh).
+- `PRAGMA foreign_key_check;` → bảng `Query · 4×0`, tức 0 hàng lỗi (ảnh).
+- Người vận hành **xác nhận bằng lời** cả 8 số lượng bản ghi khớp `5,0,3,1,1,1,1,2`; không có ảnh giá trị 8 cột ở bước này.
+- Bước 186 có xác nhận bằng lời 13 object Phase6, dự kiến gồm 4 bảng/9 trigger.
+
+**Gate `REMOTE_CLONE_PHASE6A_POSTFLIGHT: PASS` theo hai ảnh và xác nhận operator.** Đây là so sánh số lượng chứ không phải kiểm chứng từng bản ghi. Các phần này chưa thực hiện trên D1 Preview đang kết nối website.
+
+**Bước 188 chỉ trên clone `duongtrcnhiem-restore-20261128`:** chạy file cuối cùng `serverless/d1-phase6d-timed-submissions-draft.sql` qua `npx wrangler d1 execute duongtrcnhiem-restore-20261128 --remote --file=serverless/d1-phase6d-timed-submissions-draft.sql` (ghi D1 remote clone). Trước khi xác nhận Wrangler prompt, đối chiếu đúng tên database; nếu lỗi dừng, không tự retry. Sau chạy đọc metadata, dự kiến 5 bảng Phase6, 12 triggers, đủ 8 bảng cũ/14 bản ghi, quick_check ok và foreign_key_check 0. Flags Phase 6 và Preview giữ nguyên, PR36 Draft.

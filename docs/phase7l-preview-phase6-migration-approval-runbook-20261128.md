@@ -270,3 +270,17 @@ Người vận hành xác nhận đã đăng xuất và đóng các phiên DEMO 
 **Gate `FRESH_PREVIEW_TIME_TRAVEL_BOOKMARK_OBSERVED: PASS`.** Ảnh/lời xác nhận không chứng minh mọi thiết bị và tác vụ ghi khác đã ngừng tuyệt đối, vì vậy không được suy ra trạng thái write-quiescent đã được đảm bảo bằng máy chủ. Bookmark có thể thay đổi sau đó; cần giữ giá trị trong hồ sơ vận hành riêng, không dùng bookmark này một cách máy móc nếu thời gian/data thay đổi.
 
 **Còn cần phê duyệt riêng cho thao tác ghi:** từ trước đến giờ bốn migration chỉ đã chạy trên D1 clone `duongtrcnhiem-restore-20261128`, **chưa** được áp dụng lên `duongtrcnhiem-auth-preview`. Không dùng lời đáp `đã có` (xác nhận bookmark) để thay thế phê duyệt thực thi. Trước lệnh remote 6B đầu tiên: xem lại target exact, duy trì không có thao tác DEMO, kiểm tra 8 counts/0 Phase6 ở Bước 191–192 vẫn còn cập nhật, và nhận quyết định `CHO PHÉP` rõ ràng cho riêng Preview migrations. Khi phê duyệt: chỉ chạy 6B đầu tiên, kiểm tra schema/row counts/integrity/FK trước 6C. Không bật flags Phase6 hoặc đụng Production, PR36 Draft.
+
+## Bước 194 — Chủ vận hành phê duyệt triển khai 4 migration trên D1 Preview (28/11/2026)
+
+Sau Bước 193, người vận hành được hỏi rõ có đồng ý triển khai lần lượt **6B → 6C → 6A → 6D** lên duy nhất `duongtrcnhiem-auth-preview`, với hậu kiểm từng bước và dừng khi có lỗi hay không. Người vận hành trả lời nguyên văn **"đồng ý"**. Đây là **phê duyệt tường minh cho việc chạy SQL Phase 6 trên D1 Preview**, không phải phê duyệt bật API Phase6, dùng dữ liệu thật, khôi phục Time Travel, merge PR36 hay thay đổi Pages Production.
+
+Đã kiểm tra lại file `serverless/d1-phase6b-synthetic-admin-drafts-draft.sql` trên Staging: chỉ tạo 2 bảng, 1 index, 3 trigger và không thay đổi cấu trúc bảng cũ. Git blob SHA: `aa45d3a944e21d24dfb8f676a2bc606ec99c35c9`. Các bước trước đã đo baseline Preview `0 phase6_tables; 5,0,3,1,1,1,1,2`, operator đã ngừng phiên DEMO, xuất backup mới đã thử remote restore, và lấy bookmark Time Travel mới.
+
+**Phạm vi thực thi của Bước 194: một file 6B duy nhất**, chỉ trên D1 `duongtrcnhiem-auth-preview`:
+```cmd
+npx wrangler d1 execute duongtrcnhiem-auth-preview --remote --file=serverless/d1-phase6b-synthetic-admin-drafts-draft.sql
+```
+Trước khi xác nhận prompt, operator phải thấy đúng database Preview; nếu tên DB sai hoặc có câu hỏi lạ, dừng. Đây là lệnh **ghi remote** do operator tự chạy, **không** do GitHub update. Nếu gặp lỗi, không tự retry; đối chiếu schema hiện tại để xử lý trạng thái một phần.
+
+**Postflight bắt buộc trước khi cho 6C:** read-only metadata `phase6_%` dự kiến 2 bảng/3 trigger; 8 counts baseline `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0. Giữ `PHASE6_*` server flags OFF, không gộp PR, không đổi Production. Bookmark phục hồi không được lưu trong tài liệu; không chạy `time-travel restore` trừ khi có quyết định riêng.

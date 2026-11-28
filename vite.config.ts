@@ -14,6 +14,31 @@ base: process.env.VITE_FIREBASE_ENV === 'staging'
     plugins: [
       react(),
       tailwindcss(),
+      // Temporary, non-sensitive build probe for Phase 6D Preview diagnosis.
+      // Logs only boolean checks and string lengths, never raw env values.
+      {
+        name: 'phase6d-build-env-probe',
+        apply: 'build',
+        configResolved(config): void {
+          const key = 'VITE_PHASE6_STUDENT_TIMED_UI';
+          const describe = (value: unknown) => ({
+            present: value !== undefined,
+            type: typeof value,
+            exactTrue: value === 'true',
+            trimmedTrue: typeof value === 'string' && value.trim() === 'true',
+            length: typeof value === 'string' ? value.length : null,
+          });
+          const names = Object.keys(process.env);
+          const nearKeys = names.filter(name =>
+            name.replace(/[\\u200B-\\u200D\\uFEFF]/g, '').trim() === key);
+          console.info('[phase6d-build-probe] ' + JSON.stringify({
+            processEnv: describe(process.env[key]),
+            viteEnv: describe(config.env[key]),
+            exactKeyFound: Object.prototype.hasOwnProperty.call(process.env, key),
+            nearMatchKeyCount: nearKeys.length,
+          }));
+        },
+      },
       // Copies src/assets into dist/ so root-relative URLs like
       // "/src/assets/images/..." (e.g. generate_image output) still resolve
       // in production builds. Do not remove.

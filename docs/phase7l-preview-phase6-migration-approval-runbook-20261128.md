@@ -693,3 +693,15 @@ Sau khi D1 Studio Bước224 trả `drafts=1`, `events=1`, `creates=1`, người
 Kiểm tra [PR37](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/37): nhánh sửa `feature/phase6b-d1-audit-change-count-fix-20261128`, base `feature/staging-demo-quiz-pilot`, **Draft**, chưa merge, tại commit `f2a0afdbc9962ffeddb7968e1dc107cd214f3d0c`. Có ba file changed: backend helper và test Phase6B/6C. GitHub tool không trả CI statuses hay PR-triggered Actions runs ở thời điểm truy vấn, vì vậy **không được tuyên bố test PASS**; cần operator mở tab Checks/Actions để xác minh và nếu thiếu check, chạy test an toàn trên nhánh sửa trước merge.
 
 **Bước 226:** mở PR37, chụp tình trạng checks/merge gate, tuyệt đối không merge/deploy trước khi test khẳng định. Không cần chạy SQL migration hay thử Create lại. Giữ publish/student/results flags OFF, Production và PR36 Draft không thay đổi.
+
+## Bước 226 — PR37 Cloudflare preview deploy green; isolated staging CI outcome not yet confirmed (operator screenshot, 28/11/2026)
+
+Operator mở [PR37 Checks](https://github.com/nguyenquyduong1611998-cmyk/duongtrcnhiem/pull/37) và chụp:
+- PR `#37` still **Draft**, 3 commits proposed from `feature/phase6b-d1-audit-change-count-fix-20261128` into `feature/staging-demo-quiz-pilot`.
+- Tab `Checks 2`.
+- `Cloudflare Workers and Pages / Cloudflare Pages` (green) with **Deployed successfully**, commit `f2a0afd`, hashed Preview URL `f081b072.duongtrcnhiem-test.pages.dev` and **branch Preview URL** (not pinned operational alias). This verifies build for the **fix branch**, **not the pinned staging branch**. Do not test signed Admin APIs at the fix branch hostname; host allowlist will reject.
+- Separate `Staging DEMO Quiz Pilot (isolated)` **on: push** row appears with a notice/annotation count `1`, row **not expanded in photo**. It is **not possible to determine pass/fail of CI from this screenshot alone**. Must expand/check job details before approving merge.
+
+GitHub connector confirmed `PR37 draft=true`, `merged=false`, base staging, `mergeable=true`, head `f2a0afdbc9962ffeddb7968e1dc107cd214f3d0c`. No combined statuses returned; connector's commit-workflow query lists only PR-triggered runs and this CI is triggered by push; absence of tool results does **not** imply tests passed or failed.
+
+**Gate `PR37_CLOUDFLARE_FIX_BRANCH_BUILD: PASS`; `PR37_ISOLATED_CI: PENDING_EVIDENCE`; `PR37_READY_TO_MERGE: NO`** pending isolated test verified green. Next operator expands `Staging DEMO Quiz Pilot (isolated)` and captures status and failing step/annotation if any. Do not click Re-run checks blindly, do not merge PR37/PR36 yet, do not create duplicate draft or change D1. Publish/student/results flags OFF, Production untouched.

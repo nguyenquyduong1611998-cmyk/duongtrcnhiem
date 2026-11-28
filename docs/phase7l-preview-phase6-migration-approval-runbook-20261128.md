@@ -494,3 +494,23 @@ SELECT
 - Cả ba API học viên/đọc điểm `PHASE6_STUDENT_TIMED_EXAM_ENABLED`, `PHASE6_RESULTS_READONLY_ENABLED`, `PHASE6_ADMIN_RESULTS_ENABLED` vẫn mặc định OFF/chưa được cấu hình theo Bước 155. **Đừng bật cả loạt** khi chưa có đề xuất bản.
 
 **Bước 207 (chỉ xem Settings):** Cloudflare Pages project `duongtrcnhiem-test` → **Settings → Preview → Variables and secrets**; kiểm tra sự tồn tại/giá trị **4 cờ** `PHASE6_ADMIN_DRAFTS_ENABLED`, `PHASE6_ADMIN_PUBLISH_ENABLED`, `VITE_PHASE6_ADMIN_DRAFTS_UI`, `VITE_PHASE6_ADMIN_PUBLISH_UI` và xác nhận selector đúng Preview. **Không Add/Edit/Delete/Save/Reveal**; chỉ báo tên+giá trị plain-text, che tất cả secrets. Sau đó cân nhắc phê duyệt mở từng cờ (trước tiên chỉ Admin drafts) và bảo đảm deployment Preview thực sự dùng build mới. Không bật student timed exam/results, không merge PR36/đụng Production.
+
+## Bước 207 — 4 biến Admin Phase6 không xuất hiện trong ảnh cấu hình Pages (operator screenshots 28/11/2026)
+
+Operator chụp ba ảnh liên tiếp trang `Workers & Pages → duongtrcnhiem-test → Settings → Variables and secrets`, từ biến đầu đến cuối trước phần `Bindings`. Không thấy bốn biến cần thiết:
+- `PHASE6_ADMIN_DRAFTS_ENABLED` (server API draft CRUD)
+- `PHASE6_ADMIN_PUBLISH_ENABLED` (server API publish)
+- `VITE_PHASE6_ADMIN_DRAFTS_UI` (Vite build-time UI draft)
+- `VITE_PHASE6_ADMIN_PUBLISH_UI` (Vite build-time UI publish)
+
+Trong ảnh vẫn có `VITE_PHASE6F_PWA_PREVIEW_UI=true`, `VITE_FIREBASE_ENV=staging`, các Phase4/5 flags và Firebase secrets. **Ảnh bị cắt khu vực header environment selector** nên cần chắc chắn selector đang ở **Preview** trước bất kỳ cấu hình ghi nào; không suy ra các biến tương tự có/không ở Production. Không được sao chép tên secret email/account vào log.
+
+**Kết luận:** `ADMIN_PHASE6_FOUR_FLAGS_PRESENT: NO (based on visible complete list)`. `PHASE6_API_READY: NO`. Không có cờ cho API tạo đề, API publish hoặc hai UI tương ứng trong danh sách đang được xem.
+
+**Kế hoạch bật từng bước, chờ operator thao tác:**
+1. Xác nhận **Preview environment selector**; chỉ thêm `PHASE6_ADMIN_DRAFTS_ENABLED` text `true` trước, không đụng các biến khác. Mở server API draft cho signed Google Admin ở pinned Preview host; UI vẫn tắt.
+2. Sau khi xác nhận đúng Preview và biến đã được lưu, thêm build-time `VITE_PHASE6_ADMIN_DRAFTS_UI=true`, sau đó triển khai lại đúng nhánh Preview `feature/staging-demo-quiz-pilot` để asset Vite mới đọc cờ; không redeploy Production. Kiểm tra deployment alias và auth signed Google Admin.
+3. Chỉ test `action:list` khi backend/Frontend thực sự có flag; bảng drafts đang trống nên dự kiến danh sách `[]`. Không tạo/publish đề khi chưa qua chốt.
+4. Publish server/UI flags `PHASE6_ADMIN_PUBLISH_ENABLED`, `VITE_PHASE6_ADMIN_PUBLISH_UI` giữ **OFF/chưa cấu hình**. Student timed/Student results/Admin results cũng OFF. Do chưa xác định đoạn ảnh có hiển thị chính xác Preview selector, **không bật biến trước khi kiểm tra**.
+
+Cloudflare Pages docs về build-time vars và preview deployments: https://developers.cloudflare.com/pages/configuration/build-configuration/ và https://developers.cloudflare.com/pages/configuration/preview-deployments/ . No direct Cloudflare changes made by assistant.

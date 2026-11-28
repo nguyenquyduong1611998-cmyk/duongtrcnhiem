@@ -80,3 +80,16 @@ Tình trạng hiện tại: **Gate A/B/C/D BLOCKED để chờ xác minh và ph�
 So với `duongtrcnhiem-auth-preview` từng quan sát có 8 bảng, restore-test có nhiều hơn 5 bảng. Chưa có bằng chứng các bảng tăng thêm là Phase 6; không phỏng đoán dựa vào tổng số bảng hay dung lượng, và không sao chép UUID database vào tài liệu.
 
 **Bước 159, chỉ đọc:** từ database restore-test mở `Explore Data`, chụp **danh sách tên bảng** ở menu bên trái mà không nhấp mở nội dung bảng. Cần kiểm tra tiếp DB có binding với Pages/Worker hay có dữ liệu tài khoản trước khi xem xét dùng lại. Không DELETE/RESTORE, không SQL và không di chuyển bản export dữ liệu sang remote.
+
+## Bước 159 — Danh sách bảng D1 restore-test (ảnh operator ngày 28/11/2026)
+
+Ảnh Cloudflare D1 Studio → Explore Data của `duongtrcnhiem-restore-test` hiển thị 14 tên trong sidebar: 13 bảng ứng dụng cộng 1 bảng SQLite nội bộ `sqlite_sequence`.
+
+**13 bảng ứng dụng quan sát được:**
+- Phase 4/DEMO: `demo_students`, `login_attempts`, `synthetic_graded_attempts` (3)
+- Phase 5: `phase5_content_answer_keys`, `phase5_content_attempts`, `phase5_content_questions`, `phase5_content_topics`, `phase5_content_versions` (5)
+- Phase 6: `phase6_admin_draft_events`, `phase6_admin_drafts`, `phase6_admin_publications`, `phase6_exam_sessions`, `phase6_exam_submissions` (5)
+
+Các nhóm tên bảng khớp dự thảo SQL Phase 6 trong repo và chỉ số Overview `Number of Tables: 13` (không tính `sqlite_sequence`). Đây là bằng chứng **schema table-name presence trên D1 remote**; không phải xác nhận đủ 12 trigger, đúng cấu trúc cột, tính toàn vẹn/foreign keys, bản ghi thực tế, quyền truy cập hay trạng thái bind vào ứng dụng.
+
+**Bước 160 đề nghị (metadata-only, đọc):** ở **đúng** database `duongtrcnhiem-restore-test`, dùng Console SQL với `SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'phase6_%' ORDER BY name;` để liệt kê trigger; không query dữ liệu bảng, không chạy DDL/DML, không gửi secrets/UID/token. Chưa dùng DB này để nộp bài/khôi phục đè; cần kiểm chứng không có binding và cho phép tái sử dụng trước mọi ghi từ xa.

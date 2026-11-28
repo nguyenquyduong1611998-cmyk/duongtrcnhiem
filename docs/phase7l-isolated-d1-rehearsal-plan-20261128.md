@@ -72,3 +72,11 @@ Tình trạng hiện tại: **Gate A/B/C/D BLOCKED để chờ xác minh và ph�
 **Phát hiện:** Đã tồn tại database `duongtrcnhiem-restore-test`, tên gợi ý từng dùng để restore/test nhưng **chưa có bằng chứng** về nội dung, người tạo, binding, mục đích, quyền truy cập hoặc khả năng tái sử dụng. Tuyệt đối không nhập dữ liệu mới/xóa/khôi phục đè lên DB này chỉ vì tên của nó.
 
 **Bước kế tiếp (chỉ đọc):** mở `duongtrcnhiem-restore-test` → Overview; xem Number of Tables / Storage used. Sau đó cần đối chiếu có binding ứng dụng hay không và có được phép tái sử dụng hay phải tạo lab mới với dữ liệu tổng hợp, sau khi được chủ DB chấp thuận. Giữ nguyên ba cờ API Phase 6 chưa cấu hình. Gate B–D NO-GO.
+
+## Bước 158 — Overview restore-test (ảnh operator ngày 28/11/2026)
+
+Ảnh Cloudflare D1 Overview của `duongtrcnhiem-restore-test` hiển thị: `Number of Tables: 13`, `Storage used (current): 197 KB`; các bộ đếm `Total queries`, `Rows read`, `Rows written` đều bằng 0 trong phạm vi `Last 24 hours`. Database rõ ràng có schema; không được coi các bộ đếm 24 giờ bằng 0 là bằng chứng database rỗng hoặc được phép tái sử dụng.
+
+So với `duongtrcnhiem-auth-preview` từng quan sát có 8 bảng, restore-test có nhiều hơn 5 bảng. Chưa có bằng chứng các bảng tăng thêm là Phase 6; không phỏng đoán dựa vào tổng số bảng hay dung lượng, và không sao chép UUID database vào tài liệu.
+
+**Bước 159, chỉ đọc:** từ database restore-test mở `Explore Data`, chụp **danh sách tên bảng** ở menu bên trái mà không nhấp mở nội dung bảng. Cần kiểm tra tiếp DB có binding với Pages/Worker hay có dữ liệu tài khoản trước khi xem xét dùng lại. Không DELETE/RESTORE, không SQL và không di chuyển bản export dữ liệu sang remote.

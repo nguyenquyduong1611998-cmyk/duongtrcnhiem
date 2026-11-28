@@ -593,3 +593,11 @@ Người vận hành xác nhận trực tiếp sau khi làm theo hướng dẫn 
 **Bước 217 read-only:** Cloudflare Pages `duongtrcnhiem-test` → **Deployments** → bản retry **Preview** commit `75f2d81` lúc **10:37 AM 28/11/2026** có alias `feature-staging-demo-quiz-pi.duongtrcnhiem-test.pages.dev` → **Details → Build log**. Kiểm tra lệnh Vite build chạy ở đúng Preview, log có cảnh báo env/build, có báo build success; chỉ chụp các dòng đầu/cuối và những lỗi/warnings liên quan build, **không** chụp/dán dòng chứa token, Firebase secrets, JWT, hoặc toàn bộ environment dump. Build log có thể **không** in riêng `VITE_PHASE6_ADMIN_DRAFTS_UI`; thiếu dòng tên flag trong log không chứng minh cờ vắng. Nếu build log bình thường, chẩn đoán tiếp asset bundle và kiểm tra `adminAccessAllowed` mà không kích hoạt POST/mutation.
 
 Giữ mọi flags publish/student/results OFF, không đụng D1/Production, PR36 Draft.
+
+## Bước 217 — Cloudflare Preview Build log stage statuses all green (operator screenshot, 28/11/2026)
+
+Operator gửi ảnh thẻ **Build log** từ Deployment details. Ảnh hiển thị bốn giai đoạn có dấu tích xanh: `initialize`, `clone repo`, `build`, `deploy`. Ảnh **chưa mở rộng** các phần để xem output `vite build`, branch/commit/asset hash, cảnh báo build, hay environment injection.
+
+**Gate `PREVIEW_BUILD_PIPELINE_STAGES: PASS (operator screenshot)`; `VITE_PHASE6_ADMIN_DRAFTS_UI_COMPILED: UNKNOWN`**. Không quy kết lỗi API/backend hay kết luận cache; cửa sổ ẩn danh cũng không hiện khung Admin 6B. Khả năng còn gồm build-time Vite flag không nhận, build artifact không lấy biến, hoặc Admin app-state guard.
+
+**Bước 218 read-only:** operator nhấp vào hàng **build** (mở accordion) trong Build log của Preview deploy commit `75f2d81`, alias pinned; chụp đoạn hiện lệnh build `vite build`, warnings và kết quả cuối. Không chụp/copy JWT, Firebase key, Cloudflare Access cookie, nội dung .env đầy đủ; không nhấn Retry, không thêm biến, không chạy migration. Build log thành công cũng chưa đủ để xác nhận Vite flag; nếu log không có thông tin biến, chuyển sang chẩn đoán artifact `assets` hoặc UI auth guard trước khi sửa hệ thống.

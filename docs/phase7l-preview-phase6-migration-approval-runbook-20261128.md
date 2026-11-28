@@ -1316,3 +1316,23 @@ LEFT JOIN phase6_exam_submissions sub ON sub.session_id=s.session_id
 WHERE p.revision=3;
 ```
 Expected for this one isolated student workflow: **sessions=1, submissions=1, valid_30min_sessions=1, perfect_submissions=1** (if additional DEMO accounts have also started revision3, counts may exceed one, so inspect separately, no mutation). Query is SELECT only; no usernames, Firebase UID, answers or tokens exposed. If errors, STOP rather than retry write. Then `PRAGMA quick_check;` expects `ok` and `PRAGMA foreign_key_check;` expects 0 rows, each separately, stage later. Keep Phase6E OFF, PR36/PR39 Draft, Production unchanged.
+
+## Bước 277 — D1 Preview read-only audit of Phase6D session and submission counts PASS (operator screenshot, 28/11/2026)
+
+Sau khi học viên DEMO đạt 10/10 trên đề rev3 và được readback sau F5 (Bước276), operator chạy đúng SELECT read-only tổng hợp từ `phase6_exam_sessions`, `phase6_admin_publications` và `phase6_exam_submissions` trên `duongtrcnhiem-auth-preview`. Screenshot Cloudflare D1 Explore Data hiển thị **đúng 1 hàng (4 cột)**:
+- `sessions=1`
+- `submissions=1`
+- `valid_30min_sessions=1`
+- `perfect_submissions=1`
+
+**Gate `PHASE6D_D1_SESSION_SUBMISSION_AUDIT: PASS (operator screenshot)`**. Một phiên DEMO revision3/1800s và một bản nộp perfect 1/1 (score_tenths=100) đã được lưu trên D1 Preview. Truy vấn tổng hợp tránh hiển thị UID/answers. Không suy diễn từ riêng truy vấn này rằng tất cả thử nghiệm timeout/anti-double-submit hay Phase6E đã pass; cần từng gate riêng.
+
+**Bước 278 — D1 post-submission integrity read-only:** trên đúng `duongtrcnhiem-auth-preview` → Explore Data → Query, chạy từng lệnh riêng:
+```sql
+PRAGMA quick_check;
+```
+Kỳ vọng đúng 1 dòng `ok`.
+```sql
+PRAGMA foreign_key_check;
+```
+Kỳ vọng **0 hàng lỗi**. Không sửa D1, không lặp nộp bài, không chạy migrations. Nếu cả hai PASS, có thể chuẩn bị phân tích Phase6E read-only result gates riêng trên Preview (chưa bật vội). PR36 và PR39 vẫn Draft, Production/main không đổi.

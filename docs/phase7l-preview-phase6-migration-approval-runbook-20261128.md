@@ -1263,3 +1263,16 @@ Operator thử reload trang trong Edge InPrivate rồi quay về `Mục Chuyên 
 **Gate `PHASE6D_STUDENT_SESSION_RECOVER_AFTER_RELOAD: PASS (operator screenshot)`**. Tài khoản học viên DEMO trên pinned Preview đã khôi phục phiên thi D1 đang hoạt động với đồng hồ tiếp tục giảm, không tạo lại phiên 30 phút. Chưa có bằng chứng đã submit/grade/Phase6E results.
 
 **Bước 274 (một lần ghi điểm DEMO có xác nhận, khi còn thời gian):** ở chính phiên DEMO revision 3, chọn **B. 4** cho `2 + 2 = ?`, tick `Xác nhận nộp bài DEMO, không thể chỉnh sửa sau khi máy chủ lưu điểm`, sau đó nhấn `Nộp bài lên máy chủ để chấm điểm` **duy nhất một lần**. Kỳ vọng UI báo **`Đã nộp: 10/10 điểm · 1/1 câu đúng`** cùng `Điểm đã được máy chủ xác nhận và lưu trên D1.` Không thể sửa/nộp lại cùng phiên bản sau khi D1 chấm; **không nhấn lần hai nếu mất phản hồi**, chỉ bấm `Đọc lại kết quả từ D1` để phân biệt commit thành công. Nếu hết hạn trước khi nộp, không cố khởi động lại hoặc sửa D1. Không sửa bản phát hành bất biến, không bật Phase6E/read-only result API, không thay đổi Production/main, PR36 và PR39 vẫn Draft.
+
+## Bước 274 — Phase6D synthetic exam submission and grading UI acknowledgement PASS (operator screenshot, 28/11/2026)
+
+Sau Bước273 session DEMO revision 3 restore thành công, operator đã chọn đáp án B.4 và nộp bài trong thời hạn. Screenshot cùng tài khoản học viên trên pinned Preview hiển thị:
+- `Toán học DEMO - Cơ bản · phiên bản 3`;
+- `Còn lại: 21:36` tại thời điểm chụp;
+- ô kết quả xanh **`Đã nộp: 10/10 điểm · 1/1 câu đúng.`**;
+- hai nút **`Đọc lại kết quả từ D1`**, **`Đồng bộ phiên thi`**; không còn form chọn đáp án/nộp;
+- notice xanh **`Điểm đã được máy chủ xác nhận và lưu trên D1.`**.
+
+**Gate `PHASE6D_STUDENT_SUBMIT_SCORE_UI_ACK: PASS (operator screenshot)`**, một lần nộp đáp án mẫu có điểm đủ 10/10 theo phản hồi API. Chưa kiểm tra độc lập qua một request mới sau submit hoặc F5, chưa chứng minh cấm nộp lần hai bằng kiểm thử phá hoại. Không cần/không nên nộp tiếp trên revision đã lưu.
+
+**Bước 275 read-only:** ngay trong panel vừa nộp, bấm `Đọc lại kết quả từ D1` **một lần**, chụp ô `Đã nộp: 10/10 điểm · 1/1 câu đúng` và notice `Đã đọc điểm đã lưu từ D1.`. Bước này `readPhase6ExamResult(user,chosen)` chỉ đọc server, không ghi điểm hay tạo session. Nếu không nhận được, STOP, không nộp lại. Sau khi pass có thể tiếp tục F5/re-open readback và integrity SQL, nhưng tách gate riêng. Không bật Phase6E result listing/Admin flags, không merge PR36/PR39, không chạm Production/main hoặc cấu hình Vite.

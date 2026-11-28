@@ -301,3 +301,22 @@ WHERE type IN ('table','trigger') AND name LIKE 'phase6_%'
 ORDER BY type,name;
 ```
 Mong đợi `2 tables` (`phase6_admin_drafts`, `phase6_admin_draft_events`) và `3 triggers` (`phase6_admin_draft_created`, `phase6_admin_draft_deleted`, `phase6_admin_draft_saved`). Sau đó xác minh 8 bảng cũ / row counts `5,0,3,1,1,1,1,2`, `PRAGMA quick_check=ok`, `PRAGMA foreign_key_check` 0. Nếu bất thường, **STOP**, không retry SQL hoặc chạy 6C. Giữ API Phase6 flags OFF, không gộp PR36, không sửa Pages Production hoặc D1 staging.
+
+## Bước 195 — Phase 6B schema postflight trực tiếp trên D1 Preview (ảnh operator, 28/11/2026)
+
+Người vận hành mở `duongtrcnhiem-auth-preview` → D1 Studio và chạy:
+```sql
+SELECT type, name FROM sqlite_master
+WHERE type IN ('table','trigger') AND name LIKE 'phase6_%'
+ORDER BY type, name;
+```
+Hai ảnh kết quả hiển thị `sqlite_master · 2×5`, đủ năm hàng:
+- `table: phase6_admin_draft_events`
+- `table: phase6_admin_drafts`
+- `trigger: phase6_admin_draft_created`
+- `trigger: phase6_admin_draft_deleted`
+- `trigger: phase6_admin_draft_saved`
+
+**Gate `PREVIEW_PHASE6B_SCHEMA_PRESENCE: PASS`**: tồn tại 2 bảng và 3 trigger đúng tên trên D1 Preview theo ngữ cảnh thao tác. Ảnh được cắt không hiện header tên DB; nguồn là trình tự Bước 194–195. Chưa kiểm chứng thiết kế trigger SQL exact hoặc hành vi API.
+
+**Gate `PREVIEW_PHASE6B_INTEGRITY_AND_BASELINE: PENDING`**: Bước 196 phải đọc số dòng của 8 bảng cũ `5,0,3,1,1,1,1,2`, `PRAGMA quick_check = ok` và `PRAGMA foreign_key_check` trả 0 hàng trên chính `duongtrcnhiem-auth-preview`. Nếu có thay đổi, dừng và kiểm tra trước khi chạy 6C; không tự rollback hoặc chạy lại 6B. Ba flag Phase 6 vẫn chưa được cấu hình; chưa thay đổi Production hoặc merge PR36.

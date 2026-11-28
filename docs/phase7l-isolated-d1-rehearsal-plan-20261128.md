@@ -213,3 +213,11 @@ Operator chạy một lệnh `SELECT` có 8 scalar subquery `COUNT(*)` (đọc, 
 **Bước kế tiếp:** trên máy cá nhân có Wrangler đã đăng nhập, tạo bản `d1 export` **mới** của **chính tên database** `duongtrcnhiem-auth-preview` tới file trong `%USERPROFILE%\Documents\D1-Backup\`, dùng tên khác file `preview-backup-20261127.sql`. Chỉ export đọc; không chạy `d1 execute`, không import, không bật `PHASE6_*`. Tài liệu Cloudflare chính thức: https://developers.cloudflare.com/d1/wrangler-commands/ và https://developers.cloudflare.com/d1/best-practices/import-export-data/. Cần kiểm tra file và phép restore độc lập trước bất kỳ quyết định migration.
 
 **Bảo mật:** bản SQL có thể chứa dữ liệu đăng nhập giả, salted hashes và nội dung nội bộ. Chỉ giữ tại máy có quyền truy cập, tránh đưa vào GitHub, chat, email hay kho công cộng; báo trạng thái/byte/hash nếu cần. Thao tác export trên Cloudflare có thể tạm chặn các request D1 khác, vì vậy cân nhắc thời điểm sử dụng khi không có người thi đang hoạt động.
+
+## Bước 167 — Xuất backup D1 Preview mới (operator screenshot, 28/11/2026)
+
+Người vận hành chạy `npx wrangler d1 export duongtrcnhiem-auth-preview --remote --output="%USERPROFILE%\Documents\D1-Backup\preview-backup-20261128-prephase6.sql"` tại CMD Windows. Ảnh cho thấy Wrangler thông báo tải file SQL mới về `Documents\D1-Backup\preview-backup-20261128-prephase6.sql` thành công.
+
+**Trạng thái:** `D1_PREVIEW_EXPORT_COMMAND_SUCCESS: PASS` theo output do người vận hành cung cấp. Bản ngày 27/11 vẫn là file riêng; chưa kiểm tra kích thước, SHA-256, SQL contents, schema/row counts thực tế trong bản 28/11 hoặc thực nghiệm restore. **Không** tải file SQL lên GitHub, chat hoặc CI vì có thể chứa account data/hash mật khẩu. Bản backup mới cũng chưa thay thế yêu cầu phê duyệt khôi phục remote hoặc migration.
+
+Bước tiếp theo an toàn: dùng `node -e` chỉ đọc `fs.statSync` và `crypto.createHash('sha256')` trên file mới tại chính máy người vận hành; không tiết lộ nội dung SQL. Sau đó có thể thử khôi phục trong `SQLite :memory:` riêng và đối chiếu row counts baseline 8 bảng `5,0,3,1,1,1,1,2` nếu được cho phép; không dùng `--remote` để restore.
